@@ -1,4 +1,4 @@
-# ADB Manager Pro
+# Xiaomi ADB Commander
 
 A comprehensive, modern desktop application for managing Android devices via ADB (Android Debug Bridge). Optimized for Xiaomi devices with specialized debloat and MIUI optimization features.
 
@@ -36,15 +36,15 @@ A comprehensive, modern desktop application for managing Android devices via ADB
 ## 🔧 Installation
 
 ### From Release (Recommended)
-1. Download latest release from [Releases](https://github.com/yourname/adb-manager/releases)
+1. Download latest release from [Releases](https://github.com/khoaiprovip123/ToolPC_ADB/releases)
 2. Extract ZIP file
 3. Run `ADBManager.exe`
 
 ### From Source
 ```bash
 # Clone repository
-git clone https://github.com/yourname/adb-manager.git
-cd adb-manager
+git clone https://github.com/khoaiprovip123/ToolPC_ADB.git
+cd ToolPC_ADB
 
 # Run setup script
 python scripts/setup_dev.py
@@ -123,9 +123,7 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 
 ## 📞 Support
 
-- Issues: [GitHub Issues](https://github.com/yourname/adb-manager/issues)
-- Discord: [Join Server](https://discord.gg/yourserver)
-- Email: your.email@example.com
+- Issues: [GitHub Issues](https://github.com/khoaiprovip123/ToolPC_ADB/issues)
 
 ## 🌟 Star History
 
