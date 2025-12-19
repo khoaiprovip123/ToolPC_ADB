@@ -23,7 +23,7 @@ InfoAfterFile=
 ; Output Configuration
 OutputDir=installer_output
 OutputBaseFilename=XiaomiADBCommander_Setup_v{#MyAppVersion}
-; SetupIconFile=scripts\icon.ico  ; Commented out - no icon file available
+SetupIconFile=resources\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

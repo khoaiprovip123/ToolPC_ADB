@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QComboBox, QStatusBar, QMessageBox, QGraphicsDropShadowEffect
 )
 from PySide6.QtCore import Qt, QSize, QTimer
-from PySide6.QtGui import QIcon, QColor, QFont
+from PySide6.QtGui import QIcon, QColor, QFont, QPixmap
 
 # Import Core
 from src.core.adb.adb_manager import ADBManager, DeviceStatus
@@ -62,11 +62,25 @@ class Sidebar(QFrame):
                 border: 1px solid rgba(255,255,255,0.2);
             }}
         """)
-        # Using Android Robot Emoji
-        logo_lbl = QLabel("🤖", logo_frame)
+        
+        # Use custom logo image instead of emoji
+        logo_lbl = QLabel(logo_frame)
         logo_lbl.setAlignment(Qt.AlignCenter)
-        logo_lbl.setStyleSheet("color: white; font-size: 26px; background: transparent;")
         logo_lbl.setGeometry(0, 0, 44, 44)
+        
+        # Load logo image
+        import os
+        logo_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'logo.png')
+        if os.path.exists(logo_path):
+            pixmap = QPixmap(logo_path)
+            # Scale to fit while maintaining aspect ratio
+            scaled_pixmap = pixmap.scaled(36, 36, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_lbl.setPixmap(scaled_pixmap)
+        else:
+            # Fallback to emoji if image not found
+            logo_lbl.setText("🤖")
+            logo_lbl.setStyleSheet("color: white; font-size: 26px; background: transparent;")
+        
         title_layout.addWidget(logo_frame)
         
         theme = ThemeManager.get_theme()
@@ -246,6 +260,13 @@ class MainWindow(QMainWindow):
         self.adb = adb_manager if adb_manager else ADBManager()
         
         self.setWindowTitle("Xiaomi ADB Commander")
+        
+        # Set window icon
+        import os
+        icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icon.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         self.resize(1300, 850)
         
         self.apply_theme()
