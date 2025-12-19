@@ -15,6 +15,7 @@ from PySide6.QtGui import QIcon, QColor, QFont
 
 # Import Core
 from src.core.adb.adb_manager import ADBManager, DeviceStatus
+from src.core.update_manager import UpdateChecker
 
 # Import Theme
 from src.ui.theme_manager import ThemeManager
@@ -28,6 +29,7 @@ from src.ui.widgets.unified_tools import DevToolsWidget, XiaomiSuiteWidget, Syst
 from src.ui.widgets.fastboot_toolbox import FastbootToolboxWidget
 from src.ui.widgets.settings import SettingsWidget
 from src.ui.widgets.notification_center import NotificationCenter
+from src.ui.dialogs.update_dialog import UpdateNotificationDialog, UpdateProgressDialog
 from src.core.plugin_manager import PluginManager
 
 
@@ -112,7 +114,8 @@ class Sidebar(QFrame):
         layout.addStretch()
         
         # Version
-        self.version_label = QLabel("v2.4.0 • HyperOS Style")
+        from src.version import __version__
+        self.version_label = QLabel(f"v{__version__} • HyperOS Style")
         self.version_label.setStyleSheet(f"""
             color: {theme['COLOR_TEXT_SECONDARY']}; 
             padding: 12px; 
@@ -255,6 +258,14 @@ class MainWindow(QMainWindow):
         self.setup_ui()
         self.setup_timers()
         self.refresh_devices()
+        
+        # Check for updates after startup (delayed)
+        from PySide6.QtCore import QSettings
+        self.settings = QSettings("VanKhoai", "XiaomiADBCommander")
+        auto_check = self.settings.value("auto_check_updates", True, type=bool)
+        if auto_check:
+            # Delay 3 seconds to let UI load first
+            QTimer.singleShot(3000, self.check_for_updates_startup)
     
     def apply_theme(self):
         """Apply main theme"""
@@ -579,3 +590,50 @@ class MainWindow(QMainWindow):
     def toggle_notification_center(self, tab_index=None):
         if hasattr(self, 'notif_center'):
             self.notif_center.toggle(tab_index)
+    
+    def check_for_updates_startup(self):
+        """Check for updates silently on startup"""
+        try:
+            include_prerelease = self.settings.value("include_prerelease", False, type=bool)
+            self.update_checker = UpdateChecker(include_prerelease)
+            self.update_checker.update_found.connect(self.on_startup_update_found)
+            # No handler for no_update - silent on startup
+            self.update_checker.error_occurred.connect(lambda err: None)  # Silent error on startup
+            self.update_checker.start()
+            
+            # Update last check time
+            from PySide6.QtCore import QDateTime
+            current_time = QDateTime.currentDateTime().toString(Qt.ISODate)
+            self.settings.setValue("last_update_check", current_time)
+        except:
+            pass  # Silent fail on startup
+    
+    def on_startup_update_found(self, update_info: dict):
+        """Handle update found on startup"""
+        try:
+            # Check if this version should be skipped
+            skip_version = self.settings.value("skip_version", "")
+            if skip_version == update_info['version']:
+                return  # Silently skip
+            
+            # Show update dialog
+            dialog = UpdateNotificationDialog(update_info, self)
+            result = dialog.exec()
+            
+            if dialog.user_choice == 'update':
+                # Start download
+                self.start_update_download(update_info)
+            elif dialog.user_choice == 'skip':
+                # Save skip version
+                self.settings.setValue("skip_version", update_info['version'])
+        except:
+            pass  # Fail silently on startup
+    
+    def start_update_download(self, update_info: dict):
+        """Start downloading update"""
+        try:
+            progress_dialog = UpdateProgressDialog(update_info, self)
+            progress_dialog.start_download()
+            progress_dialog.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Lỗi", f"Không thể tải cập nhật:\n{str(e)}")

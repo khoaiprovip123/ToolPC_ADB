@@ -25,6 +25,7 @@ A comprehensive, modern desktop application for managing Android devices via ADB
 - 📋 **Logcat Viewer**: Real-time log monitoring with filters
 - 💾 **OTA Downloader**: Download and flash MIUI ROMs
 - 🔌 **Plugin System**: Extend functionality with plugins
+- 🔄 **Auto-Update**: Automatic update checking and installation from GitHub releases
 
 ## 📋 Requirements
 
