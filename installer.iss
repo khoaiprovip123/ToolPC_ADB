@@ -1,8 +1,8 @@
-; Inno Setup Script for Xiaomi ADB Commander v2.4.0
+; Inno Setup Script for Xiaomi ADB Commander v2.5.0
 ; This script creates a Windows installer with installation path selection
 
 #define MyAppName "Xiaomi ADB Commander"
-#define MyAppVersion "2.4.0"
+#define MyAppVersion "2.5.0"
 #define MyAppPublisher "VanKhanh Dev"
 #define MyAppExeName "XiaomiADBCommander.exe"
 
