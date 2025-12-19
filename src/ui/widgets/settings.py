@@ -8,10 +8,13 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QComboBox, QLineEdit, QFormLayout, QFileDialog,
     QMessageBox, QScrollArea, QListWidget, QStackedWidget, QListWidgetItem,
-    QButtonGroup, QFrame
+    QButtonGroup, QFrame, QCheckBox
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QSettings, QDateTime
 from src.ui.theme_manager import ThemeManager
+from src.version import __version__, __app_name__
+from src.core.update_manager import UpdateChecker
+from src.ui.dialogs.update_dialog import UpdateNotificationDialog, UpdateProgressDialog
 
 class SettingsWidget(QWidget):
     """
@@ -21,6 +24,8 @@ class SettingsWidget(QWidget):
     def __init__(self, adb_manager):
         super().__init__()
         self.adb = adb_manager
+        self.settings = QSettings("VanKhoai", "XiaomiADBCommander")
+        self.update_checker = None
         self.setup_ui()
         
     def setup_ui(self):
@@ -59,7 +64,8 @@ class SettingsWidget(QWidget):
             ("Chung", 0),
             ("Cấu hình ADB", 1),
             ("Cloud Sync", 2),
-            ("Giới thiệu", 3)
+            ("Cập Nhật", 3),
+            ("Giới thiệu", 4)
         ]
         
         for text, index in tabs:
@@ -113,6 +119,10 @@ class SettingsWidget(QWidget):
         # Cloud Sync Page
         cloud_page = self.create_cloud_page()
         self.stack.addWidget(cloud_page)
+
+        # Update Page
+        update_page = self.create_update_page()
+        self.stack.addWidget(update_page)
 
         # About Page
         about_page = self.create_about_page()
@@ -236,6 +246,168 @@ class SettingsWidget(QWidget):
         content_layout.addWidget(group)
         content_layout.addStretch()
         return page
+
+    def create_update_page(self):
+        """Create the Update page"""
+        page = QWidget()
+        content_layout = QVBoxLayout(page)
+        
+        # Update Settings Group
+        update_group = QGroupBox("Kiểm Tra Cập Nhật")
+        update_group.setStyleSheet(self.get_group_style())
+        update_layout = QVBoxLayout(update_group)
+        
+        # Current version info
+        version_label = QLabel(f"Phiên bản hiện tại: <b>{__version__}</b>")
+        version_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 14px;")
+        update_layout.addWidget(version_label)
+        
+        # Check now button
+        check_btn = QPushButton("🔍 Kiểm tra cập nhật ngay")
+        check_btn.clicked.connect(self.manual_check_update)
+        check_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
+        update_layout.addWidget(check_btn)
+        
+        # Separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setStyleSheet(f"background-color: {ThemeManager.COLOR_BORDER}; margin: 10px 0;")
+        update_layout.addWidget(separator)
+        
+        # Auto-check settings
+        self.auto_check_checkbox = QCheckBox("Tự động kiểm tra khi khởi động")
+        auto_check = self.settings.value("auto_check_updates", True, type=bool)
+        self.auto_check_checkbox.setChecked(auto_check)
+        self.auto_check_checkbox.stateChanged.connect(self.toggle_auto_check)
+        self.auto_check_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px;")
+        update_layout.addWidget(self.auto_check_checkbox)
+        
+        self.prerelease_checkbox = QCheckBox("Bao gồm phiên bản beta (pre-release)")
+        include_prerelease = self.settings.value("include_prerelease", False, type=bool)
+        self.prerelease_checkbox.setChecked(include_prerelease)
+        self.prerelease_checkbox.stateChanged.connect(self.toggle_prerelease)
+        self.prerelease_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px;")
+        update_layout.addWidget(self.prerelease_checkbox)
+        
+        # Last check info
+        last_check = self.settings.value("last_update_check", None)
+        if last_check:
+            last_check_dt = QDateTime.fromString(last_check, Qt.ISODate)
+            last_check_str = last_check_dt.toString("dd/MM/yyyy HH:mm")
+        else:
+            last_check_str = "Chưa kiểm tra"
+        
+        self.last_check_label = QLabel(f"Lần kiểm tra cuối: {last_check_str}")
+        self.last_check_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 12px; margin-top: 10px;")
+        update_layout.addWidget(self.last_check_label)
+        
+        content_layout.addWidget(update_group)
+        
+        # Info box
+        info_group = QGroupBox("ℹ️ Thông Tin")
+        info_group.setStyleSheet(self.get_group_style())
+        info_layout = QVBoxLayout(info_group)
+        
+        info_text = QLabel(
+            "Hệ thống tự động kiểm tra phiên bản mới từ GitHub Releases.\n"
+            "Khi có bản cập nhật, bạn sẽ nhận được thông báo và có thể "
+            "tải xuống trực tiếp từ ứng dụng."
+        )
+        info_text.setWordWrap(True)
+        info_text.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 13px;")
+        info_layout.addWidget(info_text)
+        
+        content_layout.addWidget(info_group)
+        content_layout.addStretch()
+        
+        return page
+    
+    def manual_check_update(self):
+        """Manually check for updates"""
+        # Show loading state
+        if hasattr(self, 'last_check_label'):
+            self.last_check_label.setText("Đang kiểm tra...")
+        
+        # Check in background
+        include_prerelease = self.settings.value("include_prerelease", False, type=bool)
+        self.update_checker = UpdateChecker(include_prerelease)
+        self.update_checker.update_found.connect(self.on_update_found)
+        self.update_checker.no_update.connect(self.on_no_update)
+        self.update_checker.error_occurred.connect(self.on_update_error)
+        self.update_checker.start()
+        
+        # Update last check time
+        current_time = QDateTime.currentDateTime().toString(Qt.ISODate)
+        self.settings.setValue("last_update_check", current_time)
+    
+    def on_update_found(self, update_info: dict):
+        """Handle update found"""
+        # Update UI
+        if hasattr(self, 'last_check_label'):
+            current_time = QDateTime.currentDateTime().toString("dd/MM/yyyy HH:mm")
+            self.last_check_label.setText(f"Lần kiểm tra cuối: {current_time}")
+        
+        # Check if this version should be skipped
+        skip_version = self.settings.value("skip_version", "")
+        if skip_version == update_info['version']:
+            QMessageBox.information(
+                self,
+                "Cập Nhật",
+                f"Phiên bản {update_info['version']} có sẵn (bạn đã chọn bỏ qua).\n\n"
+                f"Bạn có thể kiểm tra lại để cập nhật."
+            )
+            return
+        
+        # Show update dialog
+        dialog = UpdateNotificationDialog(update_info, self)
+        result = dialog.exec()
+        
+        if dialog.user_choice == 'update':
+            # Start download
+            self.start_update_download(update_info)
+        elif dialog.user_choice == 'skip':
+            # Save skip version
+            self.settings.setValue("skip_version", update_info['version'])
+            QMessageBox.information(self, "Thông báo", f"Đã bỏ qua phiên bản {update_info['version']}.")
+    
+    def on_no_update(self):
+        """Handle no update available"""
+        if hasattr(self, 'last_check_label'):
+            current_time = QDateTime.currentDateTime().toString("dd/MM/yyyy HH:mm")
+            self.last_check_label.setText(f"Lần kiểm tra cuối: {current_time}")
+        
+        QMessageBox.information(
+            self,
+            "Cập Nhật",
+            f"Bạn đang sử dụng phiên bản mới nhất ({__version__})! 🎉"
+        )
+    
+    def on_update_error(self, error_msg: str):
+        """Handle update check error"""
+        if hasattr(self, 'last_check_label'):
+            current_time = QDateTime.currentDateTime().toString("dd/MM/yyyy HH:mm")
+            self.last_check_label.setText(f"Lần kiểm tra cuối: {current_time} (Lỗi)")
+        
+        QMessageBox.warning(
+            self,
+            "Lỗi Kiểm Tra Cập Nhật",
+            f"Không thể kiểm tra cập nhật:\n{error_msg}\n\n"
+            f"Vui lòng kiểm tra kết nối internet và thử lại."
+        )
+    
+    def start_update_download(self, update_info: dict):
+        """Start downloading update"""
+        progress_dialog = UpdateProgressDialog(update_info, self)
+        progress_dialog.start_download()
+        progress_dialog.exec()
+    
+    def toggle_auto_check(self, state):
+        """Toggle auto-check updates setting"""
+        self.settings.setValue("auto_check_updates", state == Qt.Checked)
+    
+    def toggle_prerelease(self, state):
+        """Toggle include pre-release setting"""
+        self.settings.setValue("include_prerelease", state == Qt.Checked)
 
     def create_about_page(self):
         """Create the detailed about page"""

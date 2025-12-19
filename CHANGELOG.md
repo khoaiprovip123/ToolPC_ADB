@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.4.1] - 2025-12-19
+### Added
+- **Auto-Update System**: Comprehensive automatic update functionality
+  - GitHub Releases API integration for version checking
+  - Automatic update check on startup (3-second delay)
+  - Manual update check from Settings tab
+  - Download progress tracking with speed and ETA
+  - One-click update installation
+  - Configurable settings: auto-check toggle, pre-release option, skip version
+  - Settings persistence with QSettings
+  - Silent background checking without blocking UI
+- **New Settings Tab**: "Cập Nhật" (Update) with full configuration options
+- **Version Management**: Centralized version constant in `src/version.py`
+- **Update Dialogs**: Beautiful notification and progress dialogs
+
+### Changed
+- Updated version display to use centralized `__version__` constant
+- Enhanced ThemeManager with `COLOR_BORDER` and `COLOR_BORDER_LIGHT` class variables
+
+### Technical
+- New modules: `update_manager.py`, `downloader.py`, `update_dialog.py`
+- QThread-based background update checking
+- Streaming file download with progress callbacks
+- Semantic version comparison (tuple-based)
+- GitHub API v3 integration
+
 ## [2.4.0] - 2025-12-19
 ### Added
 - **File Manager**: Complete overhaul (HyperOS Style), Storage Selector, File Ops (Copy/Cut/Paste), Image Preview.
