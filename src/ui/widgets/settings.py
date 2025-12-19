@@ -1,0 +1,403 @@
+# src/ui/widgets/settings.py
+"""
+Settings Widget - Application configuration
+"""
+
+import os
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QGroupBox, QComboBox, QLineEdit, QFormLayout, QFileDialog,
+    QMessageBox, QScrollArea, QListWidget, QStackedWidget, QListWidgetItem,
+    QButtonGroup, QFrame
+)
+from PySide6.QtCore import Qt, QSize
+from src.ui.theme_manager import ThemeManager
+
+class SettingsWidget(QWidget):
+    """
+    Application Settings Widget
+    """
+    
+    def __init__(self, adb_manager):
+        super().__init__()
+        self.adb = adb_manager
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Setup UI layout"""
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
+
+        # 1. Header & Tabs
+        header_frame = QFrame()
+        header_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {ThemeManager.COLOR_GLASS_WHITE};
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.6);
+            }}
+        """)
+        header_layout = QVBoxLayout(header_frame)
+        
+        # Title
+        title = QLabel("Cài Đặt & Cấu Hình")
+        title.setStyleSheet(f"font-size: 20px; font-weight: 800; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
+        header_layout.addWidget(title)
+        
+        # Tab Buttons Container
+        tabs_container = QFrame()
+        tabs_container.setStyleSheet("background-color: rgba(0,0,0,0.05); border-radius: 10px; padding: 4px;")
+        tabs_layout = QHBoxLayout(tabs_container)
+        tabs_layout.setContentsMargins(4, 4, 4, 4)
+        tabs_layout.setSpacing(8)
+        
+        self.btn_group = QButtonGroup(self)
+        self.btn_group.setExclusive(True)
+        
+        tabs = [
+            ("Chung", 0),
+            ("Cấu hình ADB", 1),
+            ("Cloud Sync", 2),
+            ("Giới thiệu", 3)
+        ]
+        
+        for text, index in tabs:
+            btn = QPushButton(text)
+            btn.setCheckable(True)
+            btn.setCursor(Qt.PointingHandCursor)
+            # Apply Segmented Button Style directly here or via class
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    color: {ThemeManager.COLOR_TEXT_SECONDARY};
+                    padding: 8px 20px;
+                    font-size: 14px;
+                }}
+                QPushButton:checked {{
+                    background-color: {ThemeManager.COLOR_ACCENT_TRANSPARENT};
+                    color: {ThemeManager.COLOR_ACCENT};
+                    font-weight: 800;
+                }}
+                QPushButton:hover {{
+                    background-color: rgba(0,0,0,0.05);
+                }}
+            """)
+            
+            self.btn_group.addButton(btn, index)
+            tabs_layout.addWidget(btn)
+            
+            if index == 0:
+                btn.setChecked(True)
+                
+        tabs_layout.addStretch()
+        header_layout.addWidget(tabs_container)
+        
+        main_layout.addWidget(header_frame)
+
+        # 2. Content Stack
+        self.stack = QStackedWidget()
+        main_layout.addWidget(self.stack)
+
+        # General Page
+        general_page = self.create_general_page()
+        self.stack.addWidget(general_page)
+
+        # ADB Page
+        adb_page = self.create_adb_page()
+        self.stack.addWidget(adb_page)
+
+        # Cloud Sync Page
+        cloud_page = self.create_cloud_page()
+        self.stack.addWidget(cloud_page)
+
+        # About Page
+        about_page = self.create_about_page()
+        self.stack.addWidget(about_page)
+        
+        # Connect Group
+        self.btn_group.idClicked.connect(self.stack.setCurrentIndex)
+
+    def create_general_page(self):
+        """Create the general settings page"""
+        page = QWidget()
+        content_layout = QVBoxLayout(page)
+        
+        # General Settings
+        general_group = QGroupBox("Chung")
+        general_group.setStyleSheet(self.get_group_style())
+        general_layout = QFormLayout(general_group)
+        
+        self.theme_combo = QComboBox()
+        # Load themes dynamically
+        themes = ThemeManager.get_available_themes()
+        for name, key in themes:
+            self.theme_combo.addItem(name, key)
+            
+        # Set current selection
+        current = ThemeManager._current_theme
+        index = self.theme_combo.findData(current)
+        if index >= 0:
+            self.theme_combo.setCurrentIndex(index)
+            
+        self.theme_combo.setStyleSheet(ThemeManager.get_input_style())
+        self.theme_combo.currentIndexChanged.connect(self.change_theme)
+        general_layout.addRow("Giao diện:", self.theme_combo)
+        
+        self.lang_combo = QComboBox()
+        self.lang_combo.addItems(["Tiếng Việt", "Tiếng Anh"])
+        self.lang_combo.setStyleSheet(ThemeManager.get_input_style())
+        general_layout.addRow("Ngôn ngữ:", self.lang_combo)
+        
+        content_layout.addWidget(general_group)
+        content_layout.addStretch()
+
+        return page
+
+    def create_adb_page(self):
+        """Create the ADB configuration page"""
+        page = QWidget()
+        content_layout = QVBoxLayout(page)
+
+        # ADB Settings
+        adb_group = QGroupBox("Cấu hình ADB")
+        adb_group.setStyleSheet(self.get_group_style())
+        adb_layout = QVBoxLayout(adb_group)
+        
+        adb_path_layout = QHBoxLayout()
+        self.adb_path_input = QLineEdit()
+        self.adb_path_input.setText(self.adb.adb_path)
+        self.adb_path_input.setPlaceholderText("Đường dẫn đến tập tin thực thi adb")
+        self.adb_path_input.setStyleSheet(ThemeManager.get_input_style())
+        adb_path_layout.addWidget(self.adb_path_input)
+        
+        browse_btn = QPushButton("Duyệt")
+        browse_btn.clicked.connect(self.browse_adb)
+        browse_btn.setStyleSheet(ThemeManager.get_button_style("outline"))
+        adb_path_layout.addWidget(browse_btn)
+        
+        adb_layout.addLayout(adb_path_layout)
+        
+        save_adb_btn = QPushButton("Lưu đường dẫn ADB")
+        save_adb_btn.clicked.connect(self.save_adb_path)
+        save_adb_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
+        adb_layout.addWidget(save_adb_btn)
+        
+        # Fix Connection Button
+        fix_btn = QPushButton("🛠️ Sửa lỗi kết nối USB (Fix Connection)")
+        fix_btn.clicked.connect(self.fix_connection)
+        fix_btn.setStyleSheet(ThemeManager.get_button_style("warning"))
+        adb_layout.addWidget(fix_btn)
+        
+        content_layout.addWidget(adb_group)
+        content_layout.addStretch()
+
+        return page
+
+    def create_cloud_page(self):
+        """Create Cloud Sync Configuration Page"""
+        page = QWidget()
+        content_layout = QVBoxLayout(page)
+        
+        group = QGroupBox("Cấu hình Đồng bộ Đám mây")
+        group.setStyleSheet(self.get_group_style())
+        layout = QVBoxLayout(group)
+        
+        desc = QLabel(
+            "Chọn thư mục đồng bộ trên máy tính (ví dụ: thư mục Google Drive, OneDrive, Dropbox).\n"
+            "Khi bạn chọn 'Backup', file sẽ được tự động lưu vào thư mục này để đồng bộ lên mây."
+        )
+        desc.setWordWrap(True)
+        desc.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; margin-bottom: 10px;")
+        layout.addWidget(desc)
+        
+        path_layout = QHBoxLayout()
+        self.cloud_path_input = QLineEdit()
+        # You might want to load this from QSettings
+        self.cloud_path_input.setPlaceholderText("Đường dẫn thư mục Cloud (Ví dụ: C:\\Users\\Name\\OneDrive)")
+        self.cloud_path_input.setStyleSheet(ThemeManager.get_input_style())
+        path_layout.addWidget(self.cloud_path_input)
+        
+        browse_btn = QPushButton("Chọn Thư mục")
+        browse_btn.clicked.connect(self.browse_cloud_folder)
+        browse_btn.setStyleSheet(ThemeManager.get_button_style("outline"))
+        path_layout.addWidget(browse_btn)
+        
+        layout.addLayout(path_layout)
+        
+        save_btn = QPushButton("Lưu Cấu hình Cloud")
+        # save_btn.clicked.connect(self.save_cloud_config) # Implement save later
+        save_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
+        layout.addWidget(save_btn)
+        
+        content_layout.addWidget(group)
+        content_layout.addStretch()
+        return page
+
+    def create_about_page(self):
+        """Create the detailed about page"""
+        page = QWidget()
+        content_layout = QVBoxLayout(page)
+        
+        # Scroll Area for long content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("border: none; background: transparent;")
+        
+        content_container = QWidget()
+        content_layout_inner = QVBoxLayout(content_container)
+        
+        # About Header
+        about_group = QGroupBox("Giới thiệu")
+        about_group.setStyleSheet(self.get_group_style())
+        about_layout = QVBoxLayout(about_group)
+        
+        about_text = QLabel(
+            "<h2>📱 Xiaomi ADB Commander</h2>"
+            "<p><b>Phiên bản:</b> 2.4.0 (Latest)</p>"
+            "<p><b>Tác giả:</b> Van Khoai</p>"
+            "<p>Công cụ quản lý thiết bị Android toàn diện, tối ưu hóa đặc biệt cho Xiaomi/MIUI/HyperOS.</p>"
+        )
+        about_text.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY};")
+        about_layout.addWidget(about_text)
+        content_layout_inner.addWidget(about_group)
+        
+        # New Features / Changelog Preview (v2.4.0)
+        changelog_group = QGroupBox("Cập nhật mới (v2.4.0)")
+        changelog_group.setStyleSheet(self.get_group_style())
+        changelog_layout = QVBoxLayout(changelog_group)
+        
+        changelog_html = """
+        <ul style="margin-top: 0px; margin-bottom: 0px; margin-left: -20px; color: #333;">
+            <li>✨ <b>Giao diện HyperOS:</b> Thiết kế lại File Manager và Fastboot Repair theo phong cách HyperOS hiện đại.</li>
+            <li>📱 <b>HyperOS Apps:</b> Tìm kiếm và tải ứng dụng hệ thống & GCam dễ dàng với tab riêng biệt.</li>
+            <li>⚡ <b>Fastboot Repair:</b> Nút Flash và Wipe được làm mới, trực quan hơn.</li>
+            <li>📂 <b>File Manager:</b> Hỗ trợ Preview ảnh trực tiếp, Copy/Cut/Paste nội bộ, và chọn bộ nhớ linh hoạt.</li>
+        </ul>
+        """
+        if ThemeManager.get_theme() == "dark":
+             changelog_html = changelog_html.replace("#333", "#eee")
+             
+        changelog_label = QLabel(changelog_html)
+        changelog_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY};")
+        changelog_layout.addWidget(changelog_label)
+        content_layout_inner.addWidget(changelog_group)
+        
+        # Features List
+        features_group = QGroupBox("Tính năng Chính")
+        features_group.setStyleSheet(self.get_group_style())
+        features_layout = QVBoxLayout(features_group)
+        
+        features_html = """
+        <ul style="margin-top: 0px; margin-bottom: 0px; margin-left: -20px; color: #333;">
+            <li><b>Dashboard:</b> Xem thông tin chi tiết thiết bị, tình trạng pin, bộ nhớ.</li>
+            <li><b>Quản lý Ứng dụng:</b> Cài đặt, gỡ bỏ, vô hiệu hóa ứng dụng hệ thống (Debloat).</li>
+            <li><b>File Manager:</b> Quản lý tệp tin, kéo thả, upload/download nhanh chóng.</li>
+            <li><b>Screen Mirror:</b> Phản chiếu màn hình điện thoại lên máy tính (Scrcpy tích hợp).</li>
+            <li><b>Xiaomi Tools:</b> Bỏ qua tài khoản Mi, tắt quảng cáo hệ thống (MSA), tối ưu MIUI.</li>
+            <li><b>Fastboot & Recovery:</b> Các công cụ nạp ROM, xóa dữ liệu, reboot nâng cao.</li>
+        </ul>
+        """
+        if ThemeManager.get_theme() == "dark":
+             features_html = features_html.replace("#333", "#eee")
+             
+        features_label = QLabel(features_html)
+        features_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY};")
+        features_layout.addWidget(features_label)
+        content_layout_inner.addWidget(features_group)
+        
+        # Roadmap / Dev Status
+        dev_group = QGroupBox("Lộ trình Phát triển (Roadmap)")
+        dev_group.setStyleSheet(self.get_group_style())
+        dev_layout = QVBoxLayout(dev_group)
+        
+        dev_html = """
+        <p><b>Đang phát triển (Upcoming):</b></p>
+        <ul style="margin-top: 0px; margin-left: -20px;">
+            <li>☁️ <b>Cloud Sync Global:</b> Đồng bộ trực tiếp Google Drive API (Không cần qua thư mục máy tính).</li>
+            <li>🐧 <b>Linux/Mac Support:</b> Hỗ trợ đa nền tảng tốt hơn.</li>
+            <li>⚡ <b>Flash ROM Auto:</b> Tự động tải và flash ROM Stock cho Xiaomi.</li>
+            <li>🔋 <b>Battery Cycle Reset:</b> (Cần Root) Reset số lần sạc pin.</li>
+        </ul>
+        <p><i>Mọi ý kiến đóng góp xin vui lòng liên hệ tác giả.</i></p>
+        """
+        dev_label = QLabel(dev_html)
+        dev_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY};")
+        dev_layout.addWidget(dev_label)
+        content_layout_inner.addWidget(dev_group)
+        
+        content_layout_inner.addStretch()
+        
+        scroll.setWidget(content_container)
+        content_layout.addWidget(scroll)
+
+        return page
+        
+    def get_group_style(self):
+        return f"""
+            QGroupBox {{
+                background-color: {ThemeManager.COLOR_GLASS_WHITE};
+                border: 1px solid rgba(0,0,0,0.1);
+                border-radius: {ThemeManager.RADIUS_BUTTON};
+                margin-top: 10px;
+                padding: 15px;
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+                font-weight: bold;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }}
+        """
+        
+    def browse_adb(self):
+        """Browse for ADB executable"""
+        path, _ = QFileDialog.getOpenFileName(self, "Chọn tập tin thực thi ADB", "", "Executables (*.exe);;All Files (*)")
+        if path:
+            self.adb_path_input.setText(path)
+            
+    def browse_cloud_folder(self):
+        """Browse for Cloud Sync folder"""
+        path = QFileDialog.getExistingDirectory(self, "Chọn thư mục đồng bộ Cloud")
+        if path:
+            self.cloud_path_input.setText(path)
+            
+    def save_adb_path(self):
+        """Save ADB path"""
+        path = self.adb_path_input.text().strip()
+        if os.path.exists(path):
+            self.adb.adb_path = path
+            QMessageBox.information(self, "Thành công", "Đã cập nhật đường dẫn ADB")
+        else:
+            QMessageBox.warning(self, "Lỗi", "Đường dẫn không hợp lệ")
+
+    def fix_connection(self):
+        """Run ADB Fix Connection"""
+        QMessageBox.information(self, "Thông báo", "Đang tiến hành sửa lỗi kết nối...\nVui lòng đợi trong giây lát.")
+        
+        # Run in background to avoid freezing UI? For now run directly as it's short
+        result = self.adb.fix_connection()
+        
+        QMessageBox.information(self, "Kết quả", result)
+
+    def change_theme(self, index):
+        """Handle theme change"""
+        theme_key = self.theme_combo.itemData(index)
+        if theme_key:
+            ThemeManager.set_theme(theme_key)
+            
+            # Try to update parent window
+            if self.window():
+                try:
+                    self.window().apply_theme()
+                    # Also refresh self to apply new styles to inputs/buttons
+                    self.setStyleSheet("") # Reset to force refresh if needed, but apply_theme usually on main window cascades
+                    
+                    # Notify user
+                    QMessageBox.information(self, "Đổi Giao Diện", f"Đã chuyển sang giao diện: {self.theme_combo.currentText()}.\nMột số thành phần có thể cần khởi động lại ứng dụng để hiển thị đúng hoàn toàn.")
+                except Exception as e:
+                    print(f"Error applying theme: {e}")

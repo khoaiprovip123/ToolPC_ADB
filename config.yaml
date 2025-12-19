@@ -1,0 +1,54 @@
+app:
+  name: "ADB Manager Pro"
+  version: "2.0.0"
+  theme: "dark"  # dark, light, xiaomi
+  language: "en"  # en, vi
+
+adb:
+  path: null  # Auto-detect if null
+  timeout: 30
+  retry: 3
+
+ui:
+  window:
+    width: 1400
+    height: 900
+    remember_position: true
+  
+  dashboard:
+    refresh_interval: 2  # seconds
+    chart_points: 60
+  
+  app_manager:
+    show_system: false
+    sort_by: "name"  # name, size, package
+  
+device:
+  auto_connect: true
+  remember_devices: true
+  wireless_port: 5555
+
+features:
+  screen_mirror:
+    bitrate: 8000000
+    max_size: 1920
+    framerate: 60
+  
+  backup:
+    directory: "./backups"
+    auto_organize: true
+  
+  scripts:
+    directory: "./scripts"
+    auto_load: true
+
+cloud:
+  enabled: false
+  provider: null  # gdrive, dropbox, onedrive
+  sync_interval: 3600  # seconds
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "./logs/adb_manager.log"
+  max_size: 10485760  # 10 MB
+  backup_count: 5
