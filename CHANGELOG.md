@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.5.0.5] - 2025-12-20
+### Added
+- **HyperOS 3 Optimization**: Added support for enabling "Stacked" task view (iOS style) on HyperOS 3.
+
 ## [2.4.1] - 2025-12-19
 ### Added
 - **Auto-Update System**: Comprehensive automatic update functionality
