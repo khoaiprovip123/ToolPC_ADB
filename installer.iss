@@ -2,7 +2,7 @@
 ; This script creates a Windows installer with installation path selection
 
 #define MyAppName "Xiaomi ADB Commander"
-#define MyAppVersion "2.5.0.3"
+#define MyAppVersion "2.5.0.4"
 #define MyAppPublisher "VanKhanh Dev"
 #define MyAppExeName "XiaomiADBCommander.exe"
 
