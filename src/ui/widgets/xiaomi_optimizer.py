@@ -272,6 +272,7 @@ class XiaomiOptimizerWidget(QWidget):
         """Setup UI layout"""
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
         # Scroll Area for main content
         scroll = QScrollArea()
@@ -327,9 +328,6 @@ class XiaomiOptimizerWidget(QWidget):
         
         scroll.setWidget(content)
         main_layout.addWidget(scroll)
-        
-        
-        self.check_device()
         
         self.check_device()
         
