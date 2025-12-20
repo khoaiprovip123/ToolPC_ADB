@@ -94,38 +94,50 @@ class UpdateManager(QObject):
             self.check_failed.emit(f"Lỗi kiểm tra cập nhật: {str(e)}")
             return None
     
-    def _parse_version(self, version_string: str) -> Optional[Tuple[int, int, int]]:
+    def _parse_version(self, version_string: str) -> Optional[Tuple]:
         """
-        Parse version string to tuple (major, minor, patch)
+        Parse version string to tuple (major, minor, patch, build)
         
         Examples:
-            "v2.5.0" -> (2, 5, 0)
-            "2.5.0" -> (2, 5, 0)
-            "v2.5.0-beta" -> (2, 5, 0)
+            "v2.5.0" -> (2, 5, 0, 0)
+            "2.5.0.1" -> (2, 5, 0, 1)
+            "v2.5.0-beta" -> (2, 5, 0, 0)
         """
         # Remove 'v' prefix and any suffix like '-beta'
         version_string = version_string.lower().strip()
         if version_string.startswith('v'):
             version_string = version_string[1:]
         
-        # Extract numbers
-        match = re.match(r'(\d+)\.(\d+)\.(\d+)', version_string)
+        # Extract numbers (support 3 or 4 parts)
+        match = re.match(r'(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?', version_string)
         if match:
-            return tuple(int(x) for x in match.groups())
+            parts = list(match.groups())
+            # Convert to ints, treating None as 0 for 4th part
+            version_tuple = tuple(int(x) if x else 0 for x in parts)
+            return version_tuple
         
         return None
     
-    def _is_newer_version(self, latest_version: Tuple[int, int, int]) -> bool:
+    def _is_newer_version(self, latest_version: Tuple) -> bool:
         """
         Compare if latest version is newer than current
         
         Args:
-            latest_version: Version tuple (major, minor, patch)
+            latest_version: Version tuple (major, minor, patch, build...)
             
         Returns:
             True if latest is newer, False otherwise
         """
-        return latest_version > self.current_version_tuple
+        # Ensure both tuples have same length for comparison
+        current = self.current_version_tuple
+        latest = latest_version
+        
+        # Pad shorter tuple with zeros
+        max_len = max(len(current), len(latest))
+        current_padded = current + (0,) * (max_len - len(current))
+        latest_padded = latest + (0,) * (max_len - len(latest))
+        
+        return latest_padded > current_padded
     
     def compare_versions(self, version1: str, version2: str) -> int:
         """
