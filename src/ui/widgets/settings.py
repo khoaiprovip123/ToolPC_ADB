@@ -567,9 +567,39 @@ class SettingsWidget(QWidget):
                 try:
                     self.window().apply_theme()
                     # Also refresh self to apply new styles to inputs/buttons
-                    self.setStyleSheet("") # Reset to force refresh if needed, but apply_theme usually on main window cascades
+                    self.setStyleSheet("")  # Reset to force refresh
                     
-                    # Notify user
-                    QMessageBox.information(self, "Đổi Giao Diện", f"Đã chuyển sang giao diện: {self.theme_combo.currentText()}.\nMột số thành phần có thể cần khởi động lại ứng dụng để hiển thị đúng hoàn toàn.")
+                    # Notify user with themed message box
+                    msg_box = QMessageBox(self)
+                    msg_box.setWindowTitle("Đổi Giao Diện")
+                    msg_box.setText(f"Đã chuyển sang giao diện: {self.theme_combo.currentText()}.")
+                    msg_box.setInformativeText("Một số thành phần có thể cần khởi động lại ứng dụng để hiển thị đúng hoàn toàn.")
+                    msg_box.setIcon(QMessageBox.Information)
+                    
+                    # Apply theme styling to message box
+                    theme = ThemeManager.get_theme()
+                    msg_box.setStyleSheet(f"""
+                        QMessageBox {{
+                            background-color: {theme['COLOR_GLASS_WHITE']};
+                            color: {theme['COLOR_TEXT_PRIMARY']};
+                        }}
+                        QMessageBox QLabel {{
+                            color: {theme['COLOR_TEXT_PRIMARY']};
+                            background: transparent;
+                        }}
+                        QPushButton {{
+                            background: {ThemeManager.COLOR_ACCENT};
+                            color: white;
+                            border: none;
+                            padding: 8px 20px;
+                            border-radius: 6px;
+                            font-weight: bold;
+                            min-width: 80px;
+                        }}
+                        QPushButton:hover {{
+                            opacity: 0.9;
+                        }}
+                    """)
+                    msg_box.exec()
                 except Exception as e:
                     print(f"Error applying theme: {e}")
