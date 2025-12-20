@@ -196,6 +196,18 @@ class OptimizationWorker(QThread):
                 result = self.adb.apply_smart_blur()
                 self.progress.emit(f"✅ {result}")
 
+            elif self.task_type == "stacked_recent":
+                self.progress.emit("📚 Đang kích hoạt giao diện Xếp chồng...")
+                # We access the optimization manager indirectly or just run raw command here as per current pattern
+                # Current pattern in worker seems to be direct adb calls or adb manager methods. 
+                # Let's check if optimization methods are in ADBManager or we should use OptimizationManager.
+                # The existing worker uses self.adb which is ADBManager.
+                # Since I added enable_hyperos_stacked_recent to OptimizationManager, I should ideally use that,
+                # BUT this worker takes 'adb' (ADBManager). 
+                # To be consistent with existing pattern in this file which calls adb methods directly:
+                self.adb.shell("settings put global task_stack_view_layout_style 2")
+                self.progress.emit("✅ Đã áp dụng (Yêu cầu HyperOS Launcher mới)")
+
 
                 
         except Exception as e:
@@ -434,6 +446,16 @@ class XiaomiOptimizerWidget(QWidget):
         )
         grid.addWidget(card_blur, 0, 1)
         
+        # Stacked Recent Card (HyperOS 3)
+        card_stack = ModernCard(
+            "HyperOS 3 Đa nhiệm Xếp chồng",
+            "Kích hoạt giao diện đa nhiệm kiểu Stack (iOS). Cần HyperOS Launcher mới nhất.",
+            "📚",
+            self.run_hyperos_stacked_recent,
+            gradient_colors=["#a18cd1", "#fbc2eb"]
+        )
+        grid.addWidget(card_stack, 1, 0)
+
         layout.addLayout(grid)
 
     def setup_language_section(self, layout):
@@ -637,6 +659,12 @@ class XiaomiOptimizerWidget(QWidget):
     def run_smart_blur(self):
         self.opt_worker = OptimizationWorker(self.adb, "smart_blur")
         self.opt_worker.progress.connect(lambda msg: LogManager.log("Smart Blur", msg, "info"))
+        self.opt_worker.error_occurred.connect(self.show_error)
+        self.opt_worker.start()
+
+    def run_hyperos_stacked_recent(self):
+        self.opt_worker = OptimizationWorker(self.adb, "stacked_recent")
+        self.opt_worker.progress.connect(lambda msg: LogManager.log("Stacked Recent", msg, "info"))
         self.opt_worker.error_occurred.connect(self.show_error)
         self.opt_worker.start()
 
