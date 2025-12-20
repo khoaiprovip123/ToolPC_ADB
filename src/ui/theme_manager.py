@@ -117,6 +117,102 @@ class ThemeManager:
         "COLOR_BORDER_LIGHT": "rgba(55, 71, 79, 0.05)",
     }
     
+    # Ocean Blue Theme 🌊
+    OCEAN_BLUE = {
+        "COLOR_BG_GRADIENT": "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #e3f2fd, stop:1 #bbdefb)",
+        "COLOR_BG_MAIN": "#e1f5fe",
+        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.75)",
+        "COLOR_GLASS_HOVER": "rgba(33, 150, 243, 0.1)",
+        "COLOR_GLASS_CARD": "rgba(255, 255, 255, 0.95)",
+        "COLOR_TEXT_PRIMARY": "#01579b",
+        "COLOR_TEXT_SECONDARY": "#0277bd",
+        "COLOR_DATA": "#004d7a",
+        "COLOR_BG_SECONDARY": "rgba(3, 169, 244, 0.1)",
+        "COLOR_SHADOW": "rgba(0, 119, 190, 0.15)",
+        "COLOR_BORDER": "rgba(33, 150, 243, 0.3)",
+        "COLOR_BORDER_LIGHT": "rgba(33, 150, 243, 0.1)",
+    }
+
+    # Sunset Purple Theme 🌅
+    SUNSET_PURPLE = {
+        "COLOR_BG_GRADIENT": "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #f3e5f5, stop:1 #e1bee7)",
+        "COLOR_BG_MAIN": "#f3e5f5",
+        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.7)",
+        "COLOR_GLASS_HOVER": "rgba(156, 39, 176, 0.1)",
+        "COLOR_GLASS_CARD": "rgba(255, 255, 255, 0.92)",
+        "COLOR_TEXT_PRIMARY": "#4a148c",
+        "COLOR_TEXT_SECONDARY": "#7b1fa2",
+        "COLOR_DATA": "#38006b",
+        "COLOR_BG_SECONDARY": "rgba(142, 68, 173, 0.12)",
+        "COLOR_SHADOW": "rgba(106, 17, 203, 0.12)",
+        "COLOR_BORDER": "rgba(156, 39, 176, 0.25)",
+        "COLOR_BORDER_LIGHT": "rgba(156, 39, 176, 0.1)",
+    }
+
+    # Forest Green Theme 🌲
+    FOREST_GREEN = {
+        "COLOR_BG_GRADIENT": "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #e8f5e9, stop:1 #c8e6c9)",
+        "COLOR_BG_MAIN": "#e8f5e9",
+        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.72)",
+        "COLOR_GLASS_HOVER": "rgba(76, 175, 80, 0.1)",
+        "COLOR_GLASS_CARD": "rgba(255, 255, 255, 0.94)",
+        "COLOR_TEXT_PRIMARY": "#1b5e20",
+        "COLOR_TEXT_SECONDARY": "#2e7d32",
+        "COLOR_DATA": "#0d3d13",
+        "COLOR_BG_SECONDARY": "rgba(46, 125, 50, 0.1)",
+        "COLOR_SHADOW": "rgba(39, 174, 96, 0.12)",
+        "COLOR_BORDER": "rgba(76, 175, 80, 0.3)",
+        "COLOR_BORDER_LIGHT": "rgba(76, 175, 80, 0.1)",
+    }
+
+    # Rose Gold Theme 💎
+    ROSE_GOLD = {
+        "COLOR_BG_GRADIENT": "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #fce4ec, stop:1 #f8bbd0)",
+        "COLOR_BG_MAIN": "#fff0f3",
+        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.78)",
+        "COLOR_GLASS_HOVER": "rgba(233, 163, 173, 0.15)",
+        "COLOR_GLASS_CARD": "rgba(255, 255, 255, 0.96)",
+        "COLOR_TEXT_PRIMARY": "#880e4f",
+        "COLOR_TEXT_SECONDARY": "#b76e79",
+        "COLOR_DATA": "#6d0036",
+        "COLOR_BG_SECONDARY": "rgba(232, 163, 157, 0.15)",
+        "COLOR_SHADOW": "rgba(183, 110, 121, 0.18)",
+        "COLOR_BORDER": "rgba(233, 163, 173, 0.35)",
+        "COLOR_BORDER_LIGHT": "rgba(233, 163, 173, 0.12)",
+    }
+
+    # Nord Theme ❄️
+    NORD = {
+        "COLOR_BG_GRADIENT": "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #2e3440, stop:1 #3b4252)",
+        "COLOR_BG_MAIN": "#2e3440",
+        "COLOR_GLASS_WHITE": "rgba(59, 66, 82, 0.75)",
+        "COLOR_GLASS_HOVER": "rgba(76, 86, 106, 0.85)",
+        "COLOR_GLASS_CARD": "rgba(46, 52, 64, 0.92)",
+        "COLOR_TEXT_PRIMARY": "#eceff4",
+        "COLOR_TEXT_SECONDARY": "#88c0d0",
+        "COLOR_DATA": "#d8dee9",
+        "COLOR_BG_SECONDARY": "rgba(136, 192, 208, 0.12)",
+        "COLOR_SHADOW": "rgba(0, 0, 0, 0.25)",
+        "COLOR_BORDER": "rgba(136, 192, 208, 0.3)",
+        "COLOR_BORDER_LIGHT": "rgba(136, 192, 208, 0.15)",
+    }
+
+    # Material You Theme 🎨
+    MATERIAL_YOU = {
+        "COLOR_BG_GRADIENT": "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #fafafa, stop:1 #f5f5f5)",
+        "COLOR_BG_MAIN": "#ffffff",
+        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.88)",
+        "COLOR_GLASS_HOVER": "rgba(0, 137, 123, 0.08)",
+        "COLOR_GLASS_CARD": "rgba(255, 255, 255, 0.97)",
+        "COLOR_TEXT_PRIMARY": "#1a1a1a",
+        "COLOR_TEXT_SECONDARY": "#00897b",
+        "COLOR_DATA": "#000000",
+        "COLOR_BG_SECONDARY": "rgba(0, 137, 123, 0.08)",
+        "COLOR_SHADOW": "rgba(0, 0, 0, 0.12)",
+        "COLOR_BORDER": "rgba(0, 137, 123, 0.22)",
+        "COLOR_BORDER_LIGHT": "rgba(0, 0, 0, 0.08)",
+    }
+    
     # ==================== IOS ACCENT COLORS ====================
     COLOR_ACCENT = "#007AFF"        # System Blue
     COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #007AFF, stop:1 #0A84FF)"
@@ -151,6 +247,12 @@ class ThemeManager:
         if cls._current_theme == "cyberpunk": return cls.CYBERPUNK
         if cls._current_theme == "hyperos": return cls.HYPEROS
         if cls._current_theme == "minimal": return cls.MINIMAL
+        if cls._current_theme == "ocean": return cls.OCEAN_BLUE
+        if cls._current_theme == "sunset": return cls.SUNSET_PURPLE
+        if cls._current_theme == "forest": return cls.FOREST_GREEN
+        if cls._current_theme == "rose": return cls.ROSE_GOLD
+        if cls._current_theme == "nord": return cls.NORD
+        if cls._current_theme == "material": return cls.MATERIAL_YOU
         return cls.LIGHT
 
     @classmethod
@@ -161,27 +263,54 @@ class ThemeManager:
             ("Tối (Dark)", "dark"),
             ("Cyberpunk (Neon)", "cyberpunk"),
             ("HyperOS (Orange)", "hyperos"),
-            ("Minimal (Slate)", "minimal")
+            ("Minimal (Slate)", "minimal"),
+            ("Ocean Blue 🌊", "ocean"),
+            ("Sunset Purple 🌅", "sunset"),
+            ("Forest Green 🌲", "forest"),
+            ("Rose Gold 💎", "rose"),
+            ("Nord ❄️", "nord"),
+            ("Material You 🎨", "material"),
         ]
     
     @classmethod
     def set_theme(cls, theme_name):
         """Set current theme"""
-        if theme_name in ["light", "dark", "cyberpunk", "hyperos", "minimal"]:
+        valid_themes = ["light", "dark", "cyberpunk", "hyperos", "minimal", 
+                       "ocean", "sunset", "forest", "rose", "nord", "material"]
+        
+        if theme_name in valid_themes:
             cls._current_theme = theme_name
             
-            # Update Accent for Cyberpunk dynamically
+            # Update Accent colors dynamically per theme
             if theme_name == "cyberpunk":
                 cls.COLOR_ACCENT = "#00f2fe"
                 cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00f2fe, stop:1 #4facfe)"
             elif theme_name == "hyperos":
-                cls.COLOR_ACCENT = "#ff6700" # Xiaomi Orange
+                cls.COLOR_ACCENT = "#ff6700"  # Xiaomi Orange
                 cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #ff6700, stop:1 #ff8f00)"
             elif theme_name == "minimal":
                 cls.COLOR_ACCENT = "#37474f"
                 cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #37474f, stop:1 #546e7a)"
+            elif theme_name == "ocean":
+                cls.COLOR_ACCENT = "#0277bd"
+                cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #0277bd, stop:1 #03a9f4)"
+            elif theme_name == "sunset":
+                cls.COLOR_ACCENT = "#7b1fa2"
+                cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #7b1fa2, stop:1 #9c27b0)"
+            elif theme_name == "forest":
+                cls.COLOR_ACCENT = "#2e7d32"
+                cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #2e7d32, stop:1 #4caf50)"
+            elif theme_name == "rose":
+                cls.COLOR_ACCENT = "#b76e79"
+                cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #b76e79, stop:1 #e8a39d)"
+            elif theme_name == "nord":
+                cls.COLOR_ACCENT = "#88c0d0"
+                cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #88c0d0, stop:1 #81a1c1)"
+            elif theme_name == "material":
+                cls.COLOR_ACCENT = "#00897b"
+                cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00897b, stop:1 #00acc1)"
             else:
-                # Reset to Blue
+                # Default: iOS Blue
                 cls.COLOR_ACCENT = "#007AFF"
                 cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #007AFF, stop:1 #0A84FF)"
         else:
