@@ -53,20 +53,20 @@ class ThemeManager:
         "COLOR_BORDER_LIGHT": "rgba(60, 60, 67, 0.05)",
     }
     
-    # Dark Mode
+    # Dark Mode (Improved)
     DARK = {
-        "COLOR_BG_GRADIENT": "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #000000, stop:1 #1C1C1E)",
-        "COLOR_BG_MAIN": "#000000",
-        "COLOR_GLASS_WHITE": "rgba(30, 30, 30, 0.70)",
-        "COLOR_GLASS_HOVER": "rgba(44, 44, 46, 0.85)",
-        "COLOR_GLASS_CARD": "rgba(28, 28, 30, 0.95)",
-        "COLOR_TEXT_PRIMARY": "#FFFFFF",
-        "COLOR_TEXT_SECONDARY": "#98989E",
-        "COLOR_DATA": "#FFFFFF",
-        "COLOR_BG_SECONDARY": "rgba(118, 118, 128, 0.24)",
-        "COLOR_SHADOW": "rgba(0, 0, 0, 0.3)",
-        "COLOR_BORDER": "rgba(84, 84, 88, 0.50)",
-        "COLOR_BORDER_LIGHT": "rgba(84, 84, 88, 0.25)",
+        "COLOR_BG_GRADIENT": "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #1a1a1a, stop:1 #2d2d2d)",
+        "COLOR_BG_MAIN": "#1a1a1a",
+        "COLOR_GLASS_WHITE": "rgba(45, 45, 45, 0.85)",
+        "COLOR_GLASS_HOVER": "rgba(60, 60, 60, 0.90)",
+        "COLOR_GLASS_CARD": "rgba(35, 35, 35, 0.95)",
+        "COLOR_TEXT_PRIMARY": "#e8e8e8",
+        "COLOR_TEXT_SECONDARY": "#a8a8a8",
+        "COLOR_DATA": "#f0f0f0",
+        "COLOR_BG_SECONDARY": "rgba(80, 80, 80, 0.20)",
+        "COLOR_SHADOW": "rgba(0, 0, 0, 0.4)",
+        "COLOR_BORDER": "rgba(100, 100, 100, 0.3)",
+        "COLOR_BORDER_LIGHT": "rgba(100, 100, 100, 0.15)",
     }
 
     # Cyberpunk Theme (Neon)
