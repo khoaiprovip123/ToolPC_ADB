@@ -306,7 +306,7 @@ class GeneralTweaksWidget(QWidget):
         
     def add_input_toggle(self, grid_layout, row, col, key, text, placeholder, icon_char=""):
         container = QFrame()
-        container.setStyleSheet("background: rgba(0,0,0,0.02); border-radius: 8px;")
+        container.setStyleSheet("background: transparent; border: none;")
         l = QHBoxLayout(container)
         l.setContentsMargins(10, 8, 10, 8)
         
@@ -314,17 +314,20 @@ class GeneralTweaksWidget(QWidget):
         v = QVBoxLayout()
         v.setSpacing(5)
         lbl = QLabel(f"{icon_char} {text}")
-        lbl.setStyleSheet("font-weight: 500;")
+        lbl.setStyleSheet(f"font-weight: 500; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
         
         inp = QLineEdit()
         inp.setPlaceholderText(placeholder)
         inp.setText(placeholder)
-        inp.setStyleSheet("""
-            QLineEdit {
-                background: white; border: 1px solid rgba(0,0,0,0.1); 
-                border-radius: 6px; padding: 4px 8px;
-            }
-            QLineEdit:focus { border: 1px solid #007bff; }
+        inp.setStyleSheet(f"""
+            QLineEdit {{
+                background: {ThemeManager.COLOR_GLASS_CARD}; 
+                border: 1px solid {ThemeManager.COLOR_BORDER}; 
+                border-radius: 6px; 
+                padding: 4px 8px;
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+            }}
+            QLineEdit:focus {{ border: 1px solid {ThemeManager.COLOR_ACCENT}; }}
         """)
         self.inputs[key] = inp
         
@@ -345,23 +348,27 @@ class GeneralTweaksWidget(QWidget):
     def add_input_toggle_v(self, layout, key, text, placeholder, icon_char=""):
         # Vertical version for non-grid layouts
         container = QFrame()
-        container.setStyleSheet("background: rgba(0,0,0,0.02); border-radius: 8px;")
+        container.setStyleSheet("background: transparent; border: none;")
         l = QHBoxLayout(container)
         l.setContentsMargins(10, 8, 10, 8)
         
         v = QVBoxLayout()
         v.setSpacing(5)
         lbl = QLabel(f"{icon_char} {text}")
-        lbl.setStyleSheet("font-weight: 500;")
+        lbl.setStyleSheet(f"font-weight: 500; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
         
         inp = QLineEdit()
         inp.setPlaceholderText(placeholder)
         inp.setText(placeholder)
-        inp.setStyleSheet("""
-            QLineEdit {
-                background: white; border: 1px solid rgba(0,0,0,0.1); 
-                border-radius: 6px; padding: 4px 8px;
-            }
+        inp.setStyleSheet(f"""
+            QLineEdit {{
+                background: {ThemeManager.COLOR_GLASS_CARD}; 
+                border: 1px solid {ThemeManager.COLOR_BORDER}; 
+                border-radius: 6px; 
+                padding: 4px 8px;
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+            }}
+            QLineEdit:focus {{ border: 1px solid {ThemeManager.COLOR_ACCENT}; }}
         """)
         self.inputs[key] = inp
         
