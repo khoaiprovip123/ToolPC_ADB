@@ -343,6 +343,9 @@ class ThemeManager:
                 font-family: {cls.FONT_FAMILY};
                 color: {theme['COLOR_TEXT_PRIMARY']};
             }}
+            QLabel {{
+                color: {theme['COLOR_TEXT_PRIMARY']};
+            }}
             QScrollBar:vertical {{
                 border: none;
                 background: rgba(0,0,0,0.05);
