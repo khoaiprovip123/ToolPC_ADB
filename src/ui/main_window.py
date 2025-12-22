@@ -267,7 +267,7 @@ class MainWindow(QMainWindow):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         
-        self.resize(1300, 850)
+        self.resize(1450, 850)
         
         self.apply_theme()
         

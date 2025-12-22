@@ -602,11 +602,12 @@ class ADBManager:
         """Get current language and region settings"""
         props = self._get_device_properties()
         return {
-            "Region (sys.country)": props.get("persist.sys.country", "Unknown"),
-            "Locale (product.locale)": props.get("ro.product.locale", "Unknown"),
+            "Active Locale (persist.sys.locale)": props.get("persist.sys.locale", "Not Set"),
+            "Factory Locale (ro.product.locale)": props.get("ro.product.locale", "Unknown"),
+            "Region (persist.sys.country)": props.get("persist.sys.country", "Unknown"),
+            "MIUI Region (ro.miui.region)": props.get("ro.miui.region", "Unknown"),
             "Time Format (system)": self.shell("settings get system time_12_24").strip(),
             "Timezone (persist.sys.timezone)": props.get("persist.sys.timezone", "Unknown"),
-            "MIUI Region": props.get("ro.miui.region", "Unknown"),
         }
     
     def disconnect_wireless(self, ip: str, port: int = 5555) -> bool:
@@ -1365,6 +1366,172 @@ class ADBManager:
         val = "1" if enable else "0"
         self.shell(f"settings put system show_touches {val}", check=False)
 
+    def toggle_layout_bounds(self, enable: bool):
+        """Toggle 'Show Layout Bounds'"""
+        val = "true" if enable else "false"
+        self.shell(f"setprop debug.layout {val}", check=False)
+        # Force refresh (poke service)
+    def set_language_vietnamese(self) -> str:
+        """
+        Force set system language to Vietnamese via ADB properties.
+        Requires reboot to take effect.
+        """
+        try:
+            # Set properties
+            self.shell("setprop persist.sys.language vi")
+            self.shell("setprop persist.sys.country VN")
+            self.shell("setprop persist.sys.locale vi-VN")
+            
+            # Additional for some Xiaomi ROMs
+            # self.shell("setprop ro.product.locale vi-VN") # Usually RO
+            self.shell("setprop persist.sys.timezone Asia/Ho_Chi_Minh")
+            
+            return "Đã gửi lệnh. Vui lòng KHỞI ĐỘNG LẠI máy để áp dụng."
+        except Exception as e:
+            return f"Lỗi: {e}"
+
+    def skip_setup_wizard(self) -> str:
+        """
+        Skip Android Setup Wizard (Bypass FRP/Account Login after reset).
+        """
+        try:
+            # 1. Mark setup as complete
+            self.shell("settings put secure user_setup_complete 1")
+            self.shell("settings put global device_provisioned 1")
+            
+            # 2. Try to disable setup wizard packages (Google & Xiaomi)
+            # This prevents it from popping up again
+            self.shell("pm disable-user --user 0 com.google.android.setupwizard")
+            self.shell("pm disable-user --user 0 com.android.provision")
+            self.shell("pm disable-user --user 0 com.miui.provision")
+            
+            # 3. Force go to Home Screen
+            self.shell("am start -c android.intent.category.HOME -a android.intent.action.MAIN")
+            
+            return "✅ Đã bỏ qua Setup Wizard! (Nếu chưa vào được màn hình chính, hãy khởi động lại)"
+        except Exception as e:
+            return f"❌ Lỗi: {e}"
+
+    def disable_miui_ota(self) -> str:
+        """Disable MIUI System Updater"""
+        try:
+            pkgs = ["com.android.updater", "com.miui.updater", "com.miui.android.qt"]
+            count = 0
+            for p in pkgs:
+                 if self.disable_package(p): count += 1
+            return f"✅ Đã chặn cập nhật hệ thống ({count} packages disabled)"
+        except Exception as e:
+            return f"❌ Lỗi: {e}"
+
+    def set_refresh_rate(self, hz_value: int) -> str:
+        """Force specific Refresh Rate (Hz) or Reset"""
+        try:
+            if hz_value > 0:
+                self.shell(f"settings put system user_refresh_rate {hz_value}")
+                self.shell(f"settings put system peak_refresh_rate {hz_value}")
+                self.shell(f"settings put system min_refresh_rate {hz_value}")
+                return f"✅ Đã ép xung màn hình {hz_value}Hz"
+            else:
+                # Reset to auto/default
+                self.shell("settings put system user_refresh_rate 0") 
+                self.shell("settings delete system peak_refresh_rate")
+                self.shell("settings delete system min_refresh_rate")
+                return "✅ Đã đặt lại tần số quét (Auto)"
+        except Exception as e:
+            return f"❌ Lỗi: {e}"
+
+    def force_dark_mode(self, enable: bool) -> str:
+        """Force System-wide Dark Mode"""
+        try:
+            # 1. Standard Settings
+            val = "2" if enable else "1" # 2: Yes, 1: No
+            self.shell(f"settings put secure ui_night_mode {val}")
+            
+            # 2. Command Line Interface (More effective on A10+)
+            mode = "yes" if enable else "no"
+            self.shell(f"cmd uimode night {mode}")
+            
+            # 3. Developer Option Force Dark
+            self.shell("setprop debug.hwui.force_dark true" if enable else "setprop debug.hwui.force_dark false")
+            
+            return "✅ Đã gửi lệnh Dark Mode. (Có thể cần khởi động lại ứng dụng hoặc máy để áp dụng)"
+        except Exception as e:
+            return f"❌ Lỗi: {e}"
+
+    def hide_navigation_bar(self, hide: bool) -> str:
+        """Hide/Show Navigation Bar (Switch to Gestures)"""
+        try:
+            if hide:
+                # 1. Enable Full Screen Gestures (Xiaomi Legacy)
+                self.shell("settings put global force_fsg_nav_bar 1")
+                
+                # 2. Standard Android Gestures
+                self.shell("settings put secure navigation_mode 2")
+                
+                # 3. Hide Gesture Line/Indicator (HyperOS/MIUI)
+                self.shell("settings put global hide_gesture_line 1")
+                self.shell("settings put system hide_gesture_line 1") # Try system table too
+                
+                return "✅ Đã ẩn thanh điều hướng & Vạch kẻ (Full Screen)"
+            else:
+                # Show 3-Buttons
+                self.shell("settings put global force_fsg_nav_bar 0")
+                self.shell("settings put secure navigation_mode 0")
+                self.shell("settings put global hide_gesture_line 0")
+                return "✅ Đã hiện lại 3 phím điều hướng"
+        except Exception as e:
+            return f"❌ Lỗi: {e}"
+
+    def show_refresh_rate_overlay(self, show: bool) -> str:
+        """Show/Hide Refresh Rate FPS overlay"""
+        try:
+            val = "1" if show else "0"
+            
+            # 1. Developer Options Setting
+            # Ensure Dev Options is "seen" as enabled for this to take effect
+            self.shell("settings put global development_settings_enabled 1")
+            
+            self.shell(f"settings put system show_refresh_rate_overlay {val}")
+            self.shell(f"settings put global show_refresh_rate_overlay {val}")
+            self.shell(f"settings put secure show_refresh_rate_overlay {val}")
+            
+            # 2. SurfaceFlinger Service Call (Root/ADB magic)
+            # Codes change every Android version:
+            # A11: 1008
+            # A12/A13: 1034
+            # A14 (HyperOS): 1042 or 1035
+            codes = [1008, 1034, 1035, 1042] 
+            
+            for code in codes:
+                try:
+                    self.shell(f"service call SurfaceFlinger {code} i32 {val}")
+                except:
+                    pass
+
+            return "✅ Đã kích hoạt Show FPS (Hỗ trợ cả Android 14/HyperOS)" if show else "✅ Đã tắt FPS Monitor"
+        except Exception as e:
+            return f"❌ Lỗi: {e}"
+
+    def open_developer_options(self) -> str:
+        """Open Developer Options Screen"""
+        try:
+            self.shell("am start -a com.android.settings.APPLICATION_DEVELOPMENT_SETTINGS")
+            return "✅ Đã mở Cài đặt cho nhà phát triển"
+        except Exception as e:
+            return f"❌ Lỗi: {e}"
+
+    def set_display_density(self, dpi: int) -> str:
+        """Set Display Density (DPI)"""
+        try:
+            if dpi <= 0:
+                self.shell("wm density reset")
+                return "✅ Đã đặt lại DPI gốc"
+            else:
+                self.shell(f"wm density {dpi}")
+                return f"✅ Đã đổi DPI sang {dpi}"
+        except Exception as e:
+            return f"❌ Lỗi: {e}"
+            
     def toggle_layout_bounds(self, enable: bool):
         """Toggle 'Show Layout Bounds'"""
         val = "true" if enable else "false"

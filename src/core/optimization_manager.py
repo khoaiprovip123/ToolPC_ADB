@@ -95,7 +95,7 @@ class OptimizationManager:
         self.adb.set_system_setting("system", "time_12_24", "24")
 
     def enable_hyperos_stacked_recent(self):
-        """Enable HyperOS 3 Stacked Recent View (iOS Style)"""
+        """Enable HyperOS 2 Stacked Recent View (iOS Style)"""
         # Requires HyperOS Launcher RELEASE-6.01.03.1924+
         self.adb.shell("settings put global task_stack_view_layout_style 2")
 
