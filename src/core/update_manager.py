@@ -103,13 +103,17 @@ class UpdateManager(QObject):
             "2.5.0.1" -> (2, 5, 0, 1)
             "v2.5.0-beta" -> (2, 5, 0, 0)
         """
-        # Remove 'v' prefix and any suffix like '-beta'
+        # Remove 'v' or 'v.' prefix and any suffix like '-beta'
         version_string = version_string.lower().strip()
-        if version_string.startswith('v'):
+        
+        # Handle "v.2.5.1.0" or "v2.5.1.0"
+        if version_string.startswith('v.'):
+            version_string = version_string[2:]
+        elif version_string.startswith('v'):
             version_string = version_string[1:]
         
-        # Extract numbers (support 3 or 4 parts)
-        match = re.match(r'(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?', version_string)
+        # Extract numbers (support up to 4 parts)
+        match = re.search(r'(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?', version_string)
         if match:
             parts = list(match.groups())
             # Convert to ints, treating None as 0 for 4th part
