@@ -163,9 +163,55 @@ class SettingsWidget(QWidget):
         general_layout.addRow("Ngôn ngữ:", self.lang_combo)
         
         content_layout.addWidget(general_group)
+        
+        # Menu Visibility Settings
+        menu_group = QGroupBox("Hiển thị Menu / Menu Visibility")
+        menu_group.setStyleSheet(self.get_group_style())
+        menu_layout = QVBoxLayout(menu_group)
+        
+        menu_desc = QLabel("Bật/tắt các menu trong thanh điều hướng bên trái:")
+        menu_desc.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 12px;")
+        menu_layout.addWidget(menu_desc)
+        
+        # Advanced Commands Toggle
+        self.advanced_menu_checkbox = QCheckBox("⚡ Hiện menu 'Nâng Cao' / Show 'Advanced' menu")
+        show_advanced = self.settings.value("show_advanced_menu", True, type=bool)
+        self.advanced_menu_checkbox.setChecked(show_advanced)
+        self.advanced_menu_checkbox.stateChanged.connect(self.on_menu_changed_preview) # Optional: just track change if needed, or do nothing
+        self.advanced_menu_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px; padding: 5px;")
+        menu_layout.addWidget(self.advanced_menu_checkbox)
+        
+        content_layout.addWidget(menu_group)
         content_layout.addStretch()
+        
+        # Global Save Button
+        save_btn = QPushButton("💾 Lưu Cài Đặt / Save Settings")
+        save_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
+        save_btn.setFixedHeight(45)
+        save_btn.clicked.connect(self.save_general_settings)
+        content_layout.addWidget(save_btn)
 
         return page
+    
+    def on_menu_changed_preview(self, state):
+        # Optional: Enable Save button if it was disabled
+        pass
+
+    def save_general_settings(self):
+        """Save and apply all general settings"""
+        # 1. Advanced Menu Visibility
+        show_advanced = self.advanced_menu_checkbox.isChecked()
+        self.settings.setValue("show_advanced_menu", show_advanced)
+        
+        # Notify main window to update sidebar
+        if self.window() and hasattr(self.window(), 'update_menu_visibility'):
+            self.window().update_menu_visibility('advanced', show_advanced)
+            
+        # 2. Language (Placeholder for now)
+        # lang = self.lang_combo.currentText()
+        # self.settings.setValue("language", lang)
+        
+        QMessageBox.information(self, "Đã Lưu", "Cài đặt đã được lưu và áp dụng thành công! ✅")
 
     def create_adb_page(self):
         """Create the ADB configuration page"""
@@ -275,19 +321,26 @@ class SettingsWidget(QWidget):
         update_layout.addWidget(separator)
         
         # Auto-check settings
+        # Auto-check settings
         self.auto_check_checkbox = QCheckBox("Tự động kiểm tra khi khởi động")
         auto_check = self.settings.value("auto_check_updates", True, type=bool)
         self.auto_check_checkbox.setChecked(auto_check)
-        self.auto_check_checkbox.stateChanged.connect(self.toggle_auto_check)
+        # self.auto_check_checkbox.stateChanged.connect(self.toggle_auto_check) # Removed immediate save
         self.auto_check_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px;")
         update_layout.addWidget(self.auto_check_checkbox)
         
         self.prerelease_checkbox = QCheckBox("Bao gồm phiên bản beta (pre-release)")
-        include_prerelease = self.settings.value("include_prerelease", False, type=bool)
+        include_prerelease = self.settings.value("include_prerelease", True, type=bool)
         self.prerelease_checkbox.setChecked(include_prerelease)
-        self.prerelease_checkbox.stateChanged.connect(self.toggle_prerelease)
+        # self.prerelease_checkbox.stateChanged.connect(self.toggle_prerelease) # Removed immediate save
         self.prerelease_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px;")
         update_layout.addWidget(self.prerelease_checkbox)
+        
+        # Save Button for Update Settings
+        save_update_btn = QPushButton("💾 Lưu Cài Đặt Cập Nhật")
+        save_update_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
+        save_update_btn.clicked.connect(self.save_update_settings)
+        update_layout.addWidget(save_update_btn)
         
         # Last check info
         last_check = self.settings.value("last_update_check", None)
@@ -401,13 +454,29 @@ class SettingsWidget(QWidget):
         progress_dialog.start_download()
         progress_dialog.exec()
     
+    def manual_check_update(self):
+        """Manually check for updates"""
+        # ... existing implementation ...
+    
+    def save_update_settings(self):
+        """Save and apply update settings"""
+        auto_check = self.auto_check_checkbox.isChecked()
+        include_prerelease = self.prerelease_checkbox.isChecked()
+        
+        self.settings.setValue("auto_check_updates", auto_check)
+        self.settings.setValue("include_prerelease", include_prerelease)
+        
+        QMessageBox.information(self, "Đã Lưu", "Cài đặt cập nhật đã được lưu thành công! ✅")
+
     def toggle_auto_check(self, state):
-        """Toggle auto-check updates setting"""
-        self.settings.setValue("auto_check_updates", state == Qt.Checked)
+        """Toggle auto-check updates setting - DEPRECATED (Kept for compatibility if needed or removed)"""
+        # Now handled by save_update_settings
+        pass
     
     def toggle_prerelease(self, state):
-        """Toggle include pre-release setting"""
-        self.settings.setValue("include_prerelease", state == Qt.Checked)
+        """Toggle include pre-release setting - DEPRECATED"""
+        # Now handled by save_update_settings
+        pass
 
     def create_about_page(self):
         """Create the detailed about page"""
@@ -429,7 +498,7 @@ class SettingsWidget(QWidget):
         
         about_text = QLabel(
             "<h2>📱 Xiaomi ADB Commander</h2>"
-            "<p><b>Phiên bản:</b> 2.4.0 (Latest)</p>"
+            f"<p><b>Phiên bản:</b> {__version__} (Latest)</p>"
             "<p><b>Tác giả:</b> Van Khoai</p>"
             "<p>Công cụ quản lý thiết bị Android toàn diện, tối ưu hóa đặc biệt cho Xiaomi/MIUI/HyperOS.</p>"
         )
@@ -437,17 +506,24 @@ class SettingsWidget(QWidget):
         about_layout.addWidget(about_text)
         content_layout_inner.addWidget(about_group)
         
-        # New Features / Changelog Preview (v2.4.0)
-        changelog_group = QGroupBox("Cập nhật mới (v2.4.0)")
+        # New Features / Changelog Preview (Dynamic from Release Notes)
+        changelog_group = QGroupBox(f"Cập nhật mới (v{__version__})")
         changelog_group.setStyleSheet(self.get_group_style())
         changelog_layout = QVBoxLayout(changelog_group)
         
+        # Release Notes v2.5.1.1 mapped content
         changelog_html = """
+        <h3 style="margin-bottom: 5px;">🛠 Hotfix & Improvements</h3>
+        <ul style="margin-top: 0px; margin-bottom: 10px; margin-left: -20px; color: #333;">
+            <li><b>Update System Robustness:</b> Fixed an issue where the auto-updater would fail to recognize version tags with extra dots (e.g., <code>v.2.5.1.0</code>). This ensures smoother updates.</li>
+        </ul>
+
+        <h3 style="margin-bottom: 5px;">� Features from v2.5.1.0 (Included)</h3>
         <ul style="margin-top: 0px; margin-bottom: 0px; margin-left: -20px; color: #333;">
-            <li>✨ <b>Giao diện HyperOS:</b> Thiết kế lại File Manager và Fastboot Repair theo phong cách HyperOS hiện đại.</li>
-            <li>📱 <b>HyperOS Apps:</b> Tìm kiếm và tải ứng dụng hệ thống & GCam dễ dàng với tab riêng biệt.</li>
-            <li>⚡ <b>Fastboot Repair:</b> Nút Flash và Wipe được làm mới, trực quan hơn.</li>
-            <li>📂 <b>File Manager:</b> Hỗ trợ Preview ảnh trực tiếp, Copy/Cut/Paste nội bộ, và chọn bộ nhớ linh hoạt.</li>
+            <li>✨ <b>Show FPS & Refresh Rate Monitor:</b> New tool to toggle system FPS overlay, with Auto and Manual fallback modes.</li>
+            <li>⚡ <b>Advanced Refresh Rate Control:</b> Force specific Hz values (60, 90, 120, 144Hz) or reset to Auto.</li>
+            <li>� <b>Unified Xiaomi Suite ("Bộ Xiaomi"):</b> Consolidated all Xiaomi tools (Debloater, Quick Tools, Advanced) into a single, flattened menu structure.</li>
+            <li>🎨 <b>UI Improvements:</b> Fixed layout overlaps in "Advanced Features" and increased window size.</li>
         </ul>
         """
         if ThemeManager.get_theme() == "dark":

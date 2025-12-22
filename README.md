@@ -78,6 +78,7 @@ python src/main.py
 ## 📖 Documentation
 
 - [User Guide](docs/USER_GUIDE.md)
+- [Awesome ADB Guide](docs/reference/AWESOME_ADB_GUIDE.md) :books:
 - [API Documentation](docs/API.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Contributing](docs/CONTRIBUTING.md)
