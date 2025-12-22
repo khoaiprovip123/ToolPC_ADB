@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.5.1.1] - 2025-12-22
+### Hotfix
+- **Update System**: Improved version tag parsing matching logic to support non-standard tags (e.g., `v.2.5.1.0`), ensuring reliable update notifications for future releases.
+
 ## [2.5.1.0] - 2025-12-22
 ### Added
 - **Show FPS & Refresh Rate Monitor**: New tool to toggle system FPS overlay, with Auto and Manual (Developer Options) fallback modes.
