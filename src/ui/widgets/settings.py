@@ -511,19 +511,17 @@ class SettingsWidget(QWidget):
         changelog_group.setStyleSheet(self.get_group_style())
         changelog_layout = QVBoxLayout(changelog_group)
         
-        # Release Notes v2.5.1.1 mapped content
+        # Release Notes v2.5.1.2 mapped content
         changelog_html = """
-        <h3 style="margin-bottom: 5px;">🛠 Hotfix & Improvements</h3>
+        <h3 style="margin-bottom: 5px;">📦 Installer & Installer Support</h3>
         <ul style="margin-top: 0px; margin-bottom: 10px; margin-left: -20px; color: #333;">
-            <li><b>Update System Robustness:</b> Fixed an issue where the auto-updater would fail to recognize version tags with extra dots (e.g., <code>v.2.5.1.0</code>). This ensures smoother updates.</li>
+            <li><b>Official Setup Installer:</b> Added Windows installer (<code>setup.exe</code>) for easier deployment.</li>
+             <li><b>Auto-Update:</b> Fully supported in installer version.</li>
         </ul>
 
-        <h3 style="margin-bottom: 5px;">� Features from v2.5.1.0 (Included)</h3>
+        <h3 style="margin-bottom: 5px;">🛠 Improvements (v2.5.1.2)</h3>
         <ul style="margin-top: 0px; margin-bottom: 0px; margin-left: -20px; color: #333;">
-            <li>✨ <b>Show FPS & Refresh Rate Monitor:</b> New tool to toggle system FPS overlay, with Auto and Manual fallback modes.</li>
-            <li>⚡ <b>Advanced Refresh Rate Control:</b> Force specific Hz values (60, 90, 120, 144Hz) or reset to Auto.</li>
-            <li>� <b>Unified Xiaomi Suite ("Bộ Xiaomi"):</b> Consolidated all Xiaomi tools (Debloater, Quick Tools, Advanced) into a single, flattened menu structure.</li>
-            <li>🎨 <b>UI Improvements:</b> Fixed layout overlaps in "Advanced Features" and increased window size.</li>
+            <li>✨ <b>Code Signing Prep:</b> Prepared structure for future code signing.</li>
         </ul>
         """
         if ThemeManager.get_theme() == "dark":
