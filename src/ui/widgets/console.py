@@ -6,242 +6,274 @@ Style: Glassmorphism
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QLineEdit, QGroupBox
+    QTextEdit, QLineEdit, QGroupBox, QTreeWidget, QTreeWidgetItem,
+    QFrame, QMessageBox, QSplitter
 )
 from PySide6.QtCore import Qt
 from src.ui.theme_manager import ThemeManager
 
 class ConsoleWidget(QWidget):
     """
-    Console Widget
+    ADB Console Widget
+    Provides direct command execution and log viewing
     """
     
     def __init__(self, adb_manager):
         super().__init__()
         self.adb = adb_manager
+        self.history = []
+        self.history_index = 0
+        
         self.setup_ui()
         
     def setup_ui(self):
         """Setup UI layout"""
-        # Root layout for the widget
-        root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout = QHBoxLayout(self) # Changed to HBox for Sidebar
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(10)
         
-        # Scroll Area
-        from PySide6.QtWidgets import QScrollArea
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-        
-        # Content Widget
-        content_widget = QWidget()
-        content_widget.setStyleSheet(f"background-color: transparent;")
-        main_layout = QVBoxLayout(content_widget)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
-        
-        scroll.setWidget(content_widget)
-        root_layout.addWidget(scroll)
-        
-        # Header
-        header = QLabel("💻 ADB Console")
-        header.setStyleSheet(f"""
-            font-size: 20px;
-            color: {ThemeManager.COLOR_TEXT_PRIMARY};
-            font-weight: bold;
-            padding: 10px;
-        """)
-        main_layout.addWidget(header)
-        
-        # Output Area
-        self.output = QTextEdit()
-        self.output.setReadOnly(True)
-        self.output.setMinimumHeight(400) # Guarantee some height
-        self.output.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: rgba(0, 0, 0, 0.85);
-                border-radius: {ThemeManager.RADIUS_BUTTON};
-                padding: 10px;
-                color: #00FF00;
-                font-family: Consolas, monospace;
-                font-size: 13px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
+        # ==================== LEFT SIDEBAR (Quick Commands) ====================
+        sidebar_container = QFrame()
+        sidebar_container.setFixedWidth(300)
+        sidebar_container.setStyleSheet(f"""
+            QFrame {{
+                background-color: {ThemeManager.COLOR_GLASS_WHITE};
+                border-right: 1px solid {ThemeManager.COLOR_BORDER};
             }}
         """)
-        main_layout.addWidget(self.output)
+        sidebar_layout = QVBoxLayout(sidebar_container)
+        sidebar_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Sidebar Header
+        lbl_quick = QLabel("⚡ Lệnh Nhanh (Awesome ADB)")
+        lbl_quick.setStyleSheet("font-weight: bold; font-size: 14px; color: #333;")
+        sidebar_layout.addWidget(lbl_quick)
+        
+        # Command Categories
+        self.cmd_tree = QTreeWidget()
+        self.cmd_tree.setHeaderHidden(True)
+        self.cmd_tree.setIndentation(15)
+        self.cmd_tree.setStyleSheet(f"""
+            QTreeWidget {{
+                background: transparent;
+                border: none;
+                font-size: 13px;
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+            }}
+            QTreeWidget::item {{
+                padding: 6px;
+                border-radius: 6px;
+                margin-bottom: 2px;
+            }}
+            QTreeWidget::item:hover {{
+                background-color: {ThemeManager.COLOR_GLASS_HOVER};
+            }}
+            QTreeWidget::item:selected {{
+                background-color: {ThemeManager.COLOR_ACCENT}20;
+                color: {ThemeManager.COLOR_ACCENT};
+                border: 1px solid {ThemeManager.COLOR_ACCENT}50;
+            }}
+        """)
+        self.cmd_tree.itemDoubleClicked.connect(self.on_quick_command_clicked)
+        sidebar_layout.addWidget(self.cmd_tree)
+        
+        # Description Box
+        self.desc_box = QLabel("Chọn lệnh để xem hướng dẫn")
+        self.desc_box.setWordWrap(True)
+        self.desc_box.setStyleSheet(f"""
+            background-color: rgba(0,0,0,0.05);
+            border-radius: 8px;
+            padding: 10px;
+            color: {ThemeManager.COLOR_TEXT_SECONDARY};
+            font-size: 12px;
+        """)
+        sidebar_layout.addWidget(self.desc_box)
+        
+        # Populate Commands
+        self.populate_commands()
+        self.cmd_tree.currentItemChanged.connect(self.on_command_selected)
+
+        main_layout.addWidget(sidebar_container)
+        
+        # ==================== RIGHT CONTENT (Console) ====================
+        content_layout = QVBoxLayout()
+        content_layout.setSpacing(10)
+        
+        # Log Output Area
+        self.output_area = QTextEdit()
+        self.output_area.setReadOnly(True)
+        self.output_area.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                border-radius: 12px;
+                border: 1px solid {ThemeManager.COLOR_BORDER};
+                padding: 10px;
+                font-family: Consolas, monospace;
+            }}
+        """)
+        content_layout.addWidget(self.output_area)
         
         # Input Area
-        input_layout = QHBoxLayout()
-        
-        label_prompt = QLabel("adb >")
-        label_prompt.setStyleSheet(f"font-weight: bold; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
-        input_layout.addWidget(label_prompt)
-        
-        self.input_cmd = QLineEdit()
-        self.input_cmd.setPlaceholderText("Nhập lệnh ADB (ví dụ: shell pm list packages) hoặc fastboot...")
-        self.input_cmd.returnPressed.connect(self.run_command)
-        self.input_cmd.setStyleSheet(ThemeManager.get_input_style())
-        input_layout.addWidget(self.input_cmd)
-        
-        btn_run = QPushButton("Chạy")
-        btn_run.clicked.connect(self.run_command)
-        btn_run.setStyleSheet(ThemeManager.get_button_style("primary"))
-        input_layout.addWidget(btn_run)
-        
-        btn_clear = QPushButton("Xóa")
-        btn_clear.clicked.connect(self.output.clear)
-        btn_clear.setStyleSheet(ThemeManager.get_button_style("outline"))
-        input_layout.addWidget(btn_clear)
-        
-        main_layout.addLayout(input_layout)
-        
-        # Quick Commands
-        quick_group = QGroupBox("Lệnh nhanh")
-        quick_group.setStyleSheet(f"""
-            QGroupBox {{
-                font-weight: bold;
-                border: 1px solid rgba(0,0,0,0.1);
-                border-radius: {ThemeManager.RADIUS_BUTTON};
-                margin-top: 10px;
-                padding-top: 15px;
-                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+        input_container = QFrame()
+        input_container.setStyleSheet(f"""
+            QFrame {{
                 background-color: {ThemeManager.COLOR_GLASS_WHITE};
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
+                border-radius: 12px;
+                border: 1px solid {ThemeManager.COLOR_BORDER};
             }}
         """)
-        quick_layout = QVBoxLayout(quick_group)
+        input_layout = QHBoxLayout(input_container)
+        input_layout.setContentsMargins(5, 5, 5, 5)
         
-        # Row 1: Action Buttons
-        row1 = QHBoxLayout()
-        commands = [
-            ("📱 Devices", "devices"),
-            ("🔋 Battery", "shell dumpsys battery"),
-            ("🌐 IP Address", "shell ip addr show wlan0"),
-            ("🔁 Reboot", "reboot"),
-            ("📸 Screenshot", "shell screencap -p /sdcard/s.png"),
-        ]
+        self.input_field = QLineEdit()
+        self.input_field.setPlaceholderText("Nhập lệnh ADB (VD: shell pm list packages)...")
+        self.input_field.setStyleSheet("background: transparent; border: none; padding: 5px;")
+        self.input_field.returnPressed.connect(self.execute_command)
+        input_layout.addWidget(self.input_field)
         
-        for name, cmd in commands:
-            btn = QPushButton(name)
-            btn.clicked.connect(lambda checked=False, c=cmd: self.run_custom_command(c))
-            btn.setStyleSheet(ThemeManager.get_button_style("outline"))
-            row1.addWidget(btn)
+        send_btn = QPushButton("Gửi")
+        send_btn.setCursor(Qt.PointingHandCursor)
+        send_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
+        send_btn.clicked.connect(self.execute_command)
+        input_layout.addWidget(send_btn)
         
-        quick_layout.addLayout(row1)
+        content_layout.addWidget(input_container)
         
-        # Row 1.5: Fastboot Commands
-        row_fb = QHBoxLayout()
-        fb_commands = [
-            ("⚡ FB Devices", "fastboot devices"),
-            ("🔄 FB Reboot", "fastboot reboot"),
-            ("🔙 Bootloader", "fastboot reboot bootloader"),
-            ("ℹ️ FB Info", "fastboot getvar all"),
-            ("🔒 Unlock Status", "fastboot oem device-info"),
-        ]
+        # Tips Label
+        tips_lbl = QLabel("💡 Click đúp vào lệnh bên trái để chạy an toàn.")
+        tips_lbl.setStyleSheet("color: #888; font-size: 11px; margin-left: 5px;")
+        content_layout.addWidget(tips_lbl)
         
-        for name, cmd in fb_commands:
-            btn = QPushButton(name)
-            btn.clicked.connect(lambda checked=False, c=cmd: self.run_custom_command(c))
-            btn.setStyleSheet(ThemeManager.get_button_style("outline"))
-            row_fb.addWidget(btn)
-            
-        quick_layout.addLayout(row_fb)
-        
-        # Row 2: Helper Keywords
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel("Gợi ý:"))
-        
-        suggestions = [
-            "shell pm list packages",
-            "shell dumpsys package",
-            "fastboot devices",
-            "fastboot reboot",
-            "logcat -d",
-            "install -r",
-        ]
-        
-        for sug in suggestions:
-            btn = QPushButton(sug)
-            btn.setToolTip("Nhấn để điền vào ô nhập")
-            btn.clicked.connect(lambda checked=False, s=sug: self.input_cmd.setText(s))
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    border: 1px solid {ThemeManager.COLOR_ACCENT}40;
-                    border-radius: 10px;
-                    padding: 4px 8px;
-                    background-color: rgba(255, 255, 255, 0.5);
-                    font-size: 11px;
-                }}
-                QPushButton:hover {{
-                    background-color: {ThemeManager.COLOR_ACCENT}20;
-                }}
-            """)
-            row2.addWidget(btn)
-            
-        quick_layout.addLayout(row2)
-            
-        main_layout.addWidget(quick_group)
-        
-    def run_command(self):
-        cmd = self.input_cmd.text().strip()
-        if not cmd:
-            return
-            
-        self.run_custom_command(cmd)
-        self.input_cmd.clear()
-        
-    def run_custom_command(self, cmd):
-        """
-        Execute command with intelligent prefix handling
-        """
-        cmd = cmd.strip()
-        if not cmd: return
+        main_layout.addLayout(content_layout)
 
-        # Determine how to display command in log
-        display_cmd = cmd
-        if not cmd.startswith("adb") and not cmd.startswith("fastboot"):
-             display_cmd = f"adb {display_cmd}"
-             
-        self.output.append(f"\n$ {display_cmd}")
+    def populate_commands(self):
+        """Populate the sidebar with categories and commands"""
+        
+        # Data Structure: Category -> [(Name, Command List, Description, Warning)]
+        
+        commands = {
+            "📱 Hiển Thị (Display)": [
+                ("Xem Độ phân giải", ["shell", "wm", "size"], 
+                 "Hiển thị độ phân giải màn hình hiện tại.", None),
+                ("Xem Mật độ điểm ảnh (DPI)", ["shell", "wm", "density"], 
+                 "Hiển thị mật độ điểm ảnh (DPI/PPI) hiện tại.", None),
+            ],
+            "🔋 Pin & Nguồn (Power)": [
+                ("Thông tin Pin chi tiết", ["shell", "dumpsys", "battery"], 
+                 "Xem trạng thái sạc, mức pin, nhiệt độ và sức khỏe pin.", None),
+                ("Giả lập rút sạc", ["shell", "dumpsys", "battery", "unplug"], 
+                 "Giả lập tình trạng thiết bị đang không sạc.", None),
+                ("Reset trạng thái Pin", ["shell", "dumpsys", "battery", "reset"], 
+                 "Khôi phục trạng thái báo cáo pin về thực tế.", None),
+            ],
+            "📦 Ứng Dụng (Package)": [
+                ("Liệt kê App bên thứ 3", ["shell", "pm", "list", "packages", "-3"], 
+                 "Danh sách các ứng dụng do người dùng cài đặt (không phải hệ thống).", None),
+                ("Liệt kê App đã tắt", ["shell", "pm", "list", "packages", "-d"], 
+                 "Danh sách các ứng dụng đang bị vô hiệu hóa.", None),
+            ],
+            "⚙️ Hệ Thống (System)": [
+                ("Thông tin Android", ["shell", "getprop", "ro.build.version.release"], 
+                 "Xem phiên bản Android hiện tại.", None),
+                ("Thông tin Model", ["shell", "getprop", "ro.product.model"], 
+                 "Xem tên mã model của thiết bị.", None),
+                ("Khởi động lại (Reboot)", ["reboot"], 
+                 "Khởi động lại thiết bị ngay lập tức.", "⚠️ Thiết bị sẽ tắt và khởi động lại."),
+                ("Vào Fastboot", ["reboot", "bootloader"], 
+                 "Khởi động lại vào chế độ Fastboot.", "⚠️ Dành cho việc flash ROM/Firmware."),
+            ]
+        }
+        
+        for category, cmds in commands.items():
+            cat_item = QTreeWidgetItem(self.cmd_tree)
+            cat_item.setText(0, category)
+            font = cat_item.font(0)
+            font.setBold(True)
+            cat_item.setFont(0, font)
+            cat_item.setExpanded(True)
+            
+            for name, cmd, desc, warn in cmds:
+                item = QTreeWidgetItem(cat_item)
+                item.setText(0, name)
+                item.setData(0, Qt.UserRole, {
+                    "cmd": cmd,
+                    "desc": desc,
+                    "warn": warn
+                })
+
+    def on_command_selected(self, current, previous):
+        if not current: return
+        data = current.data(0, Qt.UserRole)
+        if data:
+            desc = data["desc"]
+            warn = data.get("warn")
+            
+            text = f"<b>Mô tả:</b><br>{desc}"
+            if warn:
+                text += f"<br><br><span style='color:red; font-weight:bold;'>{warn}</span>"
+            
+            self.desc_box.setText(text)
+        else:
+             self.desc_box.setText("Chọn lệnh để xem hướng dẫn")
+
+    def on_quick_command_clicked(self, item, column):
+        data = item.data(0, Qt.UserRole)
+        if not data: return # Header clicked
+        
+        cmd_list = data["cmd"]
+        warn = data.get("warn")
+        
+        # Safety Check / Warning
+        if warn:
+            reply = QMessageBox.warning(
+                self, "Cảnh báo an toàn", 
+                f"{warn}\n\nBạn có chắc chắn muốn thực hiện lệnh này không?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
+
+        self.run_command_safe(cmd_list)
+
+    def run_command_safe(self, cmd_list):
+        """Execute a predefined safe list command"""
+        cmd_disp = " ".join(cmd_list)
+        self.append_log(f"\n$ {cmd_disp}", "#00FF00")
         
         try:
-            # 1. HANDLE FASTBOOT
-            if cmd.startswith("fastboot"):
-                # Strip 'fastboot ' prefix
-                args = cmd[8:].strip()
-                if not args:
-                    result = "Error: Missing arguments for fastboot"
-                else:
-                    result = self.adb.fastboot_command(args)
-                    
-            # 2. HANDLE ADB EXPLICIT
-            elif cmd.startswith("adb "):
-                args = cmd[4:].strip()
-                if not args:
-                    result = "Error: Missing arguments for adb"
-                elif args.startswith("shell "):
-                    result = self.adb.shell(args[6:])
-                else:
-                    result = self.adb.execute(args)
-            
-            # 3. IMPLICIT ADB (Default)
-            else:
-                if cmd == "devices":
-                    result = self.adb.execute("devices")
-                elif cmd.startswith("shell "):
-                    result = self.adb.shell(cmd[6:])
-                else:
-                    result = self.adb.execute(cmd)
-                
-            self.output.append(result)
-            self.output.moveCursor(self.output.textCursor().MoveOperation.End)
-            
+             res = self.adb.execute(cmd_list)
+             self.append_log(res)
         except Exception as e:
-            self.output.append(f"Lỗi: {e}")
+             self.append_log(f"Error: {str(e)}", "red")
+             
+    def execute_command(self):
+        """Execute command from input field (Legacy/Manual)"""
+        cmd = self.input_field.text().strip()
+        if not cmd: return
             
-    def reset(self):
-        pass
+        self.history.append(cmd)
+        self.history_index = len(self.history)
+        
+        self.append_log(f"\n$ {cmd}", "#00FF00")
+        
+        # Basic Safety Filter
+        if any(x in cmd for x in ["rm -rf", "mkfs"]):
+             self.append_log("❌ Lệnh này bị chặn bởi bộ lọc an toàn.", "red")
+             return
+
+        try:
+            # Still use string input for manual typing (ADBManager handles it)
+            result = self.adb.execute(cmd)
+            self.append_log(result)
+        except Exception as e:
+            self.append_log(f"Error: {str(e)}", "red")
+            
+        self.input_field.clear()
+
+    def append_log(self, text, color=None):
+        if color:
+             self.output_area.append(f'<span style="color:{color};">{text}</span>')
+        else:
+             self.output_area.append(text)
+        self.output_area.moveCursor(self.output_area.textCursor().MoveOperation.End)

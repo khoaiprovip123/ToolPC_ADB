@@ -279,16 +279,32 @@ class ADBManager:
             # Don't crash if ADB check fails, just warn
             print(f"ADB verification warning: {str(e)}")
     
-    def execute(self, command: str, timeout: int = 30, check: bool = True) -> str:
+    def execute(self, command: str | List[str], timeout: int = 30, check: bool = True) -> str:
         """
         Execute ADB command
+        Args:
+            command: Command string or list of arguments (Safe Mode)
+            timeout: Timeout in seconds
+            check: Raise exception on non-zero return code
         """
-        full_cmd = f'"{self.adb_path}" {command}' if os.path.isabs(self.adb_path) else f'{self.adb_path} {command}'
+        use_shell = isinstance(command, str)
+        
+        # Prepare command
+        if isinstance(command, list):
+            # Safe Mode: shell=False
+            full_cmd = [self.adb_path] + command
+        else:
+            # Legacy Mode: shell=True (Potentially unsafe if input not sanitized)
+            # Warn if command contains dangerous characters and isn't a simple fixed string
+            if any(c in command for c in [";", "&", "|"]) and "shell" not in command:
+                self.logger.log("Security Warning", f"Unsafe characters in command: {command}", "warning")
+            
+            full_cmd = f'"{self.adb_path}" {command}' if os.path.isabs(self.adb_path) else f'{self.adb_path} {command}'
         
         try:
             result = subprocess.run(
                 full_cmd,
-                shell=True,
+                shell=use_shell,
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -297,31 +313,38 @@ class ADBManager:
             )
             
             if check and result.returncode != 0:
+                cmd_str = command if isinstance(command, str) else " ".join(command)
                 raise RuntimeError(
-                    f"ADB command failed: {command}\n"
+                    f"ADB command failed: {cmd_str}\n"
                     f"Error: {result.stderr}"
                 )
             
             output = result.stdout.strip()
             
             # Log specific high-level commands
-            if command.startswith("install ") and "Success" in output:
-                LogManager.log("Cài đặt APK", f"Đã cài đặt thành công: {command.split()[-1]}", "success")
+            cmd_start = command if isinstance(command, str) else (command[0] if command else "")
+            if cmd_start.startswith("install ") and "Success" in output:
+                 LogManager.log("Cài đặt APK", f"Đã cài đặt thành công", "success")
+            elif isinstance(command, list) and command[0] == "install" and "Success" in output:
+                 LogManager.log("Cài đặt APK", f"Đã cài đặt thành công: {command[-1]}", "success")
                 
             return output
             
         except subprocess.TimeoutExpired:
-            err_msg = f"Command timed out after {timeout}s: {command}"
+            cmd_str = command if isinstance(command, str) else " ".join(command)
+            err_msg = f"Command timed out after {timeout}s: {cmd_str}"
             LogManager.log("ADB Timeout", err_msg, "error")
             raise TimeoutError(err_msg)
         except Exception as e:
             err_msg = str(e)
+            cmd_str = command if isinstance(command, str) else " ".join(command)
+            
             # Filter noise
-            if "dumpsys" not in command and "getprop" not in command:
-                 LogManager.log("ADB Error", f"Cmd: {command}\n{err_msg}", "error")
+            if "dumpsys" not in cmd_str and "getprop" not in cmd_str:
+                 LogManager.log("ADB Error", f"Cmd: {cmd_str}\n{err_msg}", "error")
             
             if check:
-                raise RuntimeError(f"Failed to execute: {command}\nError: {err_msg}")
+                raise RuntimeError(f"Failed to execute: {cmd_str}\nError: {err_msg}")
             return ""
     
     def shell(self, command: str, timeout: int = 30, check: bool = True) -> str:
@@ -1332,8 +1355,8 @@ class ADBManager:
     def push_file(self, local_path: str, remote_path: str) -> bool:
         """Push file to device"""
         try:
-            # Use quotes for paths to handle spaces
-            self.execute(f"push \"{local_path}\" \"{remote_path}\"")
+            # Use list arguments for safe execution (handles spaces and special chars automatically)
+            self.execute(["push", local_path, remote_path])
             LogManager.log("Push File", f"Đã gửi file: {os.path.basename(local_path)}", "success")
             return True
         except Exception:
@@ -1342,7 +1365,7 @@ class ADBManager:
     def pull_file(self, remote_path: str, local_path: str) -> bool:
         """Pull file from device"""
         try:
-            self.execute(f"pull \"{remote_path}\" \"{local_path}\"")
+            self.execute(["pull", remote_path, local_path])
             LogManager.log("Pull File", f"Đã lấy file: {os.path.basename(remote_path)}", "success")
             return True
         except Exception:

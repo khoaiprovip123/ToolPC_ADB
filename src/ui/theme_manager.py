@@ -11,18 +11,20 @@ class ThemeManager:
     # ==================== ICON MAPPING (Vibrant Emojis for Windows) ====================
     ICONS = {
         # Navigation
-        "dashboard": "🏠",      # House
-        "apps": "📱",           # Mobile Phone / Grid
-        "files": "📁",          # Folder
-        "xiaomi": "⚡",         # High Voltage (Xiaomi Power)
-        "mirror": "🖥️",        # Desktop Computer
-        "devtools": "🛠️",       # Hammer and Wrench
-        "cloud": "☁️",         # Cloud
-        "settings": "⚙️",       # Gear
-        "fastboot": "🔌",       # Plug/Connection
-        "tools": "🧰",          # Toolbox
+        "dashboard": "dashboard.png",
+        "apps": "apps.png",
+        "files": "files.png",
+        "xiaomi": "xiaomi.png",
+        "mirror": "mirror.png",
+        "devtools": "devtools.png",
+        "cloud": "cloud.png",
+        "settings": "settings.png",
+        "fastboot": "devtools.png", # Re-use devtools
+        "tools": "tools.png",
+        "advanced": "⚡",  # Advanced commands - use emoji fallback
         
-        # Actions
+        # Actions (Keep emojis for now or find small icons later)
+        "refresh": "↻",
         "refresh": "↻",
         "search": "🔍",
         "power": "⏻",

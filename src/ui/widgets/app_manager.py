@@ -101,7 +101,8 @@ class InstallerThread(QThread):
                 # Single APK
                 for path in self.paths:
                     self.progress.emit(f"Đang cài đặt {os.path.basename(path)}...")
-                    res = self.adb.execute(f"install -r \"{path}\"")
+                    # Secure install execution
+                    res = self.adb.execute(["install", "-r", path])
                     
                     if "Success" in res:
                         continue
@@ -160,8 +161,8 @@ class BackupThread(QThread):
                 # For specific: adb backup -apk -shared -f file.ab pkg1 pkg2
                 # Including -shared to try and get external data (images)
                 
-                cmd = f"backup -apk -shared -f \"{backup_file}\" {pkg_str}"
-                res = self.adb.execute(cmd, timeout=300) # Long timeout for user interaction
+                cmd_list = ["backup", "-apk", "-shared", "-f", backup_file] + packages
+                res = self.adb.execute(cmd_list, timeout=300) # Long timeout for user interaction
                 
                 if "error" not in res.lower():
                     self.finished.emit(True, f"Đã gửi lệnh Backup Data!\nFile: {os.path.basename(backup_file)}\n\nLưu ý: Kiểm tra file .ab có dung lượng > 0KB không.")

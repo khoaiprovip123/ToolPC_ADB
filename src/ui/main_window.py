@@ -29,6 +29,7 @@ from src.ui.widgets.unified_tools import DevToolsWidget, XiaomiSuiteWidget, Syst
 from src.ui.widgets.fastboot_toolbox import FastbootToolboxWidget
 from src.ui.widgets.settings import SettingsWidget
 from src.ui.widgets.notification_center import NotificationCenter
+from src.ui.widgets.advanced_commands import AdvancedCommandsWidget
 from src.ui.dialogs.update_dialog import UpdateNotificationDialog, UpdateProgressDialog
 from src.core.plugin_manager import PluginManager
 
@@ -119,11 +120,20 @@ class Sidebar(QFrame):
         # self.add_nav_button("Fastboot", "fastboot", 4, layout) # Consolidated into Tools
         self.add_nav_button("Công cụ", "tools", 4, layout)
         self.add_nav_button("Dev Tools", "devtools", 5, layout)
+        self.advanced_btn = self.add_nav_button("Nâng Cao", "advanced", 6, layout)
+        
+        # Load visibility settings
+        from PySide6.QtCore import QSettings
+        settings = QSettings("VanKhoai", "XiaomiADBCommander")
+        show_advanced = settings.value("show_advanced_menu", True, type=bool)
+        if not show_advanced:
+            self.advanced_btn.setVisible(False)
+        
         layout.addSpacing(20)
         
         # Hệ thống
         self.add_group_label("HỆ THỐNG", layout)
-        self.add_nav_button("Cài Đặt", "settings", 6, layout)
+        self.add_nav_button("Cài Đặt", "settings", 7, layout)
         
         layout.addStretch()
         
@@ -168,9 +178,23 @@ class Sidebar(QFrame):
     
     def add_nav_button(self, text, icon_key, index, layout, active=False):
         theme = ThemeManager.get_theme()
-        icon_str = ThemeManager.get_icon(icon_key, "●")
+        icon_val = ThemeManager.get_icon(icon_key, "●")
         
-        btn = QPushButton(f"  {icon_str}   {text}")
+        btn = QPushButton(text)
+        
+        # Check for image icon
+        import os
+        icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icons', icon_val)
+        
+        has_icon = False
+        if icon_val.endswith('.png') and os.path.exists(icon_path):
+            btn.setIcon(QIcon(icon_path))
+            btn.setIconSize(QSize(26, 26))
+            has_icon = True
+        else:
+            # Fallback to emoji text
+            btn.setText(f"  {icon_val}   {text}")
+            
         btn.setCheckable(True)
         btn.setAutoExclusive(True)
         btn.setCursor(Qt.PointingHandCursor)
@@ -181,10 +205,13 @@ class Sidebar(QFrame):
         active_bg = ThemeManager.COLOR_ACCENT + "25" # Stronger active background
         active_color = ThemeManager.COLOR_ACCENT
         
+        # Padding adjustment for QIcon vs Text
+        padding_left = "16px" if has_icon else "16px" 
+        
         btn.setStyleSheet(f"""
             QPushButton {{
                 text-align: left;
-                padding-left: 16px;
+                padding-left: {padding_left};
                 border: none;
                 border-radius: 12px;
                 font-size: 15px;
@@ -214,6 +241,8 @@ class Sidebar(QFrame):
         btn.setProperty("page_index", index)
         self.buttons.append(btn)
         layout.addWidget(btn)
+        
+        return btn
 
 
 class DeviceSelector(QComboBox):
@@ -414,20 +443,37 @@ class MainWindow(QMainWindow):
         """)
         
         # Control Center Button
-        ctrl_btn = QPushButton("🎛️")
+        ctrl_btn = QPushButton()
         ctrl_btn.setFixedSize(44, 44)
         ctrl_btn.setCursor(Qt.PointingHandCursor)
         ctrl_btn.setToolTip("Trung tâm Điều khiển")
         ctrl_btn.clicked.connect(lambda checked: self.toggle_notification_center(0))
         ctrl_btn.setStyleSheet(refresh_btn.styleSheet())
         
+        # Load control center icon
+        import os
+        ctrl_icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icons', 'control_center.png')
+        if os.path.exists(ctrl_icon_path):
+            ctrl_btn.setIcon(QIcon(ctrl_icon_path))
+            ctrl_btn.setIconSize(QSize(24, 24))
+        else:
+            ctrl_btn.setText("🎛️")
+        
         # Notification Button
-        notif_btn = QPushButton("🔔")
+        notif_btn = QPushButton()
         notif_btn.setFixedSize(44, 44)
         notif_btn.setCursor(Qt.PointingHandCursor)
         notif_btn.setToolTip("Thông báo")
         notif_btn.clicked.connect(lambda checked: self.toggle_notification_center(1))
         notif_btn.setStyleSheet(refresh_btn.styleSheet())
+        
+        # Load notification icon
+        notif_icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icons', 'notification.png')
+        if os.path.exists(notif_icon_path):
+            notif_btn.setIcon(QIcon(notif_icon_path))
+            notif_btn.setIconSize(QSize(24, 24))
+        else:
+            notif_btn.setText("🔔")
         
         layout.addWidget(refresh_btn)
         layout.addSpacing(10)
@@ -467,7 +513,11 @@ class MainWindow(QMainWindow):
         self.dev_tools = DevToolsWidget(self.adb)
         self.pages.addWidget(self.dev_tools)
         
-        # 7. Settings
+        # 7. Advanced Commands
+        self.advanced_commands = AdvancedCommandsWidget(self.adb)
+        self.pages.addWidget(self.advanced_commands)
+        
+        # 8. Settings
         self.settings = SettingsWidget(self.adb)
         self.pages.addWidget(self.settings)
     
@@ -607,6 +657,11 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'screen_mirror'):
             self.screen_mirror.stop_mirroring()
         event.accept()
+
+    def update_menu_visibility(self, menu_name, is_visible):
+        """Update sidebar menu button visibility"""
+        if menu_name == 'advanced' and hasattr(self.sidebar, 'advanced_btn'):
+            self.sidebar.advanced_btn.setVisible(is_visible)
 
     def toggle_notification_center(self, tab_index=None):
         if hasattr(self, 'notif_center'):

@@ -94,8 +94,23 @@ class StatCard(QFrame):
         
         # Header
         h_layout = QHBoxLayout()
-        icon_lbl = QLabel(icon)
-        icon_lbl.setStyleSheet("font-size: 22px; background: transparent; border: none;")
+        
+        # Icon - load from file or use emoji fallback
+        icon_lbl = QLabel()
+        icon_lbl.setFixedSize(28, 28)
+        icon_lbl.setAlignment(Qt.AlignCenter)
+        import os
+        if icon and os.path.isfile(icon):
+            from PySide6.QtGui import QPixmap
+            pixmap = QPixmap(icon)
+            if not pixmap.isNull():
+                pixmap = pixmap.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                icon_lbl.setPixmap(pixmap)
+            else:
+                icon_lbl.setText("📌")
+        else:
+            icon_lbl.setText(icon if icon else "📌")
+        icon_lbl.setStyleSheet("background: transparent; border: none;")
         title_lbl = QLabel(title)
         title_lbl.setStyleSheet(f"color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 600; text-transform: uppercase; background: transparent; border: none;")
         
@@ -137,17 +152,30 @@ class SpecItem(QFrame):
         layout.setContentsMargins(12, 10, 15, 10)
         layout.setSpacing(15)
         
-        # Icon Container
+        # Icon Container - load from PNG file
         icon_container = QLabel()
         icon_container.setFixedSize(42, 42)
         icon_container.setAlignment(Qt.AlignCenter)
-        icon_container.setText(icon)
+        
+        # Load icon from file path
+        import os
+        if icon and os.path.isfile(icon):
+            from PySide6.QtGui import QPixmap
+            pixmap = QPixmap(icon)
+            if not pixmap.isNull():
+                pixmap = pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                icon_container.setPixmap(pixmap)
+            else:
+                icon_container.setText("📌")
+        else:
+            # Fallback to emoji if file not found
+            icon_container.setText("📌")
+        
         icon_container.setStyleSheet(f"""
-            background-color: {ThemeManager.COLOR_ACCENT}15;
-            color: {ThemeManager.COLOR_ACCENT};
-            border-radius: 10px;
-            font-size: 20px;
+            background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}60;
+            border-radius: 12px;
             border: none;
+            padding: 5px;
         """)
         layout.addWidget(icon_container)
         
@@ -215,6 +243,14 @@ class DashboardWidget(QWidget):
         self.clock_timer = QTimer()
         self.clock_timer.timeout.connect(self.update_clock)
         self.clock_timer.setInterval(1000) # Every second
+        
+    def get_icon_path(self, icon_name):
+        """Get path to icon file in resources/icons folder"""
+        from pathlib import Path
+        # dashboard.py is in src/ui/widgets, need to go up 3 levels to reach root
+        # widgets -> ui -> src -> Xiaomi_ADB_Commander (root)
+        base_path = Path(__file__).resolve().parent.parent.parent.parent / 'resources' / 'icons' / icon_name
+        return str(base_path)
         
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -318,19 +354,19 @@ class DashboardWidget(QWidget):
         grid.setSpacing(20)
         
         # RAM Card (Cyan) - Shows Total Capacity
-        self.card_ram = StatCard("RAM", "Checking...", "💾", ["#4facfe", "#00f2fe"])
+        self.card_ram = StatCard("RAM", "Checking...", self.get_icon_path("ram.png"), ["#4facfe", "#00f2fe"])
         grid.addWidget(self.card_ram, 0, 0)
         
         # CPU Card (Purple) - Shows Chipset
-        self.card_cpu = StatCard("CPU", "Checking...", "⚡", ["#a18cd1", "#fbc2eb"])
+        self.card_cpu = StatCard("CPU", "Checking...", self.get_icon_path("cpu.png"), ["#a18cd1", "#fbc2eb"])
         grid.addWidget(self.card_cpu, 0, 1)
         
         # Android (Green)
-        self.card_android = StatCard("Android", "Checking...", "🤖", ["#43e97b", "#38f9d7"])
+        self.card_android = StatCard("Android", "Checking...", self.get_icon_path("android.png"), ["#43e97b", "#38f9d7"])
         grid.addWidget(self.card_android, 1, 0)
         
         # Security (Orange/Yellow - Xiaomi Vibe)
-        self.card_os = StatCard("Bảo mật", "Checking...", "🛡️", ["#fa709a", "#fee140"])
+        self.card_os = StatCard("Bảo mật", "Checking...", self.get_icon_path("shield.png"), ["#fa709a", "#fee140"])
         grid.addWidget(self.card_os, 1, 1)
         
         self.content_layout.addLayout(grid)
@@ -373,9 +409,9 @@ class DashboardWidget(QWidget):
         hw_header.setStyleSheet(f"font-size: 13px; font-weight: 700; color: {ThemeManager.COLOR_ACCENT}; letter-spacing: 1px; margin-bottom: 5px;")
         hw_layout.addWidget(hw_header)
         
-        self.add_hardware_spec("Model", "model", "📱", hw_layout)
-        self.add_hardware_spec("Codename", "device_name", "🏷️", hw_layout)
-        self.add_hardware_spec("Chipset", "soc_name", "🧠", hw_layout)
+        self.add_hardware_spec("Model", "model", self.get_icon_path("model.png"), hw_layout)
+        self.add_hardware_spec("Codename", "device_name", self.get_icon_path("codename.png"), hw_layout)
+        self.add_hardware_spec("Chipset", "soc_name", self.get_icon_path("chipset.png"), hw_layout)
         
         hw_layout.addStretch()
         h_layout.addWidget(hw_container)
@@ -398,9 +434,9 @@ class DashboardWidget(QWidget):
         sw_header.setStyleSheet(f"font-size: 13px; font-weight: 700; color: {ThemeManager.COLOR_ACCENT}; letter-spacing: 1px; margin-bottom: 5px;")
         sw_layout.addWidget(sw_header)
         
-        self.add_software_spec("Build ID", "build_id", "🔢", sw_layout)
-        self.add_software_spec("Security Patch", "security_patch", "🛡️", sw_layout)
-        self.add_software_spec("Kernel", "kernel", "🐧", sw_layout)
+        self.add_software_spec("Build ID", "build_id", self.get_icon_path("build_id.png"), sw_layout)
+        self.add_software_spec("Security Patch", "security_patch", self.get_icon_path("security.png"), sw_layout)
+        self.add_software_spec("Kernel", "kernel", self.get_icon_path("kernel.png"), sw_layout)
         
         sw_layout.addStretch()
         h_layout.addWidget(sw_container)
