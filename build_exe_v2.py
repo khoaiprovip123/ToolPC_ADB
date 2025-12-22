@@ -20,6 +20,8 @@ def run_build():
         f"src/data/soc_database.json{sep}src/data",
         f"resources/adb{sep}resources/adb",
         f"scripts{sep}resources/scrcpy",
+        f"resources/icons{sep}resources/icons",
+        f"resources/logo.png{sep}resources",
     ]
     
     # 3. Check for Icon
