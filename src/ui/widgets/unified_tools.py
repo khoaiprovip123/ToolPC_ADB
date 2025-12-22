@@ -16,7 +16,10 @@ from src.ui.widgets.logcat_viewer import LogcatViewerWidget
 from src.ui.widgets.wireless_debug import WirelessDebugWidget
 from src.ui.widgets.dns_config import DNSConfigWidget
 from src.ui.widgets.script_engine import ScriptEngineWidget
-from src.ui.widgets.xiaomi_optimizer import XiaomiOptimizerWidget # Kept for reference but not used in lists if unified
+from src.ui.widgets.xiaomi_optimizer import (
+    XiaomiOptimizerWidget, XiaomiDebloaterWidget, 
+    XiaomiQuickToolsWidget, XiaomiAdvancedWidget
+)
 from src.ui.widgets.ota_downloader import OTADownloaderWidget, HyperOSAppsWidget
 from src.ui.widgets.cloud_sync import CloudSyncWidget
 from src.ui.widgets.plugin_manager_ui import PluginManagerWidget
@@ -140,8 +143,14 @@ class XiaomiSuiteWidget(BaseTabbedWidget):
         # 1. General Tweaks (Card UI)
         self.add_tab(GeneralTweaksWidget(adb_manager, self.opt_manager), "Tối Ưu Chung", "🚀")
         
-        # 2. Xiaomi Ext
-        self.add_tool(XiaomiOptimizerWidget, "Tiện Ích Xiaomi", "✨")
+        # 2. Debloater (New)
+        self.add_tool(XiaomiDebloaterWidget, "Gỡ Apps Rác", "🗑️")
+
+        # 3. Quick Tools (New)
+        self.add_tool(XiaomiQuickToolsWidget, "Tiện Ích Scan", "✨")
+
+        # 4. Advanced (New)
+        self.add_tool(XiaomiAdvancedWidget, "Tính năng Nâng cao", "⚙️")
         
         # 3. Fastboot & Repair
         self.add_tool(FastbootToolboxWidget, "Fastboot Repair", "🔌")

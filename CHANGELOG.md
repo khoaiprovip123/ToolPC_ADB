@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.5.1.0] - 2025-12-22
+### Added
+- **Show FPS & Refresh Rate Monitor**: New tool to toggle system FPS overlay, with Auto and Manual (Developer Options) fallback modes.
+- **Advanced Refresh Rate Control**: Added ability to force specific Hz values (60, 90, 120, 144Hz) or reset to Auto.
+- **Xiaomi Suite (Unified Menu)**: consolidated all Xiaomi tools (Debloater, Quick Tools, Advanced) into a single, flattened "Bộ Xiaomi" menu.
+
+### Changed
+- **UI Refactoring**: Modularized `XiaomiOptimizerWidget` into standalone components (`XiaomiDebloaterWidget`, `XiaomiQuickToolsWidget`, `XiaomiAdvancedWidget`) for better maintainability and navigation.
+- **Window Size**: Increased default application window size to 1450x850 for improved layout visibility.
+
+### Fixed
+- **UI Layout Overlap**: Fixed widget collision in the "Tính năng Nâng cao" (Advanced Features) tab.
+- **Menu Structure**: Resolved "tabs within tabs" design issue by promoting sub-tabs to the main suite level.
+
 ## [2.5.0.5] - 2025-12-20
 ### Added
 - **HyperOS 3 Optimization**: Added support for enabling "Stacked" task view (iOS style) on HyperOS 3.
