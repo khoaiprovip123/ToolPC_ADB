@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.5.1.3] - 2025-12-23
+### Added
+- **HyperOS 3 & Android 16 Support**: Enhanced detection for newer OS versions (`OS3.x.x`).
+- **Stacked Recent View**: Improved reliability on HyperOS 3 with automatic launcher restart.
+- **Improved Debloater**: Expanded bloatware list (added `com.xiaomi.discover`) and added `pm uninstall --user 0` fallback for newer Android versions.
+- **Smart Blur**: Added support for Control Center and Recents blur on HyperOS 3.
+
+### Fixed
+- **Installer "File in Use"**: Added `AppMutex` and automated `adb.exe` termination in the installer script to prevent "Access is denied" errors during updates.
+- **Permission Denied Errors**: Implemented "Silent Fail" for battery/CPU data access on restricted Android 16 systems to prevent crash logs.
+
 ## [2.5.1.1] - 2025-12-22
 ### Hotfix
 - **Update System**: Improved version tag parsing matching logic to support non-standard tags (e.g., `v.2.5.1.0`), ensuring reliable update notifications for future releases.
