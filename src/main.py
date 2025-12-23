@@ -5,6 +5,7 @@ Application Entry Point
 
 import sys
 import os
+import ctypes
 from pathlib import Path
 
 # Add src to python path
@@ -20,10 +21,24 @@ from src.ui.main_window import MainWindow
 
 def main():
     """Main entry point"""
+    # Create Win32 Mutex to prevent multiple instances and support installer lock
+    mutex_name = "XiaomiADBCommanderMutex"
+    kernel32 = ctypes.windll.kernel32
+    mutex = kernel32.CreateMutexW(None, False, mutex_name)
+    last_error = kernel32.GetLastError()
+    
+    if last_error == 183: # ERROR_ALREADY_EXISTS
+        print("Another instance is already running.")
+        # Optional: Bring existing window to front here
+        sys.exit(0)
+
     # Create application
     app = QApplication(sys.argv)
-    app.setApplicationName("ADB Manager Pro")
-    app.setOrganizationName("YourOrg")
+    app.setApplicationName("Xiaomi ADB Commander")
+    app.setOrganizationName("VanKhoai")
+    
+    # Keep mutex reference alive
+    app._app_mutex = mutex
     
     # Set app icon
     icon_path = root_dir / 'src' / 'resources' / 'icons' / 'app_icon.ico'
