@@ -9,6 +9,7 @@
 [Setup]
 ; App Information
 AppId={{A8F5E9D2-3C4B-4E7F-9A1D-6B8C2D5E7F9A}
+AppMutex=XiaomiADBCommanderMutex
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
