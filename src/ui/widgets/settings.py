@@ -511,17 +511,20 @@ class SettingsWidget(QWidget):
         changelog_group.setStyleSheet(self.get_group_style())
         changelog_layout = QVBoxLayout(changelog_group)
         
-        # Release Notes v2.5.1.2 mapped content
+        # Release Notes v2.5.1.3 mapped content
         changelog_html = """
-        <h3 style="margin-bottom: 5px;">📦 Installer & Installer Support</h3>
+        <h3 style="margin-bottom: 5px;">🚀 HyperOS 3 & Android 16 Support</h3>
         <ul style="margin-top: 0px; margin-bottom: 10px; margin-left: -20px; color: #333;">
-            <li><b>Official Setup Installer:</b> Added Windows installer (<code>setup.exe</code>) for easier deployment.</li>
-             <li><b>Auto-Update:</b> Fully supported in installer version.</li>
+            <li><b>Full Compatibility:</b> Optimized for Xiaomi HyperOS 3 and Android 16.</li>
+            <li><b>Smart Detection:</b> Accurately identifies OS3.x version strings.</li>
+            <li><b>Enhanced Security:</b> Robust handling of Android 16 permissions.</li>
         </ul>
 
-        <h3 style="margin-bottom: 5px;">🛠 Improvements (v2.5.1.2)</h3>
+        <h3 style="margin-bottom: 5px;">🛠 Optimization Features</h3>
         <ul style="margin-top: 0px; margin-bottom: 0px; margin-left: -20px; color: #333;">
-            <li>✨ <b>Code Signing Prep:</b> Prepared structure for future code signing.</li>
+            <li>✨ <b>Stacked Recent:</b> Instant activation with auto-launcher restart.</li>
+            <li>✨ <b>Improved Debloater:</b> Enhanced removal logic and updated bloatware list.</li>
+            <li>✨ <b>Smart Blur:</b> Full support for HyperOS 3 Control Center blur.</li>
         </ul>
         """
         if ThemeManager.get_theme() == "dark":
