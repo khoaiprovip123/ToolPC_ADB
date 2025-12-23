@@ -279,13 +279,14 @@ class ADBManager:
             # Don't crash if ADB check fails, just warn
             print(f"ADB verification warning: {str(e)}")
     
-    def execute(self, command: str | List[str], timeout: int = 30, check: bool = True) -> str:
+    def execute(self, command: str | List[str], timeout: int = 30, check: bool = True, log_error: bool = True) -> str:
         """
         Execute ADB command
         Args:
             command: Command string or list of arguments (Safe Mode)
             timeout: Timeout in seconds
             check: Raise exception on non-zero return code
+            log_error: Whether to log errors to LogManager
         """
         use_shell = isinstance(command, str)
         
@@ -333,21 +334,22 @@ class ADBManager:
         except subprocess.TimeoutExpired:
             cmd_str = command if isinstance(command, str) else " ".join(command)
             err_msg = f"Command timed out after {timeout}s: {cmd_str}"
-            LogManager.log("ADB Timeout", err_msg, "error")
+            if log_error:
+                LogManager.log("ADB Timeout", err_msg, "error")
             raise TimeoutError(err_msg)
         except Exception as e:
             err_msg = str(e)
             cmd_str = command if isinstance(command, str) else " ".join(command)
             
             # Filter noise
-            if "dumpsys" not in cmd_str and "getprop" not in cmd_str:
+            if log_error and "dumpsys" not in cmd_str and "getprop" not in cmd_str:
                  LogManager.log("ADB Error", f"Cmd: {cmd_str}\n{err_msg}", "error")
             
             if check:
                 raise RuntimeError(f"Failed to execute: {cmd_str}\nError: {err_msg}")
             return ""
     
-    def shell(self, command: str, timeout: int = 30, check: bool = True) -> str:
+    def shell(self, command: str, timeout: int = 30, check: bool = True, log_error: bool = True) -> str:
         """
         Execute shell command on device
         """
@@ -355,7 +357,7 @@ class ADBManager:
         # Quote the command to prevent shell interpretation by host OS
         # Escape double quotes inside the command
         safe_command = command.replace('"', '\\"')
-        return self.execute(f'{device_arg} shell "{safe_command}"', timeout=timeout, check=check)
+        return self.execute(f'{device_arg} shell "{safe_command}"', timeout=timeout, check=check, log_error=log_error)
     
     # ==================== Device Management ====================
     
@@ -414,6 +416,14 @@ class ADBManager:
                     if ':' in self.current_device 
                     else ConnectionType.USB)
         
+        # Detect HyperOS 3+ or regular HyperOS/MIUI
+        hyperos_ver = props.get('ro.mi.os.version.name')
+        if not hyperos_ver:
+             # Try new HyperOS 3+ properties
+             os_code = props.get('ro.mi.os.version.code')
+             if os_code and os_code.startswith('3'):
+                  hyperos_ver = f"OS3.{props.get('ro.mi.os.version.incremental', '0')}"
+        
         return DeviceInfo(
             serial=self.current_device,
             model=props.get('ro.product.model', 'Unknown'),
@@ -425,7 +435,7 @@ class ADBManager:
             status=DeviceStatus.ONLINE,
             ip_address=self._get_device_ip(),
             miui_version=props.get('ro.miui.ui.version.name', None),
-            hyperos_version=props.get('ro.mi.os.version.name', None),
+            hyperos_version=hyperos_ver,
             battery_level=battery.get('level'),
             storage_used=storage.get('used'),
             storage_total=storage.get('total'),
@@ -537,6 +547,12 @@ class ADBManager:
                 wm_density = wm_density_out.split("Physical density:")[1].strip()
             
             hyperos = props.get("ro.mi.os.version.name")
+            if not hyperos:
+                 # Check for HyperOS 3 properties
+                 os_code = props.get('ro.mi.os.version.code')
+                 if os_code and os_code.startswith('3'):
+                      hyperos = f"OS3.{props.get('ro.mi.os.version.incremental', '')}"
+
             miui = props.get("ro.miui.ui.version.name")
             build_disp = props.get("ro.build.display.id", "Unknown")
             
@@ -803,7 +819,8 @@ class ADBManager:
             freqs = []
             for i in range(info['cores']):
                 try:
-                    freq = self.shell(f"cat /sys/devices/system/cpu/cpu{i}/cpufreq/scaling_max_freq").strip()
+                    # check=False and log_error=False to prevent permission denied error dialogs
+                    freq = self.shell(f"cat /sys/devices/system/cpu/cpu{i}/cpufreq/scaling_max_freq", check=False, log_error=False).strip()
                     if freq.isdigit():
                         freqs.append(int(freq) // 1000) # Convert to MHz
                 except:
@@ -1089,7 +1106,8 @@ class ADBManager:
                     if info[key] > 0 and key != 'cycle_count': continue # Keep scanning cycles if needed
                     
                     for fname in filenames:
-                        val_str = self.shell(f"cat {path}{fname}", check=False).strip()
+                        # Use check=False and log_error=False to prevent permission denied errors
+                        val_str = self.shell(f"cat {path}{fname}", check=False, log_error=False).strip()
                         if val_str and val_str[0].isdigit():
                             log.append(f"Read {path}{fname} => {val_str}")
                             raw_val = safe_int(val_str)
@@ -1229,6 +1247,9 @@ class ADBManager:
                 desc = "Đã kích hoạt Blur mức tối ưu cho máy cấu hình trung bình."
                 
             self.shell(f"settings put global deviceLevelList {val}")
+            # Extra properties for HyperOS 3/Android 16 blur
+            self.shell("settings put global blur_enable 1", check=False)
+            self.shell("settings put global miui_recents_container_type 1", check=False) # Enable blur in recents
             
             LogManager.log("Smart Blur", f"Applied {mode}", "success")
             return f"{desc}\n(Mode: {mode})"
@@ -1237,12 +1258,12 @@ class ADBManager:
             return f"Lỗi: {e}"
 
     def disable_msa(self) -> bool:
-        """Disable MIUI System Ads"""
-        return self.disable_package("com.miui.msa.global")
+        """Disable MIUI System Ads (Using uninstall for Android 16 compatibility)"""
+        return self.uninstall_package("com.miui.msa.global")
 
     def disable_analytics(self) -> bool:
-        """Disable MIUI Analytics"""
-        return self.disable_package("com.miui.analytics")
+        """Disable MIUI Analytics (Using uninstall for Android 16 compatibility)"""
+        return self.uninstall_package("com.miui.analytics")
 
     # ==================== System Cleaner ====================
 

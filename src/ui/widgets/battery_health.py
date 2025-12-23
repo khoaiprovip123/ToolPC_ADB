@@ -319,7 +319,11 @@ class BatteryHealthWidget(QWidget):
         level = info.get("level", 0)
         
         # Update Main
-        self.lbl_main_cap.setText(f"{full_mah:,} mAh")
+        if full_mah > 0:
+            self.lbl_main_cap.setText(f"{full_mah:,} mAh")
+        else:
+            self.lbl_main_cap.setText("N/A (Restricted)")
+            self.lbl_main_cap.setStyleSheet("font-size: 24px; font-weight: bold; color: #7f8fa6; border: none;")
         self.lbl_percent.setText(f"{level}%")
         status_txt = info.get("status", "Unknown")
         tech = info.get("technology", "Li-poly")
@@ -330,8 +334,8 @@ class BatteryHealthWidget(QWidget):
         self.bat_icon.set_data(level, is_charging)
         
         # Update Details
-        self.lbl_design.setText(f"{design_mah:,} mAh")
-        self.lbl_real.setText(f"{full_mah:,} mAh")
+        self.lbl_design.setText(f"{design_mah:,} mAh" if design_mah > 0 else "N/A")
+        self.lbl_real.setText(f"{full_mah:,} mAh" if full_mah > 0 else "N/A")
         
         if design_mah > 0:
             loss = max(0, design_mah - full_mah)

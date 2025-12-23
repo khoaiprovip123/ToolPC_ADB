@@ -194,7 +194,9 @@ class OptimizationWorker(QThread):
             elif self.task_type == "stacked_recent":
                 self.progress.emit("📚 Đang kích hoạt giao diện Xếp chồng...")
                 self.adb.shell("settings put global task_stack_view_layout_style 2")
-                self.progress.emit("✅ Đã áp dụng (Yêu cầu HyperOS Launcher mới)")
+                self.progress.emit("🔄 Đang khởi động lại Launcher để áp dụng...")
+                self.adb.shell("am force-stop com.miui.home")
+                self.progress.emit("✅ Đã áp dụng giao diện Xếp chồng")
 
             elif self.task_type == "skip_setup":
                 self.progress.emit("⏩ Đang bỏ qua Setup Wizard...")
@@ -282,6 +284,8 @@ BLOATWARE_DICT = {
         "com.xiaomi.joyose", 
         "com.google.android.gms.location.history",
         "com.miui.systemadsolution",
+        "com.miui.hybrid.accessory",
+        "com.xiaomi.discover",
     ],
     "Ứng dụng Rác Hệ thống (An toàn) 🗑️": [
         "com.miui.calculator",
@@ -347,7 +351,10 @@ class XiaomiBaseWidget(QWidget):
             if is_xiaomi_brand or is_xiaomi_os:
                 text = f"✅ Đã kết nối: {info.model}"
                 if info.hyperos_version:
-                    text = f"✅ Đã kết nối: Xiaomi HyperOS ({info.hyperos_version})"
+                    if info.hyperos_version.startswith("OS3"):
+                        text = f"✅ Đã kết nối: Xiaomi HyperOS 3 ({info.hyperos_version})"
+                    else:
+                        text = f"✅ Đã kết nối: Xiaomi HyperOS ({info.hyperos_version})"
                 elif info.miui_version:
                     text = f"✅ Đã kết nối: MIUI ({info.miui_version})"
                 status_label.setText(text)

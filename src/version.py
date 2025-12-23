@@ -4,8 +4,8 @@ Application version information
 Centralized version constant for easy maintenance
 """
 
-__version__ = "2.5.1.2"
-__version_info__ = (2, 5, 1, 2)
+__version__ = "2.5.1.3"
+__version_info__ = (2, 5, 1, 3)
 __author__ = "Van Khoai"
 __app_name__ = "Xiaomi ADB Commander"
 
