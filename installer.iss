@@ -31,6 +31,9 @@ WizardStyle=modern
 ; Privileges
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+CloseApplications=yes
+CloseApplicationsFilter=adb.exe,XiaomiADBCommander.exe
+AppMutex=XiaomiADBCommanderMutex
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
