@@ -23,16 +23,19 @@ from src.ui.widgets.xiaomi_optimizer import (
 from src.ui.widgets.ota_downloader import OTADownloaderWidget, HyperOSAppsWidget
 from src.ui.widgets.cloud_sync import CloudSyncWidget
 from src.ui.widgets.plugin_manager_ui import PluginManagerWidget
+from src.ui.widgets.permission_tools import PermissionToolsWidget
 from src.ui.widgets.battery_health import BatteryHealthWidget
 from src.ui.widgets.cleaner import CleanerWidget
 from src.ui.widgets.fastboot_toolbox import FastbootToolboxWidget
-from src.ui.widgets.apk_analyzer import APKAnalyzerWidget
 from src.core.optimization_manager import OptimizationManager
 from src.ui.widgets.global_optimizer import GeneralTweaksWidget
+from src.ui.widgets.app_manager import AppManagerWidget
+from src.ui.widgets.file_manager import FileManagerWidget
+from src.ui.widgets.advanced_commands import AdvancedCommandsWidget
 
 class BaseTabbedWidget(QWidget):
-    """Base class for tabbed tool containers"""
-    def __init__(self, adb_manager, title):
+    """Base class for tabbed tool containers - Space Optimized"""
+    def __init__(self, adb_manager, title=""):
         super().__init__()
         self.adb = adb_manager
         self.title = title
@@ -41,77 +44,53 @@ class BaseTabbedWidget(QWidget):
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(5, 5, 5, 5) # Compact margins
+        layout.setSpacing(0)
         
-        # Header
-        header = QLabel(self.title)
-        header.setStyleSheet(f"font-size: 20px; font-weight: bold; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
-        layout.addWidget(header)
-        
-        # Tabs
+        # Tabs - Header-less for space
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(f"""
             QTabWidget::pane {{
-                border: 1px solid rgba(0,0,0,0.1);
-                border-radius: {ThemeManager.RADIUS_BUTTON};
-                background: rgba(255, 255, 255, 0.5);
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+                border-radius: 12px;
+                background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
             }}
             QTabBar::tab {{
-                background: rgba(255, 255, 255, 0.3);
+                background: transparent;
                 border: none;
-                padding: 10px 20px;
-                margin-right: 5px;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+                padding: 12px 24px;
+                margin-right: 2px;
+                color: {ThemeManager.COLOR_TEXT_SECONDARY};
+                font-family: {ThemeManager.FONT_FAMILY};
+                font-size: 14px;
+                font-weight: 500;
+            }}
+            QTabBar::tab:hover {{
+                background: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']};
+                border-radius: 8px;
             }}
             QTabBar::tab:selected {{
-                background: rgba(255, 255, 255, 0.8);
-                font-weight: bold;
-                border-bottom: 2px solid {ThemeManager.COLOR_ACCENT};
+                color: {ThemeManager.COLOR_ACCENT};
+                font-weight: 700;
+                border-bottom: 3px solid {ThemeManager.COLOR_ACCENT};
             }}
         """)
         layout.addWidget(self.tabs)
         
     def add_tool(self, widget_class, title, icon=""):
-        # Instantiate widget
         widget = widget_class(self.adb)
         self.widgets.append(widget)
-        self.add_tab(widget, title, icon) # Reuse add_tab logic
+        self.add_tab(widget, title, icon)
 
     def add_tab(self, widget, title, icon=""):
-        """Add an instantiated widget, wrapped in ScrollArea"""
         from PySide6.QtWidgets import QScrollArea
-        
-        # Wrap in ScrollArea to prevent clipping on small screens
         scroll = QScrollArea()
-        scroll.setWidgetResizable(True) # Important!
+        scroll.setWidgetResizable(True)
         scroll.setWidget(widget)
-        
-        # Transparent style for scroll area so it blends in
         scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background: transparent;
-            }
-            QScrollArea > QWidget > QWidget {
-                background: transparent;
-            }
-            QScrollBar:vertical {
-                border: none;
-                background: rgba(0,0,0,0.05);
-                width: 8px;
-                margin: 0px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical {
-                background: rgba(0,0,0,0.2);
-                min-height: 20px;
-                border-radius: 4px;
-            }
+            QScrollArea { border: none; background: transparent; }
+            QScrollArea > QWidget > QWidget { background: transparent; }
         """)
-        
-        self.widgets.append(widget) # Keep validation ref
         self.tabs.addTab(scroll, f"{icon} {title}")
         
     def reset(self):
@@ -119,54 +98,37 @@ class BaseTabbedWidget(QWidget):
             if hasattr(widget, 'reset'):
                 widget.reset()
 
-class DevToolsWidget(BaseTabbedWidget):
-    """Combines all developer tools"""
-    def __init__(self, adb_manager):
-        super().__init__(adb_manager, "🛠️ Công cụ Lập trình (Dev Tools)")
-        
-        self.add_tool(ConsoleWidget, "Console", "💻")
-        self.add_tool(LogcatViewerWidget, "Logcat", "📜")
-        self.add_tool(WirelessDebugWidget, "Wireless Debug", "📡")
-        self.add_tool(DNSConfigWidget, "DNS Config", "🌐")
-        self.add_tool(ScriptEngineWidget, "Script Engine", "⚡")
-        self.add_tool(APKAnalyzerWidget, "APK Analyzer", "📦")
-
-
 class XiaomiSuiteWidget(BaseTabbedWidget):
-    """Combines Xiaomi specific tools"""
+    """Unified Xiaomi Suite - Flat Hierarchy"""
     def __init__(self, adb_manager):
-        super().__init__(adb_manager, "🚀 Bộ công cụ Xiaomi")
+        super().__init__(adb_manager)
         
-        # Initialize Manager
         self.opt_manager = OptimizationManager(adb_manager)
         
-        # 1. General Tweaks (Card UI)
-        self.add_tab(GeneralTweaksWidget(adb_manager, self.opt_manager), "Tối Ưu Chung", "🚀")
-        
-        # 2. Debloater (New)
-        self.add_tool(XiaomiDebloaterWidget, "Gỡ Apps Rác", "🗑️")
+        self.add_tab(GeneralTweaksWidget(adb_manager, self.opt_manager), "Tối Ưu", "🚀")
+        self.add_tool(XiaomiDebloaterWidget, "Gỡ App", "🗑️")
+        self.add_tool(XiaomiQuickToolsWidget, "Tiện Ích", "✨")
+        self.add_tool(XiaomiAdvancedWidget, "Nâng Cao", "⚙️")
+        self.add_tool(FastbootToolboxWidget, "Fastboot", "🔌")
+        self.add_tool(OTADownloaderWidget, "OTA Download", "☁️")
+        self.add_tool(HyperOSAppsWidget, "Kho Apps", "📱")
 
-        # 3. Quick Tools (New)
-        self.add_tool(XiaomiQuickToolsWidget, "Tiện Ích Scan", "✨")
-
-        # 4. Advanced (New)
-        self.add_tool(XiaomiAdvancedWidget, "Tính năng Nâng cao", "⚙️")
-        
-        # 3. Fastboot & Repair
-        self.add_tool(FastbootToolboxWidget, "Fastboot Repair", "🔌")
-
-        # 4. OTA
-        self.add_tool(OTADownloaderWidget, "OTA Downloader", "☁️")
-        
-        # 5. Apps
-        self.add_tool(HyperOSAppsWidget, "HyperOS Apps", "📱")
-
-class SystemUtilsWidget(BaseTabbedWidget):
-    """Combines system utilities"""
+class GeneralToolsWidget(BaseTabbedWidget):
+    """Unified General Tools & Dev Suite - Flat Hierarchy"""
     def __init__(self, adb_manager):
-        super().__init__(adb_manager, "⚙️ Tiện ích Hệ thống")
+        super().__init__(adb_manager)
         
-        self.add_tool(CleanerWidget, "Dọn Rác (Cleaner)", "🗑️")
-        self.add_tool(BatteryHealthWidget, "Battery Health", "🔋")
-        self.add_tool(CloudSyncWidget, "Cloud Sync", "☁️")
-        self.add_tool(PluginManagerWidget, "Plugins", "🧩")
+        # System Utils
+        self.add_tool(CleanerWidget, "Dọn Rác", "🧹")
+        self.add_tool(BatteryHealthWidget, "Sức Khỏe Pin", "🔋")
+        self.add_tool(PermissionToolsWidget, "Cấp Quyền", "🔐")
+        
+        # Dev Tools
+        self.add_tool(ConsoleWidget, "Console", "💻")
+        self.add_tool(LogcatViewerWidget, "Logcat", "📜")
+        self.add_tool(WirelessDebugWidget, "Wireless", "📡")
+        
+        # Others
+        # self.add_tool(CloudSyncWidget, "Cloud Sync", "☁️")
+        # self.add_tool(PluginManagerWidget, "Plugins", "🧩")
+        self.add_tool(AdvancedCommandsWidget, "Lệnh Nâng Cao", "⚡")

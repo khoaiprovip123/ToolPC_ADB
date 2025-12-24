@@ -12,20 +12,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Signal
 from src.ui.theme_manager import ThemeManager
 
-class ShizukuWorker(QThread):
-    finished = Signal(str)
-    
-    def __init__(self, adb, cmd):
-        super().__init__()
-        self.adb = adb
-        self.cmd = cmd
-        
-    def run(self):
-        try:
-            res = self.adb.shell(self.cmd)
-            self.finished.emit(res)
-        except Exception as e:
-            self.finished.emit(f"Error: {str(e)}")
+# ShizukuWorker removed - moved to permission_tools.py
 
 class Card(QFrame):
     def __init__(self, title, layout_type=QVBoxLayout):
@@ -85,32 +72,13 @@ class WirelessDebugWidget(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
         
-        # --- 1. Shizuku Section ---
-        shizuku_card = Card("Shizuku Manager", QHBoxLayout)
-        
-        info_lbl = QLabel("Kích hoạt Shizuku (hỗ trợ không cần Root nếu đã ghép đôi Wireless Debugging)")
+        # --- 1. Info Section ---
+        info_card = Card("Thông tin", QVBoxLayout)
+        info_lbl = QLabel("Công cụ hỗ trợ kết nối và gỡ lỗi không dây (Wireless Debugging).\nYêu cầu cùng mạng Wifi.")
         info_lbl.setWordWrap(True)
         info_lbl.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; border: none; background: transparent;")
-        shizuku_card.content_layout.addWidget(info_lbl, stretch=1)
-        
-        btn_start_shizuku = QPushButton("⚡ Start Shizuku")
-        btn_start_shizuku.setCursor(Qt.PointingHandCursor)
-        btn_start_shizuku.setStyleSheet("""
-            QPushButton {
-                background-color: #f1c40f; 
-                color: white; 
-                font-weight: bold; 
-                border-radius: 8px; 
-                padding: 10px 20px;
-                border: none;
-            }
-            QPushButton:hover { background-color: #f39c12; }
-            QPushButton:pressed { background-color: #d35400; }
-        """)
-        btn_start_shizuku.clicked.connect(self.start_shizuku)
-        shizuku_card.content_layout.addWidget(btn_start_shizuku)
-        
-        layout.addWidget(shizuku_card)
+        info_card.content_layout.addWidget(info_lbl)
+        layout.addWidget(info_card)
         
         # --- 2. Pairing Section ---
         pair_card = Card("Android 11+ (Pairing)", QFormLayout)
@@ -223,37 +191,4 @@ class WirelessDebugWidget(QWidget):
         else:
             QMessageBox.warning(self, "Lỗi", "Không thể kích hoạt TCP/IP")
 
-    def start_shizuku(self):
-        cmd = "sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh"
-        
-        # Show Loading Dialog
-        self.progress = QDialog(self)
-        self.progress.setWindowTitle("Starting Shizuku")
-        self.progress.setFixedSize(300, 100)
-        l = QVBoxLayout(self.progress)
-        l.addWidget(QLabel("Đang gửi lệnh kích hoạt..."))
-        self.progress.show()
-        
-        self.worker = ShizukuWorker(self.adb, cmd)
-        self.worker.finished.connect(self.on_shizuku_done)
-        self.worker.start()
-        
-    def on_shizuku_done(self, output):
-        self.progress.close()
-        
-        result_dialog = QDialog(self)
-        result_dialog.setWindowTitle("Shizuku Result")
-        result_dialog.resize(400, 300)
-        l = QVBoxLayout(result_dialog)
-        
-        txt = QTextEdit()
-        txt.setPlainText(output)
-        txt.setReadOnly(True)
-        l.addWidget(txt)
-        
-        if "info: shizuku_starter exit with 0" in output:
-            l.addWidget(QLabel("✅ Kích hoạt thành công!"))
-        else:
-            l.addWidget(QLabel("⚠️ Kiểm tra log để biết chi tiết."))
-            
-        result_dialog.exec()
+    # start_shizuku moved to permission_tools.py

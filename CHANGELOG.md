@@ -1,4 +1,18 @@
-# Changelog
+## [2.5.2] - 2025-12-24
+### Fixed
+- **Dashboard "Checking..." Freeze**: 
+  - Fixed critical bug where `shell()` returned `None`, causing the dashboard to hang indefinitely on startup.
+  - Resolved `AttributeError: legacy_shell` by restoring the return statement implementation.
+- **Battery Health Error**: Adjusted log parsing to handle non-standard dumpsys output gracefully.
+- **ART Tuning Feedback**:
+  - Implemented real-time progress streaming for "Tăng tốc ứng dụng (ART Tuning)".
+  - Fixed "Destroyed while thread is still running" crash by adding proper thread state checks.
+  - Corrected log display bug which showed "OK: package" instead of actual app names.
+- **Log System**:
+  - Added persistent file logging to `logs/app_log.txt` for easier troubleshooting.
+  - Logs now include timestamp, level (INFO/ERROR), and category.
+
+
 
 ## [2.5.1.3] - 2025-12-23
 ### Added

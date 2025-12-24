@@ -511,20 +511,14 @@ class SettingsWidget(QWidget):
         changelog_group.setStyleSheet(self.get_group_style())
         changelog_layout = QVBoxLayout(changelog_group)
         
-        # Release Notes v2.5.1.3 mapped content
+        # Release Notes v2.5.2 mapped content
         changelog_html = """
-        <h3 style="margin-bottom: 5px;">🚀 HyperOS 3 & Android 16 Support</h3>
+        <h3 style="margin-bottom: 5px;">🔧 Fixes & Optimizations (v2.5.2)</h3>
         <ul style="margin-top: 0px; margin-bottom: 10px; margin-left: -20px; color: #333;">
-            <li><b>Full Compatibility:</b> Optimized for Xiaomi HyperOS 3 and Android 16.</li>
-            <li><b>Smart Detection:</b> Accurately identifies OS3.x version strings.</li>
-            <li><b>Enhanced Security:</b> Robust handling of Android 16 permissions.</li>
-        </ul>
-
-        <h3 style="margin-bottom: 5px;">🛠 Optimization Features</h3>
-        <ul style="margin-top: 0px; margin-bottom: 0px; margin-left: -20px; color: #333;">
-            <li>✨ <b>Stacked Recent:</b> Instant activation with auto-launcher restart.</li>
-            <li>✨ <b>Improved Debloater:</b> Enhanced removal logic and updated bloatware list.</li>
-            <li>✨ <b>Smart Blur:</b> Full support for HyperOS 3 Control Center blur.</li>
+            <li>✅ <b>Dashboard Fix:</b> Resolved "Checking..." freeze and missing data display.</li>
+            <li>✅ <b>ART Tuning:</b> Fixed crash and added real-time progress for app optimization.</li>
+            <li>✅ <b>Log System:</b> Added file logging (app_log.txt) for better debugging.</li>
+            <li>✅ <b>Stability:</b> Fixed random crashes during long-running tasks.</li>
         </ul>
         """
         if ThemeManager.get_theme() == "dark":

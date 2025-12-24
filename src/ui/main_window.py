@@ -7,10 +7,12 @@ Style: Modern Glassmorphism with Colored Icons
 import sys
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QStackedWidget, QPushButton, QLabel, QFrame,
-    QComboBox, QStatusBar, QMessageBox, QGraphicsDropShadowEffect
+    QComboBox, QStatusBar, QMessageBox, QGraphicsDropShadowEffect,
+    QApplication
 )
-from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtCore import Qt, QSize, QTimer, QEvent
 from PySide6.QtGui import QIcon, QColor, QFont, QPixmap
 
 # Import Core
@@ -25,11 +27,11 @@ from src.ui.widgets.dashboard import DashboardWidget
 from src.ui.widgets.app_manager import AppManagerWidget
 from src.ui.widgets.file_manager import FileManagerWidget
 # from src.ui.widgets.screen_mirror import ScreenMirrorWidget # Removed
-from src.ui.widgets.unified_tools import DevToolsWidget, XiaomiSuiteWidget, SystemUtilsWidget
-from src.ui.widgets.fastboot_toolbox import FastbootToolboxWidget
+from src.ui.widgets.unified_tools import (
+    XiaomiSuiteWidget, GeneralToolsWidget
+)
 from src.ui.widgets.settings import SettingsWidget
 from src.ui.widgets.notification_center import NotificationCenter
-from src.ui.widgets.advanced_commands import AdvancedCommandsWidget
 from src.ui.dialogs.update_dialog import UpdateNotificationDialog, UpdateProgressDialog
 from src.core.plugin_manager import PluginManager
 
@@ -110,30 +112,18 @@ class Sidebar(QFrame):
         # Quản lý
         self.add_group_label("QUẢN LÝ", layout)
         self.add_nav_button("Ứng Dụng", "apps", 1, layout)
-        self.add_nav_button("Tệp Tin", "files", 3, layout)
+        self.add_nav_button("Tệp Tin", "files", 2, layout)
         layout.addSpacing(20)
         
         # Công cụ
-        self.add_group_label("TIỆN ÍCH", layout)
-        self.add_nav_button("Bộ Xiaomi", "xiaomi", 2, layout)
-        # Fastboot & Tools
-        # self.add_nav_button("Fastboot", "fastboot", 4, layout) # Consolidated into Tools
-        self.add_nav_button("Công cụ", "tools", 4, layout)
-        self.add_nav_button("Dev Tools", "devtools", 5, layout)
-        self.advanced_btn = self.add_nav_button("Nâng Cao", "advanced", 6, layout)
-        
-        # Load visibility settings
-        from PySide6.QtCore import QSettings
-        settings = QSettings("VanKhoai", "XiaomiADBCommander")
-        show_advanced = settings.value("show_advanced_menu", True, type=bool)
-        if not show_advanced:
-            self.advanced_btn.setVisible(False)
-        
+        self.add_group_label("CÔNG CỤ", layout)
+        self.add_nav_button("Bộ Xiaomi", "xiaomi", 3, layout)
+        self.add_nav_button("Công Cụ Khác", "tools", 4, layout)
         layout.addSpacing(20)
         
         # Hệ thống
         self.add_group_label("HỆ THỐNG", layout)
-        self.add_nav_button("Cài Đặt", "settings", 7, layout)
+        self.add_nav_button("Cài Đặt", "settings", 5, layout)
         
         layout.addStretch()
         
@@ -326,6 +316,9 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
+        # Install Global Event Filter for robust Auto-Hide (catches clicks on other widgets)
+        QApplication.instance().installEventFilter(self)
+        
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -493,33 +486,21 @@ class MainWindow(QMainWindow):
         self.app_manager = AppManagerWidget(self.adb)
         self.pages.addWidget(self.app_manager)
         
-        # 2. Xiaomi Suite
-        self.xiaomi_suite = XiaomiSuiteWidget(self.adb)
-        self.pages.addWidget(self.xiaomi_suite)
-        
-        # 3. File Manager
+        # 2. File Manager
         self.file_manager = FileManagerWidget(self.adb)
         self.pages.addWidget(self.file_manager)
         
-        # 4. Fastboot - Consolidated into SystemUtilsWidget
-        # self.fastboot_tool = FastbootToolboxWidget(self.adb)
-        # self.pages.addWidget(self.fastboot_tool)
+        # 3. Xiaomi Suite
+        self.xiaomi_suite = XiaomiSuiteWidget(self.adb)
+        self.pages.addWidget(self.xiaomi_suite)
         
-        # 5. Unified Tools
-        self.system_utils = SystemUtilsWidget(self.adb)
-        self.pages.addWidget(self.system_utils)
+        # 4. General Tools
+        self.general_tools = GeneralToolsWidget(self.adb)
+        self.pages.addWidget(self.general_tools)
         
-        # 6. Dev Tools
-        self.dev_tools = DevToolsWidget(self.adb)
-        self.pages.addWidget(self.dev_tools)
-        
-        # 7. Advanced Commands
-        self.advanced_commands = AdvancedCommandsWidget(self.adb)
-        self.pages.addWidget(self.advanced_commands)
-        
-        # 8. Settings
-        self.settings = SettingsWidget(self.adb)
-        self.pages.addWidget(self.settings)
+        # 5. Settings
+        self.settings_widget = SettingsWidget(self.adb)
+        self.pages.addWidget(self.settings_widget)
     
     def setup_timers(self):
         """Setup background timers"""
@@ -632,10 +613,8 @@ class MainWindow(QMainWindow):
                 
                 if hasattr(self, 'app_manager'): self.app_manager.reset()
                 if hasattr(self, 'file_manager'): self.file_manager.reset()
-                if hasattr(self, 'screen_mirror'): self.screen_mirror.reset()
-                if hasattr(self, 'dev_tools'): self.dev_tools.reset() 
                 if hasattr(self, 'xiaomi_suite'): self.xiaomi_suite.reset()
-                if hasattr(self, 'system_utils'): self.system_utils.reset()
+                if hasattr(self, 'general_tools'): self.general_tools.reset()
                 
                 if hasattr(self, 'dashboard'):
                     self.dashboard.start_updates()
@@ -654,9 +633,69 @@ class MainWindow(QMainWindow):
         """Handle app close"""
         if hasattr(self, 'dashboard'):
             self.dashboard.stop_updates()
-        if hasattr(self, 'screen_mirror'):
-            self.screen_mirror.stop_mirroring()
+        if hasattr(self, 'notif_center'):
+            self.notif_center.stop_mirroring()
         event.accept()
+
+    def resizeEvent(self, event):
+        """Ensure Notification Center stays on the right edge"""
+        if hasattr(self, 'notif_center'):
+            # Height: Match window height
+            self.notif_center.setFixedHeight(self.height())
+            
+            # Position: Right aligned
+            # x = width - notif_width
+            # y = 0
+            new_x = self.width() - self.notif_center.width()
+            self.notif_center.move(new_x, 0)
+        
+        super().resizeEvent(event)
+
+    def eventFilter(self, obj, event):
+        """Handle global events for Auto-Hide logic"""
+        if event.type() == QEvent.MouseButtonPress:
+            if hasattr(self, 'notif_center') and self.notif_center.isVisible():
+                # Global Event Filter (via QApplication) logic
+                # Check if the object receiving the click is part of the Notification Center
+                
+                # 1. Get widget under mouse
+                widget_under_mouse = QApplication.widgetAt(event.globalPos()) if hasattr(event, 'globalPos') else QApplication.widgetAt(event.globalPosition().toPoint())
+                
+                # 2. Check hierarchy
+                is_inside = False
+                if widget_under_mouse:
+                    # Check if widget is notif_center or a child of it
+                    if widget_under_mouse == self.notif_center or self.notif_center.isAncestorOf(widget_under_mouse):
+                        is_inside = True
+                
+                # 3. Check Toggle Buttons (Prevent immediate reopen)
+                # We need to see if the click target is one of our toggle buttons
+                is_toggle_btn = False
+                if widget_under_mouse:
+                    # Heuristic: Check tooltip or parent
+                    # Simplified: If we click outside, we hide.
+                    # The toggle button click event will process AFTER this filter? 
+                    # If this filter returns False, event propagates.
+                    # If Toggle Button receives click, it toggles (Shows/Hides).
+                    # If Update: Open -> Click Toggle -> (Filter: Hides) -> (Button: Toggles -> Shows again?)
+                    # Fix: If clicking toggle button, DO NOTHING in filter.
+                    
+                    # Identify toggle buttons by property or object
+                    # We can iterate sidebar buttons or check tooltip "Thông báo" / "Trung tâm Điều khiển"
+                     if isinstance(widget_under_mouse, QPushButton):
+                         tip = widget_under_mouse.toolTip()
+                         if tip in ["Thông báo", "Trung tâm Điều khiển"]:
+                             is_toggle_btn = True
+                         # Also check icon parents if QIcon? (No, widget is button)
+                
+                if not is_inside and not is_toggle_btn:
+                    # Clicked outside!
+                    self.notif_center.toggle()
+                    # Do not consume event, let it trigger the background click
+        
+        return super().eventFilter(obj, event)
+        
+        return super().eventFilter(obj, event)
 
     def update_menu_visibility(self, menu_name, is_visible):
         """Update sidebar menu button visibility"""
