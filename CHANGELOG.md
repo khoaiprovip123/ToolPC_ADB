@@ -1,4 +1,4 @@
-## [2.5.2] - 2025-12-24
+## [2.5.2.0] - 2025-12-24
 ### Fixed
 - **Dashboard "Checking..." Freeze**: 
   - Fixed critical bug where `shell()` returned `None`, causing the dashboard to hang indefinitely on startup.

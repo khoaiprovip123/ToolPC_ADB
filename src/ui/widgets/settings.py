@@ -511,9 +511,9 @@ class SettingsWidget(QWidget):
         changelog_group.setStyleSheet(self.get_group_style())
         changelog_layout = QVBoxLayout(changelog_group)
         
-        # Release Notes v2.5.2 mapped content
+        # Release Notes v2.5.2.0 mapped content
         changelog_html = """
-        <h3 style="margin-bottom: 5px;">🔧 Fixes & Optimizations (v2.5.2)</h3>
+        <h3 style="margin-bottom: 5px;">🔧 Fixes & Optimizations (v2.5.2.0)</h3>
         <ul style="margin-top: 0px; margin-bottom: 10px; margin-left: -20px; color: #333;">
             <li>✅ <b>Dashboard Fix:</b> Resolved "Checking..." freeze and missing data display.</li>
             <li>✅ <b>ART Tuning:</b> Fixed crash and added real-time progress for app optimization.</li>
