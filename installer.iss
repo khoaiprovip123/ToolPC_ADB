@@ -2,7 +2,7 @@
 ; This script creates a Windows installer with installation path selection
 
 #define MyAppName "Xiaomi ADB Commander"
-#define MyAppVersion "2.5.1.3"
+#define MyAppVersion "2.5.2.0"
 #define MyAppPublisher "VanKhanh Dev"
 #define MyAppExeName "XiaomiADBCommander.exe"
 
@@ -33,7 +33,7 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 CloseApplications=yes
 CloseApplicationsFilter=adb.exe,XiaomiADBCommander.exe
-AppMutex=XiaomiADBCommanderMutex
+
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
