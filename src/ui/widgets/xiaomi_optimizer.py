@@ -192,8 +192,13 @@ class OptimizationWorker(QThread):
                 self.progress.emit(f"✅ {result}")
 
             elif self.task_type == "stacked_recent":
-                self.progress.emit("📚 Đang kích hoạt giao diện Xếp chồng...")
+                self.progress.emit("📚 Đang kích hoạt giao diện Xếp chồng (HyperOS Native)...")
+                # 1. New native method
+                result = self.adb.set_recents_style(1)
+                self.progress.emit(result)
+                # 2. Legacy method
                 self.adb.shell("settings put global task_stack_view_layout_style 2")
+                
                 self.progress.emit("🔄 Đang khởi động lại Launcher để áp dụng...")
                 self.adb.shell("am force-stop com.miui.home")
                 self.progress.emit("✅ Đã áp dụng giao diện Xếp chồng")
@@ -258,6 +263,19 @@ class OptimizationWorker(QThread):
                  result = self.adb.open_developer_options()
                  self.progress.emit(result)
 
+            elif self.task_type == "expert_optimize":
+                 self.progress.emit("🚀 Đang kích hoạt Tối ưu hóa Chuyên sâu (HyperOS 3+)...")
+                 result = self.adb.apply_performance_props()
+                 self.progress.emit(result)
+                 self.progress.emit("🔄 Đang tối ưu hóa Compiler (speed-profile)...")
+                 result = self.adb.compile_apps("speed-profile", timeout=300, callback=self.progress.emit)
+                 self.progress.emit(result)
+
+            elif self.task_type == "art_tuning":
+                 self.progress.emit("⚡ Đang tối ưu hóa ART (Full Speed)...")
+                 result = self.adb.compile_apps("speed", timeout=600, callback=self.progress.emit)
+                 self.progress.emit(result)
+
         except Exception as e:
             err_str = str(e)
             if "SecurityException" in err_str:
@@ -286,6 +304,8 @@ BLOATWARE_DICT = {
         "com.miui.systemadsolution",
         "com.miui.hybrid.accessory",
         "com.xiaomi.discover",
+        "com.miui.daemon",
+        "com.xiaomi.vipaccount",
     ],
     "Ứng dụng Rác Hệ thống (An toàn) 🗑️": [
         "com.miui.calculator",
@@ -299,6 +319,9 @@ BLOATWARE_DICT = {
         "com.miui.yellowpage",
         "com.miui.bugreport",
         "com.miui.miservice",
+        "com.miui.cleanmaster",
+        "com.xiaomi.mipicks",
+        "com.xiaomi.glgm",
     ],
     "Xiaomi Cloud & Sync ☁️": [
         "com.miui.cloudservice",
@@ -307,6 +330,7 @@ BLOATWARE_DICT = {
         "com.xiaomi.midrop", 
         "com.miui.virtualsim",
         "com.xiaomi.payment",
+        "com.miui.micloudsync",
     ],
     "Partner Apps & Facebook 👎": [
         "com.facebook.appmanager",
@@ -316,6 +340,7 @@ BLOATWARE_DICT = {
         "com.ebay.carrier",
         "com.ebay.mobile",
         "com.linkedin.android",
+        "com.duokan.phone.remotecontroller",
     ]
 }
 
@@ -329,7 +354,8 @@ class XiaomiBaseWidget(QWidget):
         self.worker = None
         
     def show_error(self, title, message):
-        QMessageBox.warning(self, title, message)
+        # Use LogManager instead of Popup
+        LogManager.log(title, message, "error")
     
     def check_device(self, status_label):
         """Helper to update a status label with device info"""
@@ -567,18 +593,44 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
             gradient_colors=["#a18cd1", "#fbc2eb"]
         )
         grid.addWidget(card_stack, 1, 0)
+        
+        # Expert Optimization Card
+        card_expert = ModernCard(
+            "Tối Ưu Chuyên Sâu (Expert)",
+            "Tăng tốc animations, tối ưu hóa kernel và compiler cho HyperOS 3 / Android 16.",
+            "💎",
+            self.run_expert_optimization,
+            gradient_colors=["#f093fb", "#f5576c"]
+        )
+        grid.addWidget(card_expert, 1, 1)
+
+        # ART Tuning Card
+        card_art = ModernCard(
+            "Tăng Tốc Ứng Dụng (ART)",
+            "Ép hệ thống biên dịch lại ứng dụng sang mã máy (speed) để phản hồi tức thì.",
+            "🔥",
+            self.run_art_tuning,
+            gradient_colors=["#84fab0", "#8fd3f4"]
+        )
+        grid.addWidget(card_art, 2, 0)
 
         grid.setRowStretch(2, 1) # Push to top
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
     def optimize_animations(self):
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
         self.opt_worker = OptimizationWorker(self.adb, "animations")
         self.opt_worker.progress.connect(lambda msg: LogManager.log("Animations", msg, "info"))
         self.opt_worker.error_occurred.connect(self.show_error)
         self.opt_worker.start()
 
     def run_smart_blur(self):
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
         self.opt_worker = OptimizationWorker(self.adb, "smart_blur")
         self.opt_worker.progress.connect(lambda msg: LogManager.log("Smart Blur", msg, "info"))
         self.opt_worker.error_occurred.connect(self.show_error)
@@ -595,16 +647,17 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
                     pass
             
             if android_ver < 14:
-                QMessageBox.warning(self, "Không hỗ trợ", f"Yêu cầu Android 14+ (Hiện tại: {info.android_version})")
+                LogManager.log("Compat", f"Yêu cầu Android 14+ (Hiện tại: {info.android_version})", "warning")
                 return
 
             if not info.hyperos_version:
-                 QMessageBox.warning(self, "Không hỗ trợ", "Chỉ hỗ trợ Xiaomi HyperOS.")
+                 LogManager.log("Compat", "Chỉ hỗ trợ Xiaomi HyperOS.", "warning")
                  return
 
             brand = self.adb.shell("getprop ro.product.brand").strip().lower()
             if "poco" in brand:
-                 QMessageBox.warning(self, "Chưa hỗ trợ POCO", "POCO Launcher chưa hỗ trợ tính năng này.")
+                 LogManager.log("Compat", "POCO Launcher chưa được hỗ trợ chính thức.", "warning")
+                 # return # Allow POCO to try if they want? No, keep restricted if risky. 
                  return
                  
         except Exception as e:
@@ -631,21 +684,59 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
                      msg = QMessageBox(self)
                      msg.setIcon(QMessageBox.Warning)
                      msg.setWindowTitle("Phiên bản Launcher cũ")
-                     msg.setText(f"Yêu cầu HyperOS Launcher >= RELEASE-6.01.03.1924\nHiện tại: {version_str}")
+                     msg.setText(f"Yêu cầu HyperOS Launcher >= RELEASE-6.01.03.1924\nHiện tại: {version_str}\n\n(! Một số trường hợp không kích hoạt được có thể dùng lệnh can thiệp sâu để kích hoạt tính năng này)")
                      btn_download = msg.addButton("Tải bản cập nhật 🌐", QMessageBox.ActionRole)
+                     btn_deep = msg.addButton("Can thiệp sâu (ADB) ⚡", QMessageBox.ActionRole)
                      msg.addButton("Đóng", QMessageBox.RejectRole)
                      msg.exec()
                      
                      if msg.clickedButton() == btn_download:
                          QDesktopServices.openUrl(QUrl("https://hyperosupdates.com/apps/com.miui.home"))
-                     return
+                         return
+                     elif msg.clickedButton() == btn_deep:
+                         # Continue to start worker
+                         LogManager.log("Deep Action", "Đang kích hoạt can thiệp sâu...", "info")
+                         pass
+                     else:
+                         return
         except:
              pass
+
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
 
         self.opt_worker = OptimizationWorker(self.adb, "stacked_recent")
         self.opt_worker.progress.connect(lambda msg: LogManager.log("Stacked Recent", msg, "info"))
         self.opt_worker.error_occurred.connect(self.show_error)
         self.opt_worker.start()
+
+    def run_expert_optimization(self):
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
+
+        self.opt_worker = OptimizationWorker(self.adb, "expert_optimize")
+        self.opt_worker.progress.connect(lambda msg: LogManager.log("Expert Opt", msg, "info"))
+        self.opt_worker.error_occurred.connect(self.show_error)
+        self.opt_worker.start()
+
+    def run_art_tuning(self):
+        # Confirm because it takes time
+        confirm = QMessageBox.question(
+            self, "Xác nhận", 
+            "Quá trình này có thể mất 5-10 phút và làm nóng máy nhẹ. Bạn có muốn tiếp tục?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if confirm == QMessageBox.Yes:
+            if self.opt_worker and self.opt_worker.isRunning():
+                LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+                return
+
+            self.opt_worker = OptimizationWorker(self.adb, "art_tuning")
+            self.opt_worker.progress.connect(lambda msg: LogManager.log("ART Tuning", msg, "info"))
+            self.opt_worker.error_occurred.connect(self.show_error)
+            self.opt_worker.start()
 
 
 class XiaomiAdvancedWidget(XiaomiBaseWidget):
@@ -763,6 +854,9 @@ class XiaomiAdvancedWidget(XiaomiBaseWidget):
             elif "90Hz" in item: hz = 90
             elif "120Hz" in item: hz = 120
             elif "144Hz" in item: hz = 144
+            if self.opt_worker and self.opt_worker.isRunning():
+                LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+                return
             self.opt_worker = OptimizationWorker(self.adb, "force_refresh_rate")
             self.opt_worker.refresh_rate = hz
             self.opt_worker.progress.connect(lambda m: LogManager.log("Refresh Rate", m, "info"))
@@ -783,6 +877,10 @@ class XiaomiAdvancedWidget(XiaomiBaseWidget):
         elif msg.clickedButton() == btn_manual: task = "open_dev_options"
         else: return
 
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
+
         self.opt_worker = OptimizationWorker(self.adb, task)
         self.opt_worker.progress.connect(lambda m: LogManager.log("FPS Monitor", m, "info"))
         self.opt_worker.start()
@@ -791,6 +889,9 @@ class XiaomiAdvancedWidget(XiaomiBaseWidget):
         from PySide6.QtWidgets import QInputDialog
         val, ok = QInputDialog.getInt(self, "Đổi DPI Màn hình", "Nhập giá trị DPI mong muốn (Ví dụ: 392, 440, 480...)\nNhập 0 để Reset về mặc định.", value=0, minValue=0, maxValue=999)
         if ok:
+            if self.opt_worker and self.opt_worker.isRunning():
+                LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+                return
             self.opt_worker = OptimizationWorker(self.adb, "set_dpi")
             self.opt_worker.dpi_value = val
             self.opt_worker.progress.connect(lambda m: LogManager.log("DPI Modifier", m, "info"))
@@ -807,6 +908,11 @@ class XiaomiAdvancedWidget(XiaomiBaseWidget):
         if msg.clickedButton() == btn_on: task = "force_dark_mode_on"
         elif msg.clickedButton() == btn_off: task = "force_dark_mode_off"
         else: return
+        
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
+            
         self.opt_worker = OptimizationWorker(self.adb, task)
         self.opt_worker.progress.connect(lambda m: LogManager.log("Dark Mode", m, "info"))
         self.opt_worker.start()
@@ -814,6 +920,9 @@ class XiaomiAdvancedWidget(XiaomiBaseWidget):
     def run_disable_ota(self):
         reply = QMessageBox.question(self, "Chặn Cập Nhật", "Bạn có muốn chặn vĩnh viễn tính năng Cập nhật Hệ thống (OTA)?", QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
+            if self.opt_worker and self.opt_worker.isRunning():
+                LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+                return
             self.opt_worker = OptimizationWorker(self.adb, "disable_ota")
             self.opt_worker.progress.connect(lambda msg: LogManager.log("Disable OTA", msg, "info"))
             self.opt_worker.start()
@@ -821,6 +930,9 @@ class XiaomiAdvancedWidget(XiaomiBaseWidget):
     def run_skip_setup(self):
         reply = QMessageBox.question(self, "Xác nhận", "Tiện ích này giúp bỏ qua các bước thiết lập ban đầu sau khi Reset máy.\nBạn có muốn tiếp tục?", QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
+            if self.opt_worker and self.opt_worker.isRunning():
+                LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+                return
             self.opt_worker = OptimizationWorker(self.adb, "skip_setup")
             self.opt_worker.progress.connect(lambda msg: LogManager.log("Skip Setup", msg, "info"))
             self.opt_worker.error_occurred.connect(self.show_error)
@@ -837,6 +949,11 @@ class XiaomiAdvancedWidget(XiaomiBaseWidget):
         if msg.clickedButton() == btn_hide: task = "hide_nav_on"
         elif msg.clickedButton() == btn_show: task = "hide_nav_off"
         else: return
+        
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
+            
         self.opt_worker = OptimizationWorker(self.adb, task)
         self.opt_worker.progress.connect(lambda m: LogManager.log("Nav Bar", m, "info"))
         self.opt_worker.start()
@@ -844,18 +961,27 @@ class XiaomiAdvancedWidget(XiaomiBaseWidget):
     def run_set_vietnamese(self):
         confirm = QMessageBox.question(self, "Xác nhận", "Thao tác này sẽ gửi lệnh thay đổi ngôn ngữ hệ thống sang vi-VN.\nThiết bị cần KHỞI ĐỘNG LẠI để áp dụng.\n\nBạn có muốn tiếp tục?", QMessageBox.Yes | QMessageBox.No)
         if confirm == QMessageBox.Yes:
+            if self.opt_worker and self.opt_worker.isRunning():
+                LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+                return
             self.opt_worker = OptimizationWorker(self.adb, "set_vietnamese")
             self.opt_worker.progress.connect(lambda msg: LogManager.log("Language", msg, "info"))
             self.opt_worker.error_occurred.connect(self.show_error)
             self.opt_worker.start()
 
     def run_fix_eu_vn(self):
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
         self.opt_worker = OptimizationWorker(self.adb, "fix_eu_vn")
         self.opt_worker.progress.connect(lambda msg: LogManager.log("Region Fix", msg, "info"))
         self.opt_worker.error_occurred.connect(self.show_error)
         self.opt_worker.start()
 
     def run_verify_status(self):
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
         self.opt_worker = OptimizationWorker(self.adb, "check_status")
         self.opt_worker.progress.connect(lambda msg: LogManager.log("System Check", msg, "info"))
         self.opt_worker.result_ready.connect(self.show_status_dialog)
@@ -949,6 +1075,9 @@ class XiaomiOptimizerWidget(XiaomiBaseWidget):
         layout.addWidget(container)
         
     def run_full_optimization(self):
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
         self.opt_worker = OptimizationWorker(self.adb, "full_scan")
         self.opt_worker.progress.connect(lambda msg: LogManager.log("Optimization", msg, "info"))
         self.opt_worker.start()

@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\main.py", line 59, in <module>
+    main()
+  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\main.py", line 50, in main
+    window = MainWindow(adb)
+             ^^^^^^^^^^^^^^^
+  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\ui\main_window.py", line 296, in __init__
+    self.setup_ui()
+  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\ui\main_window.py", line 318, in setup_ui
+    QApplication.instance().installEventFilter(self)
+    ^^^^^^^^^^^^
+NameError: name 'QApplication' is not defined

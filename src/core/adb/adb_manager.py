@@ -10,7 +10,7 @@ import re
 import time
 import json
 import sys
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Iterator
 from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
@@ -72,6 +72,10 @@ class ADBManager:
         self.current_device: Optional[str] = None
         self.logger = LogManager()
         
+        # Cache for static properties
+        self._prop_cache: Dict[str, Dict[str, str]] = {}
+        self._cached_serial: Optional[str] = None
+        
         # Load SoC Database
         self.soc_mappings = {}
         try:
@@ -98,6 +102,33 @@ class ADBManager:
         if self.adb_path == "adb" and not self._check_adb_command():
              print("ADB not found in PATH. Attempting to download...")
              self.download_adb()
+
+    def safe_int(self, val, default=0) -> int:
+        """Safely convert string to int, handling duration strings and floats"""
+        try:
+            if not val: return default
+            # Handle cases like '+21h20m...' by taking numeric part if possible
+            # or simply relying on float() failure if it's completely non-numeric
+            s_val = str(val).strip()
+            # If it starts with +, remove it
+            if s_val.startswith('+'): s_val = s_val[1:]
+            
+            # Try direct conversion first (fastest)
+            try: return int(float(s_val))
+            except (ValueError, TypeError):
+                # If that fails, try to extract leading digits (for cases like "100%")
+                match = re.match(r"^(\d+)", s_val)
+                if match: return int(match.group(1))
+                return default
+        except:
+            return default
+
+    def safe_shell(self, cmd: str, default: str = "") -> str:
+        """Execute shell command and return result or default on error"""
+        try:
+            return self.shell(cmd, check=False, log_error=False).strip()
+        except:
+            return default
              
         self._verify_adb()
     
@@ -359,6 +390,42 @@ class ADBManager:
         safe_command = command.replace('"', '\\"')
         return self.execute(f'{device_arg} shell "{safe_command}"', timeout=timeout, check=check, log_error=log_error)
     
+    def shell_stream(self, command: str, timeout: int = 900) -> Iterator[str]:
+        """
+        Execute shell command and yield output line by line
+        """
+        device_arg = f"-s {self.current_device}" if self.current_device else ""
+        safe_command = command.replace('"', '\\"')
+        full_cmd = f'{self.adb_path} {device_arg} shell "{safe_command}"'
+        
+        try:
+            process = subprocess.Popen(
+                full_cmd,
+                shell=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                bufsize=1
+            )
+            
+            start_time = time.time()
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                if line:
+                    yield line.strip()
+                    
+                if time.time() - start_time > timeout:
+                    process.kill()
+                    yield "❌ Timeout!"
+                    break
+                    
+        except Exception as e:
+            yield f"❌ Error: {e}"
+    
     # ==================== Device Management ====================
     
     def get_devices(self) -> List[Tuple[str, DeviceStatus]]:
@@ -390,7 +457,10 @@ class ADBManager:
     
     def select_device(self, serial: str):
         """Set current device for operations"""
-        self.current_device = serial
+        if self.current_device != serial:
+            self.current_device = serial
+            # Cache will be invalidated if serial mismatch found in _get_device_properties
+        self.logger.log("ADB", f"Đã chọn thiết bị: {serial}", "info")
     
     def get_device_info(self) -> DeviceInfo:
         """
@@ -429,7 +499,7 @@ class ADBManager:
             model=props.get('ro.product.model', 'Unknown'),
             manufacturer=props.get('ro.product.manufacturer', 'Unknown'),
             android_version=props.get('ro.build.version.release', 'Unknown'),
-            sdk_version=int(props.get('ro.build.version.sdk', '0')),
+            sdk_version=self.safe_int(props.get('ro.build.version.sdk', '0')),
             build_id=props.get('ro.build.id', 'Unknown'),
             connection_type=conn_type,
             status=DeviceStatus.ONLINE,
@@ -460,14 +530,10 @@ class ADBManager:
             if not props:
                 return {}
                 
-            def safe_shell(cmd):
-                try: return self.shell(cmd).strip()
-                except: return ""
-
             # Kernel Version
-            kernel = safe_shell("uname -r")
+            kernel = self.safe_shell("uname -r")
             if "Unknown" in kernel or not kernel:
-                proc_ver = safe_shell("cat /proc/version")
+                proc_ver = self.safe_shell("cat /proc/version")
                 if proc_ver:
                     parts = proc_ver.split()
                     if len(parts) > 2:
@@ -503,7 +569,7 @@ class ADBManager:
 
             # CPU Details
             cpu_info = self.get_cpu_info()
-            cpu_cores = safe_shell("cat /proc/cpuinfo | grep processor | wc -l")
+            cpu_cores = self.safe_shell("cat /proc/cpuinfo | grep processor | wc -l")
             
             # RAM Extended
             mem_info = self.get_memory_info()
@@ -511,9 +577,14 @@ class ADBManager:
             # Battery Level
             battery_level = 0
             try:
-                dumpsys_batt = self.shell("dumpsys battery | grep level")
-                if "level:" in dumpsys_batt:
-                    battery_level = int(dumpsys_batt.split(":")[1].strip())
+                # Use exact matching to avoid duration strings (mBatteryLevelUpdateTime)
+                dumpsys_batt = self.shell("dumpsys battery")
+                for line in dumpsys_batt.split('\n'):
+                    if "level:" in line.lower():
+                        parts = line.split(":")
+                        if len(parts) > 1:
+                            battery_level = self.safe_int(parts[1].strip())
+                            break
             except:
                 pass
 
@@ -529,19 +600,19 @@ class ADBManager:
                     if len(parts) >= 5:
                         storage_total = parts[1]
                         storage_used = parts[2]
-                        storage_percent = int(parts[4].replace('%', ''))
+                        storage_percent = self.safe_int(parts[4].replace('%', ''))
             except:
                 pass
 
             # Security Patch, Screen, OS Version
             security_patch = props.get("ro.build.version.security_patch", "Unknown")
             
-            wm_size_out = safe_shell("wm size")
+            wm_size_out = self.safe_shell("wm size")
             wm_size = "Unknown"
             if "Physical size:" in wm_size_out:
                 wm_size = wm_size_out.split("Physical size:")[1].strip()
 
-            wm_density_out = safe_shell("wm density")
+            wm_density_out = self.safe_shell("wm density")
             wm_density = "Unknown"
             if "Physical density:" in wm_density_out:
                 wm_density = wm_density_out.split("Physical density:")[1].strip()
@@ -604,16 +675,36 @@ class ADBManager:
 
     def _get_device_properties(self) -> Dict[str, str]:
         """Get device properties via getprop"""
-        output = self.shell("getprop")
-        props = {}
-        
-        for line in output.split('\n'):
-            match = re.match(r'\[(.*?)\]: \[(.*?)\]', line)
-            if match:
-                key, value = match.groups()
-                props[key] = value
-        
-        return props
+        if not self.current_device:
+            return {}
+            
+        # Check cache
+        if self._cached_serial == self.current_device and self._prop_cache:
+            return self._prop_cache
+            
+        try:
+            output = self.shell("getprop")
+            props = {}
+            for line in output.split('\n'):
+                # Handle bracketed output [key]: [value]
+                if ']: [' in line:
+                    parts = line.split(']: [')
+                    key = parts[0].replace('[', '').strip()
+                    val = parts[1].replace(']', '').strip()
+                    props[key] = val
+                else:
+                    # Fallback for other formats
+                    match = re.search(r'\[(.*?)\]: \[(.*?)\]', line)
+                    if match:
+                        key, val = match.groups()
+                        props[key] = val
+                    
+            # Update cache
+            self._prop_cache = props
+            self._cached_serial = self.current_device
+            return props
+        except Exception:
+            return {}
     
     def _get_device_ip(self) -> Optional[str]:
         """Get device IP address"""
@@ -721,21 +812,21 @@ class ADBManager:
         for line in output.split('\n'):
             line = line.strip()
             if ':' in line:
-                key, value = line.split(':', 1)
-                key = key.strip().lower()
-                value = value.strip()
+                key, value = [x.strip() for x in line.split(':', 1)]
+                key_lower = key.lower()
                 
-                if 'level' in key:
-                    info['level'] = int(value)
-                elif 'status' in key:
+                # Precise matching for key to avoid duration strings like mBatteryLevelUpdateTime
+                if key_lower == 'level':
+                    info['level'] = self.safe_int(value)
+                elif key_lower == 'status':
                     info['status'] = value
-                elif 'health' in key:
+                elif key_lower == 'health':
                     info['health'] = value
-                elif 'temperature' in key:
-                    info['temperature'] = int(value) / 10  # Convert to Celsius
-                elif 'voltage' in key:
-                    info['voltage'] = int(value) / 1000  # Convert to V
-                elif 'technology' in key:
+                elif key_lower == 'temperature':
+                    info['temperature'] = self.safe_int(value) / 10  # Convert to Celsius
+                elif key_lower == 'voltage':
+                    info['voltage'] = self.safe_int(value) / 1000  # Convert to V
+                elif key_lower == 'technology':
                     info['technology'] = value
         
         return info
@@ -752,9 +843,9 @@ class ADBManager:
                 parts = lines[1].split()
                 if len(parts) >= 4:
                     # df output is usually in 1K blocks
-                    info['total'] = int(parts[1]) * 1024
-                    info['used'] = int(parts[2]) * 1024
-                    info['free'] = int(parts[3]) * 1024
+                    info['total'] = self.safe_int(parts[1]) * 1024
+                    info['used'] = self.safe_int(parts[2]) * 1024
+                    info['free'] = self.safe_int(parts[3]) * 1024
         except:
             pass
         return info
@@ -967,6 +1058,17 @@ class ADBManager:
         log.append("\n✅ Đã gửi lệnh mở khóa FRP.")
         return "\n".join(log)
 
+    def clean_capacity(self, val: int) -> int:
+        """Logic to normalize uAh/tens-uAh to mAh"""
+        if val > 20000: 
+            if val > 1000000: # e.g. 4000000 -> 4000
+                val //= 1000
+            elif val > 100000: # e.g. 400000 -> 4000
+                val //= 100
+            else: # e.g. 40000 -> 4000
+                val //= 10
+        return val
+
     def get_battery_health(self) -> Dict:
         """
         Refactored implementation of get_battery_health
@@ -974,7 +1076,6 @@ class ADBManager:
         """
         
         # Database of Design Capacities (mAh)
-        # Add more as discovered
         KNOWN_CAPACITIES = {
             "lisa": 4250,      # Mi 11 Lite 5G NE
             "renoir": 4250,    # Mi 11 Lite 5G
@@ -1030,21 +1131,8 @@ class ADBManager:
         
         log = []
         
-        def safe_int(val, default=0):
-            try: return int(float(val)) # float handles strings like '390.10'
-            except: return default
-            
-        def clean_capacity(val):
-             # Logic to normalize uAh/tens-uAh to mAh
-             if val > 20000: 
-                 if val > 1000000: # e.g. 4000000 -> 4000
-                     val //= 1000
-                 elif val > 100000: # e.g. 400000 -> 4000
-                     val //= 100
-                 else: # e.g. 40000 -> 4000
-                     val //= 10
-             return val
-
+        log = []
+        
         try:
             # 0. Identify Device
             codename = "unknown"
@@ -1064,25 +1152,25 @@ class ADBManager:
                 if k == "status":
                     status_map = {"1": "Unknown", "2": "Charging", "3": "Discharging", "4": "Not charging", "5": "Full"}
                     info["status"] = status_map.get(v, v)
-                elif k == "level": info["level"] = safe_int(v)
-                elif k == "scale": info["scale"] = safe_int(v, 100)
-                elif k == "voltage": info["voltage"] = safe_int(v) / 1000.0 # to Volts
-                elif k == "temperature": info["temperature"] = safe_int(v) / 10.0
+                elif k == "level": info["level"] = self.safe_int(v)
+                elif k == "scale": info["scale"] = self.safe_int(v, 100)
+                elif k == "voltage": info["voltage"] = self.safe_int(v) / 1000.0 # to Volts
+                elif k == "temperature": info["temperature"] = self.safe_int(v) / 10.0
                 elif k == "technology": info["technology"] = v
             
             # Extract Charge Counter
             match_cc = re.search(r"Charge counter: (\d+)", dumpsys)
             if match_cc:
                 # Charge counter is usually in uAh
-                cc = safe_int(match_cc.group(1))
-                info["charge_current"] = clean_capacity(cc)
+                cc = self.safe_int(match_cc.group(1))
+                info["charge_current"] = self.clean_capacity(cc)
 
             # --- Method 2: Dumpsys Batterystats (Design Capacity) ---
             try:
                 stats = self.shell("dumpsys batterystats")
                 match_cap = re.search(r"Capacity: (\d+)", stats)
                 if match_cap:
-                    info["charge_full_design"] = safe_int(match_cap.group(1))
+                    info["charge_full_design"] = self.safe_int(match_cap.group(1))
                     log.append(f"Found Design Capacity in stats: {info['charge_full_design']}")
             except Exception as e:
                 log.append(f"Batterystats Error: {e}")
@@ -1346,30 +1434,38 @@ class ADBManager:
         except Exception as e:
             return f"❌ Lỗi: {e}"
 
-    def compile_apps(self, mode: str, timeout: int = 900) -> str:
+    def compile_apps(self, mode: str, timeout: int = 900, callback=None) -> str:
         """
-        Compile apps using 'cmd package compile'.
-        Modes:
-        - speed: Max performance
-        - quicken: Battery/Storage balance
-        - speed-profile: Daily use (based on usage)
-        - verify: Fast install / First boot
-        - everything: Full optimization (slowest)
+        Compile apps using 'cmd package compile' with streaming output.
         """
         try:
-            # -a means all apps
-            # -f means force
             cmd = f"cmd package compile -m {mode} -a"
-            # This can take a long time, so we might want to run it in background or just return 'started'
-            # But here we wait for result usually.
-            result = self.shell(cmd, timeout=timeout)
-            if "Success" in result or "Success" in result: # Sometimes output varies
-                msg = f"✅ Tối ưu hóa (Mode: {mode}) hoàn tất!"
-                LogManager.log("Compilation", msg, "success")
-                return msg
-            return f"⚠️ Kết quả: {result}"
+            
+            if callback:
+                callback(f"🚀 Bắt đầu tối ưu hóa (Mode: {mode})...")
+                
+            success_count = 0
+            for line in self.shell_stream(cmd, timeout=timeout):
+                if callback:
+                     # Filter interesting lines to avoid spam
+                     if "Success" in line:
+                         success_count += 1
+                         # Try to find package name using regex (com.foo.bar)
+                         match = re.search(r'([a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+)', line)
+                         pkg = match.group(0) if match else "Application"
+                         callback(f"✅ OK: {pkg}")
+                     elif "Failure" in line:
+                         callback(f"⚠️ Skip: {line}")
+                     elif hasattr(line, 'strip') and len(line.strip()) > 0:
+                         # Still show other important info but filter empty lines
+                         callback(f"ℹ️ {line}")
+            
+            msg = f"✅ Tối ưu hóa ART hoàn tất! ({success_count} ứng dụng)"
+            LogManager.log("Compilation", msg, "success")
+            return msg
+            
         except Exception as e:
-            return f"❌ Lỗi: {e}"
+            return f"❌ Lỗi biên dịch: {e}"
 
     # ==================== File Transfer ====================
     
@@ -1391,6 +1487,35 @@ class ADBManager:
             return True
         except Exception:
             return False
+
+    def set_prop(self, key: str, value: str):
+        """Set system property best-effort (no error UI)"""
+        self.shell(f"setprop {key} {value}", check=False, log_error=False)
+
+    def apply_performance_props(self) -> str:
+        """
+        Expert System Property Tweaks for HyperOS 3 / Android 16.
+        Focus: animations, cache, and kernel tuning.
+        """
+        try:
+            # 1. Settings-based Tweaks (Usually safe)
+            self.shell("settings put global window_animation_scale 0.5", check=False)
+            self.shell("settings put global transition_animation_scale 0.5", check=False)
+            self.shell("settings put global animator_duration_scale 0.5", check=False)
+            
+            # 2. System Prop Tweaks (Best effort)
+            # These might fail on non-root or restricted ROMs, so we use check=False
+            self.set_prop("persist.sys.composition.type", "cgo")
+            self.set_prop("persist.sys.use_16k_pages", "1")
+            self.set_prop("ro.config.low_ram", "false")
+            
+            # Dalvik tuning
+            self.set_prop("dalvik.vm.dex2oat-threads", "8")
+            self.set_prop("dalvik.vm.image-dex2oat-threads", "8")
+            
+            return "✅ Đã tối ưu hóa Animation và tham số Kernel (Best-effort)."
+        except Exception as e:
+            return f"❌ Lỗi: {e}"
 
     # ==================== Quick Controls ====================
 
@@ -1582,3 +1707,30 @@ class ADBManager:
         self.shell(f"setprop debug.layout {val}", check=False)
         # Force refresh (poke service)
         self.shell("service call activity 1599295570", check=False)
+
+    def set_recents_style(self, style: int) -> str:
+        """
+        Set MIUI/HyperOS Recents Style with verification.
+        0: Grid (Vertical)
+        1: Stack (iOS style)
+        """
+        try:
+            # 1. Native flag for HyperOS 2 / 3
+            self.shell(f"settings put global miui_recents_style {style}")
+            
+            # 2. Deep intervention / Legacy support
+            self.shell(f"settings put system miui_recents_style {style}")
+            self.shell(f"settings put global task_stack_view_layout_style {2 if style == 1 else 1}")
+            
+            # Verification
+            check_val = self.shell("settings get global miui_recents_style").strip()
+            
+            label = "Xếp chồng (Stack)" if style == 1 else "Dọc (Grid)"
+            if check_val == str(style):
+                return f"✅ Đã kích hoạt kiểu {label} thành công!"
+            else:
+                return f"⚠️ Đã gửi lệnh nhưng thiết bị chưa phản hồi (Hãy kiểm tra quyền 'Cài đặt bảo mật')."
+        except Exception as e:
+            if "SecurityException" in str(e):
+                return "❌ Lỗi: Cần bật 'Gỡ lỗi USB (Cài đặt bảo mật)' trong Tùy chọn nhà phát triển."
+            return f"❌ Lỗi can thiệp hệ thống: {e}"

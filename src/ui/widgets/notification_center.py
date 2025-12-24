@@ -564,5 +564,15 @@ class NotificationCenter(QFrame):
         
         self.notif_list.scrollToBottom()
 
+        # [AUTO-OPEN] Automatically open notification tab on new message
+        if not self.isVisible():
+            self.toggle(tab_index=1)
+        elif self.stack.currentIndex() != 1:
+            self.switch_tab(1)
+
     def clear_notifications(self):
         self.notif_list.clear()
+
+    def eventFilter(self, obj, event):
+        # Allow MainWindow to use this filter if needed, but logic is mainly in MainWindow
+        return super().eventFilter(obj, event)
