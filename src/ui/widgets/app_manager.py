@@ -20,6 +20,10 @@ from src.ui.theme_manager import ThemeManager
 from src.core.adb.adb_manager import DeviceStatus
 from src.data.app_data import AppInfo
 from src.workers.app_worker import InstallerThread, BackupThread, AppScanner, RestoreThread
+import webbrowser
+
+# OneDrive APK Repository
+ONEDRIVE_APK_FOLDER = "https://4wl8ft-my.sharepoint.com/:f:/g/personal/vankhoai_4wl8ft_onmicrosoft_com/IgDXdoT3HHxqTLwC2ClHOMPsATiYFsuCYtWBDTH1zBQaYG0?e=mjZW4R"
 
 # --- Imports for Delegate ---
 from PySide6.QtWidgets import QStyledItemDelegate, QStyle
@@ -540,7 +544,7 @@ class AppManagerWidget(QWidget):
         
         h.addStretch()
         
-        btn = QPushButton("CÀI ĐẶT")
+        btn = QPushButton("TẢI VỀ")
         btn.setCursor(Qt.PointingHandCursor)
         btn.setFixedSize(80, 32)
         btn.setStyleSheet(f"""
@@ -740,13 +744,18 @@ class AppManagerWidget(QWidget):
             self.install_files(files)
             
     def install_single_apk(self, filename):
-        # Resolve path
-        base = os.path.join(os.getcwd(), "resources", "Apk")
-        path = os.path.join(base, filename)
-        if os.path.exists(path):
-            self.install_files([path])
-        else:
-             QMessageBox.warning(self, "Lỗi", f"Không tìm thấy {filename}")
+        """Open OneDrive folder in browser for user to download APK"""
+        try:
+            webbrowser.open(ONEDRIVE_APK_FOLDER)
+            QMessageBox.information(
+                self, 
+                "Mở OneDrive", 
+                f"Đã mở thư mục APK trong trình duyệt.\n\n"
+                f"Vui lòng tải file: {filename}\n"
+                f"Sau đó sử dụng nút 'Chọn File' để cài đặt."
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Lỗi", f"Không thể mở trình duyệt: {str(e)}")
 
     def install_files(self, files):
         self.install_thread = InstallerThread(self.adb, files, False)
