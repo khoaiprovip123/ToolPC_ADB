@@ -41,7 +41,7 @@ def main():
     app._app_mutex = mutex
     
     # Set app icon
-    icon_path = root_dir / 'src' / 'resources' / 'icons' / 'app_icon.ico'
+    icon_path = root_dir / 'resources' / 'icon.ico'
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
     

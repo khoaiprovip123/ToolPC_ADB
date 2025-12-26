@@ -174,11 +174,18 @@ class GeneralTweaksWidget(QWidget):
         
         # Left: Whitelist
         v_sys_l = QVBoxLayout()
-        self.add_input_toggle_v(v_sys_l, "notify_opt", "Whitelist Thông Báo (Package)", "com.facebook.orca,com.zing.zalo", "🔔")
+        # Removed "Whitelist Notify" as requested (Redundant)
+        lbl_info = QLabel("ℹ️ Các tính năng này giúp\nkhắc phục chậm thông báo\ntrên ROM nội địa/HyperOS.")
+        lbl_info.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 11px; font-style: italic;")
+        v_sys_l.addWidget(lbl_info)
         l_sys.addLayout(v_sys_l, 1)
         
         # Right: Toggles
         v_sys_r = QVBoxLayout()
+        # Converted to Input Toggle as requested
+        default_socials = "app.revanced.android.gms,com.facebook.katana,com.facebook.orca,com.zing.zalo"
+        self.add_input_toggle_v(v_sys_r, "fix_social_pkgs", "Fix Thông Báo & Pin (Danh sách App)", default_socials, "🔔")
+        
         self.add_toggle(v_sys_r, "opt_sysui", "Tối Ưu SystemUI (Compile)", "⚙️")
         self.add_toggle(v_sys_r, "restart", "Tự Động Khởi Động Lại", "🔄")
         l_sys.addLayout(v_sys_r, 1)
@@ -452,10 +459,13 @@ class GeneralTweaksWidget(QWidget):
             tasks.append(("set_system_setting", ("secure", "long_press_timeout", val), "Settings: Long Press Timeout"))
             
         # Other
-        if self.is_checked("notify_opt"):
-            val = self.get_input("notify_opt")
-            tasks.append(("optimize_notifications", val, "Tối ưu hóa Thông báo"))
+        # if self.is_checked("notify_opt"):
+        #     val = self.get_input("notify_opt")
+        #     tasks.append(("optimize_notifications", val, "Tối ưu hóa Thông báo"))
             
+        if self.is_checked("fix_social_pkgs"):
+            tasks.append((self.run_fix_social_logic, None, "Fix Thông báo & Pin (Custom List)"))
+
         if self.is_checked("opt_sysui"):
             tasks.append(("shell", ("cmd package compile -m speed com.android.systemui", 600), "Tối ưu SystemUI"))
             
@@ -490,6 +500,35 @@ class GeneralTweaksWidget(QWidget):
         self.progress_bar.setValue(100)
         QMessageBox.information(self, "Thành công", "Đã thực hiện xong các tối ưu hóa đã chọn!")
         QTimer.singleShot(3000, self.progress_bar.hide) # Clean up after 3s
+
+
+    def run_fix_social_logic(self):
+        """Logic to optimize apps from input string directly on the thread"""
+        # Get input string
+        raw_input = self.get_input("fix_social_pkgs")
+        if not raw_input:
+             return
+
+        # Split by comma and strip whitespace
+        targets = [x.strip() for x in raw_input.split(",") if x.strip()]
+        
+        for pkg in targets:
+            try:
+                 # 1. Battery Optimization (Unlimited / Ignore)
+                 self.adb.shell(f"dumpsys deviceidle whitelist +{pkg}", log_error=False)
+                 
+                 # 2. Allow Background Run (Standard)
+                 self.adb.shell(f"cmd appops set {pkg} RUN_IN_BACKGROUND allow", log_error=False)
+                 self.adb.shell(f"cmd appops set {pkg} RUN_ANY_IN_BACKGROUND allow", log_error=False)
+                 
+                 # 3. Autostart (Xiaomi Specific - OpCode 10008)
+                 self.adb.shell(f"cmd appops set {pkg} 10008 allow", log_error=False)
+                 self.adb.shell(f"cmd appops set {pkg} START_FOREGROUND allow", log_error=False)
+                 
+                 # 4. Remove from App Standby
+                 self.adb.shell(f"am set-inactive {pkg} false", log_error=False)
+            except:
+                 pass
 
 
 class GlobalOptimizerWidget(QWidget):

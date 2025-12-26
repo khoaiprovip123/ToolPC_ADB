@@ -288,6 +288,13 @@ class MainWindow(QMainWindow):
         
         self.resize(1450, 850)
         
+        # Initialize Settings & Theme
+        from PySide6.QtCore import QSettings
+        self.settings = QSettings("VanKhoai", "XiaomiADBCommander")
+        
+        # Load and apply saved theme
+        saved_theme = self.settings.value("theme", "light")
+        ThemeManager.set_theme(saved_theme)
         self.apply_theme()
         
         # Initialize Plugins
@@ -300,8 +307,6 @@ class MainWindow(QMainWindow):
         self.refresh_devices()
         
         # Check for updates after startup (delayed)
-        from PySide6.QtCore import QSettings
-        self.settings = QSettings("VanKhoai", "XiaomiADBCommander")
         auto_check = self.settings.value("auto_check_updates", True, type=bool)
         if auto_check:
             # Delay 3 seconds to let UI load first

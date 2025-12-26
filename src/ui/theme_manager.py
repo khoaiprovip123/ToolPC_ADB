@@ -262,9 +262,9 @@ class ThemeManager:
         """Return list of (Display Name, key)"""
         return [
             ("Sáng (Light)", "light"),
-            ("Tối (Dark)", "dark"),
-            ("Cyberpunk (Neon)", "cyberpunk"),
-            ("HyperOS (Orange)", "hyperos"),
+            # ("Tối (Dark)", "dark"),         # Disable as requested
+            # ("Cyberpunk (Neon)", "cyberpunk"), # Disable as requested
+            # ("HyperOS (Orange)", "hyperos"),   # Disable as requested
             ("Minimal (Slate)", "minimal"),
             ("Ocean Blue 🌊", "ocean"),
             ("Sunset Purple 🌅", "sunset"),
@@ -332,6 +332,24 @@ class ThemeManager:
     def get_icon(cls, name, fallback="●"):
         """Get icon by name with fallback"""
         return cls.ICONS.get(name, fallback)
+
+    @staticmethod
+    def adjust_color(hex_color, factor):
+        """
+        Adjusts the brightness of a HEX color.
+        factor > 1: Lighter, factor < 1: Darker
+        """
+        if not hex_color.startswith('#'):
+            return hex_color
+            
+        hex_color = hex_color.lstrip('#')
+        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        
+        r = min(255, int(r * factor))
+        g = min(255, int(g * factor))
+        b = min(255, int(b * factor))
+        
+        return f"#{r:02x}{g:02x}{b:02x}"
     
     # ==================== STYLE GENERATORS ====================
     @classmethod
@@ -578,6 +596,41 @@ class ThemeManager:
                 top: 8px;
                 padding: 0 8px;
                 background-color: {theme['COLOR_GLASS_WHITE']};
+            }}
+        """
+
+    @classmethod
+    def get_checkbox_style(cls):
+        """Style for CheckBox and RadioButton"""
+        theme = cls.get_theme()
+        return f"""
+            QCheckBox, QRadioButton {{
+                spacing: 10px;
+                font-size: 14px;
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                font-family: {cls.FONT_FAMILY};
+                background: transparent;
+                padding: 4px;
+            }}
+            QCheckBox::indicator, QRadioButton::indicator {{
+                width: 18px;
+                height: 18px;
+                border: 2px solid {theme['COLOR_TEXT_SECONDARY']};
+                background: {theme['COLOR_GLASS_WHITE']};
+            }}
+            QCheckBox::indicator {{
+                border-radius: 4px;
+            }}
+            QRadioButton::indicator {{
+                border-radius: 11px;
+            }}
+            QCheckBox::indicator:checked, QRadioButton::indicator:checked {{
+                border: 2px solid {cls.COLOR_ACCENT};
+                background-color: {cls.COLOR_ACCENT};
+            }}
+            QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
+                border-color: {cls.COLOR_ACCENT};
+                background-color: {theme['COLOR_GLASS_HOVER']};
             }}
         """
 

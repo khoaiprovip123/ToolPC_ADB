@@ -16,6 +16,8 @@ import os
 import shutil
 import tempfile
 from src.ui.theme_manager import ThemeManager
+from src.workers.file_worker import FileWorker
+from src.data.file_data import FileEntry
 
 class CategoryCard(QFrame):
     """Clickable Category Card (HyperOS Style)"""
@@ -140,6 +142,33 @@ class FileManagerWidget(QWidget):
         
         self.setup_ui()
         
+        # Initialize Worker
+        self.file_worker = FileWorker(self.adb)
+        self.file_worker.listing_ready.connect(self.on_listing_ready)
+        self.file_worker.op_finished.connect(self.on_op_finished)
+        
+        # Initial Load
+        if self.adb.current_device:
+            self.refresh_storages()
+            self.refresh_files()
+
+    def on_listing_ready(self, entries):
+        """Update UI with file list from worker"""
+        self.tree.clear()
+        self.path_lbl.setText(self.current_path)
+        
+        for entry in entries:
+            self.add_tree_item(entry)
+            
+    def on_op_finished(self, success, msg):
+        """Handle operation result"""
+        if success:
+            # self.status_bar.showMessage(msg) # If we had access to status bar
+            self.refresh_files() # Refresh list
+            if msg: QMessageBox.information(self, "Thành công", msg)
+        else:
+            QMessageBox.critical(self, "Lỗi", msg)
+
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -352,47 +381,15 @@ class FileManagerWidget(QWidget):
     def refresh_files(self):
         if not self.adb.current_device: return
         self.tree.clear()
-        self.path_lbl.setText(self.current_path)
-        try:
-            # Use ls -1p for robust folder detection (names end with /)
-            # -1: One entry per line
-            # -p: Append / indicator to directories
-            cmd = f"ls -1p \"{self.current_path}\""
-            output = self.adb.shell(cmd)
-            if "No such" in output or not output: return
-
-            lines = output.strip().split('\n')
-            dirs, files = [], []
+        self.path_lbl.setText(self.current_path + " (Đang tải...)")
+        # Async call
+        self.file_worker.list_files(self.current_path)
             
-            for line in lines:
-                line = line.strip()
-                if not line: continue
-                
-                is_dir = line.endswith('/')
-                name = line[:-1] if is_dir else line
-                
-                if name in ['.', '..']: continue
-                
-                # Metadata unavailable with ls -1p, but structure is correct
-                size = "" 
-                date = ""
-                
-                item = {"name": name, "size": size, "date": date, "is_dir": is_dir}
-                if is_dir: dirs.append(item)
-                else: files.append(item)
-            
-            # Sort: Dirs a-z, then Files a-z
-            dirs.sort(key=lambda x: x['name'].lower())
-            files.sort(key=lambda x: x['name'].lower())
-            
-            for d in dirs: self.add_tree_item(d)
-            for f in files: self.add_tree_item(f)
-        except Exception as e: print(f"List error: {e}")
-            
-    def add_tree_item(self, data):
+    def add_tree_item(self, entry: FileEntry):
         item = QTreeWidgetItem(self.tree)
-        is_dir = data['is_dir']
-        name = data['name']
+        is_dir = entry.is_dir
+        name = entry.name
+        
         if is_dir: icon = "📁"
         else:
             icon = "📄"
@@ -401,21 +398,19 @@ class FileManagerWidget(QWidget):
             elif name.lower().endswith(('.mp4','.avi','.mkv')): icon = "🎬"
             elif name.lower().endswith(('.mp3','.wav','.m4a')): icon = "🎵"
             elif name.lower().endswith('.zip'): icon = "📦"
+            
         item.setText(0, f"{icon}  {name}")
         item.setData(0, Qt.UserRole, is_dir)
         item.setData(0, Qt.UserRole + 1, name)
+        
         if not is_dir:
-            item.setText(1, self.format_size(data['size']))
+            item.setText(1, self.format_size(entry.size))
             item.setTextAlignment(1, Qt.AlignRight | Qt.AlignVCenter)
         
     def format_size(self, size_str):
-        try:
-            size = int(size_str)
-            for unit in ['B', 'KB', 'MB', 'GB']:
-                if size < 1024: return f"{size:.1f} {unit}"
-                size /= 1024
-            return f"{size:.1f} TB"
-        except: return size_str
+        # TODO: Worker doesn't parse size yet (ls -1p limitation)
+        # We can implement 'ls -la' parsing later for size
+        return size_str if size_str else ""
             
     def go_up(self):
         if self.current_path == "/": return
@@ -461,11 +456,9 @@ class FileManagerWidget(QWidget):
     def create_folder(self):
         name, ok = QInputDialog.getText(self, "Tạo thư mục", "Tên thư mục mới:")
         if ok and name:
-            try:
-                target = f"{self.current_path}/{name}"
-                self.adb.shell(f"mkdir \"{target}\"")
-                self.refresh_files()
-            except Exception as e: QMessageBox.critical(self, "Lỗi", str(e))
+            target = f"{self.current_path}/{name}"
+            # Use Worker
+            self.file_worker.create_folder(target)
 
     def upload_file(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Chọn tập tin từ Máy tính")
@@ -504,11 +497,9 @@ class FileManagerWidget(QWidget):
         old_name = item.data(0, Qt.UserRole + 1)
         new_name, ok = QInputDialog.getText(self, "Đổi tên", "Tên mới:", text=old_name)
         if ok and new_name and new_name != old_name:
-            try:
-                src, dst = f"{self.current_path}/{old_name}", f"{self.current_path}/{new_name}"
-                self.adb.shell(f"mv \"{src}\" \"{dst}\"")
-                self.refresh_files()
-            except Exception as e: QMessageBox.critical(self, "Lỗi", str(e))
+            src = f"{self.current_path}/{old_name}"
+            dst = f"{self.current_path}/{new_name}"
+            self.file_worker.rename_item(src, dst)
 
     def delete_selected(self):
         item = self.tree.currentItem()
@@ -516,10 +507,7 @@ class FileManagerWidget(QWidget):
         name = item.data(0, Qt.UserRole + 1)
         path = f"{self.current_path}/{name}"
         if QMessageBox.question(self, "Xóa", f"Xóa {name}?", QMessageBox.Yes|QMessageBox.No) == QMessageBox.Yes:
-            try:
-                self.adb.shell(f"rm -rf \"{path}\"")
-                self.refresh_files()
-            except Exception as e: QMessageBox.critical(self, "Lỗi", str(e))
+            self.file_worker.delete_item(path)
 
     def copy_selected(self): self._set_clipboard("copy")
     def cut_selected(self): self._set_clipboard("cut")
@@ -535,12 +523,12 @@ class FileManagerWidget(QWidget):
         if not hasattr(self, 'clipboard_path') or not self.clipboard_path: return
         filename = os.path.basename(self.clipboard_path)
         dest = f"{self.current_path}/{filename}".replace('//', '/')
-        try:
-            cmd = f"cp -r \"{self.clipboard_path}\" \"{dest}\"" if self.clipboard_action == "copy" else f"mv \"{self.clipboard_path}\" \"{dest}\""
-            self.adb.shell(cmd)
-            self.refresh_files()
-            if self.clipboard_action == "cut": self.clipboard_path = None
-        except Exception as e: QMessageBox.critical(self, "Lỗi", str(e))
+        
+        if self.clipboard_action == "copy":
+            self.file_worker.copy_item(self.clipboard_path, dest)
+        elif self.clipboard_action == "cut":
+            self.file_worker.move_item(self.clipboard_path, dest)
+            self.clipboard_path = None # Clear after cut->paste request
 
     def show_context_menu(self, position):
         menu = QMenu()

@@ -1,3 +1,15 @@
+## [2.5.3.0] - 2025-12-26
+### Added
+- **App Manager UX Overhaul (Premium Glass UI)**:
+  - **New Design**: Completely redesigned the interface with a "Glassmorphism" aesthetic, featuring subtle blurs and rounded cards.
+  - **Floating Action Bar**: Introduced a context-aware floating bar at the bottom for quick actions (Uninstall, Disable, Enable, Restore).
+  - **Vietnamese Localization**: Translated all app tags (`HỆ THỐNG`, `NGƯỜI DÙNG`, `ĐÃ BẬT`, `ĐÃ TẮT`, `ĐÃ GỠ`) for better accessibility.
+  - **Dynamic Icons**: Added colorful generated icons for app list items.
+  - **Optimistic UI**: Implement instant visual feedback for management actions.
+  - **Smart Fallback**: Automatically attempts to "Archive" (Uninstall user 0) system apps if "Disable" fails.
+  - **Selection Indicator**: Added a sleek side-accent bar for selected rows.
+  - **Error Handling**: Suppressed aggressive "ADB Error" dialogs for expected scenarios.
+
 ## [2.5.2.0] - 2025-12-24
 ### Fixed
 - **Dashboard "Checking..." Freeze**: 

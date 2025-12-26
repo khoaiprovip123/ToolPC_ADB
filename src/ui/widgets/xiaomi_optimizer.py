@@ -16,6 +16,11 @@ from src.ui.theme_manager import ThemeManager
 from src.core.log_manager import LogManager
 from PySide6.QtWidgets import QDialog
 
+# Imports from refactored modules
+from src.workers.debloat_worker import DebloatWorker
+from src.workers.optimization_worker import OptimizationWorker
+from src.data.bloatware_data import BLOATWARE_DICT
+
 # Reuse GradientCard logic or import if shared (Defining here for simplicity/independence)
 class ModernCard(QFrame):
     def __init__(self, title, desc, icon, callback, gradient_colors=None, parent=None):
@@ -100,250 +105,6 @@ class ModernCard(QFrame):
             self.callback()
 
 
-class DebloatWorker(QThread):
-    """Background worker for debloating"""
-    progress = Signal(str)
-    finished = Signal()
-    
-    def __init__(self, adb, packages):
-        super().__init__()
-        self.adb = adb
-        self.packages = packages
-        self._is_running = True
-        
-    def run(self):
-        for package in self.packages:
-            if not self._is_running:
-                break
-            
-            try:
-                self.progress.emit(f"Đang xử lý: {package}...")
-                # Uninstall for user 0 (safe removal)
-                result = self.adb.shell(f"pm uninstall --user 0 {package}")
-                
-                if "success" in result.lower():
-                    self.progress.emit(f"✅ Đã gỡ: {package}")
-                else:
-                    # Try disable if uninstall fails
-                    self.adb.shell(f"pm disable-user --user 0 {package}")
-                    self.progress.emit(f"⚠️ Đã tắt: {package}")
-                    
-            except Exception as e:
-                self.progress.emit(f"❌ Lỗi {package}: {e}")
-                
-        self.finished.emit()
-        
-    def stop(self):
-        self._is_running = False
-
-
-class OptimizationWorker(QThread):
-    """Background worker for optimizations"""
-    progress = Signal(str)
-    result_ready = Signal(dict) # new signal for results
-    error_occurred = Signal(str, str) # title, message
-    finished = Signal()
-    
-    def __init__(self, adb, task_type):
-        super().__init__()
-        self.adb = adb
-        self.task_type = task_type
-        
-    def run(self):
-        try:
-            if self.task_type == "full_scan":
-                self.progress.emit("🔍 Đang quét hệ thống...")
-                self.progress.emit("Đang kiểm tra MSA...")
-                self.adb.disable_msa()
-                self.progress.emit("✅ Đã xử lý System Ads")
-                self.progress.emit("Đang xử lý Analytics...")
-                self.adb.disable_analytics()
-                self.progress.emit("✅ Đã tắt Theo dõi")
-                self.progress.emit("Đang tối ưu hiệu ứng...")
-                self.adb.optimize_animations(0.5)
-                self.progress.emit("✅ Đã tăng tốc hiệu ứng")
-                
-            elif self.task_type == "animations":
-                self.progress.emit("Đang tăng tốc hiệu ứng (0.5x)...")
-                self.adb.optimize_animations(0.5)
-                self.progress.emit("✅ Đã đặt tỷ lệ hiệu ứng 0.5x")
-
-            elif self.task_type == "set_vietnamese":
-                self.progress.emit("🇻🇳 Đang cài đặt Tiếng Việt...")
-                result = self.adb.set_language_vietnamese()
-                self.progress.emit(f"ℹ️ {result}")
-                
-            elif self.task_type == "fix_eu_vn":
-                self.progress.emit("🌍 Đang sửa lỗi vùng EU_VN...")
-                self.adb.set_prop("persist.sys.country", "VN")
-                self.adb.set_prop("ro.product.locale", "vi-VN") 
-                self.adb.set_system_setting("system", "time_12_24", "24")
-                self.progress.emit("✅ Đã cập nhật Region VN & Time 24h")
-
-            elif self.task_type == "check_status":
-                self.progress.emit("🔍 Đang đọc thông số hệ thống...")
-                status = self.adb.get_language_region_status()
-                self.result_ready.emit(status)
-                self.progress.emit("✅ Đã đọc dữ liệu xong")
-
-            elif self.task_type == "smart_blur":
-                self.progress.emit("✨ Đang phân tích cấu hình & kích hoạt Blur...")
-                result = self.adb.apply_smart_blur()
-                self.progress.emit(f"✅ {result}")
-
-            elif self.task_type == "stacked_recent":
-                self.progress.emit("📚 Đang kích hoạt giao diện Xếp chồng (HyperOS Native)...")
-                # 1. New native method
-                result = self.adb.set_recents_style(1)
-                self.progress.emit(result)
-                # 2. Legacy method
-                self.adb.shell("settings put global task_stack_view_layout_style 2")
-                
-                self.progress.emit("🔄 Đang khởi động lại Launcher để áp dụng...")
-                self.adb.shell("am force-stop com.miui.home")
-                self.progress.emit("✅ Đã áp dụng giao diện Xếp chồng")
-
-            elif self.task_type == "skip_setup":
-                self.progress.emit("⏩ Đang bỏ qua Setup Wizard...")
-                result = self.adb.skip_setup_wizard()
-                self.progress.emit(result)
-
-            elif self.task_type == "disable_ota":
-                self.progress.emit("🛑 Đang chặn cập nhật hệ thống...")
-                result = self.adb.disable_miui_ota()
-                self.progress.emit(result)
-
-            elif self.task_type == "force_refresh_rate":
-                hz = 0
-                if hasattr(self, 'refresh_rate'):
-                    hz = self.refresh_rate
-                label = "Mặc định (Auto)" if hz <= 0 else f"{hz}Hz"
-                self.progress.emit(f"⚡ Đang áp dụng tần số quét {label}...")
-                result = self.adb.set_refresh_rate(hz)
-                self.progress.emit(result)
-
-            elif self.task_type == "force_dark_mode_on":
-                self.progress.emit("🌙 Đang bật Dark Mode hệ thống...")
-                result = self.adb.force_dark_mode(True)
-                self.progress.emit(result)
-
-            elif self.task_type == "force_dark_mode_off":
-                self.progress.emit("☀️ Đang tắt Dark Mode hệ thống...")
-                result = self.adb.force_dark_mode(False)
-                self.progress.emit(result)
-
-            elif self.task_type == "hide_nav_on":
-                self.progress.emit("↔️ Đang ẩn thanh điều hướng...")
-                result = self.adb.hide_navigation_bar(True)
-                self.progress.emit(result)
-
-            elif self.task_type == "hide_nav_off":
-                self.progress.emit("↔️ Đang hiện thanh điều hướng...")
-                result = self.adb.hide_navigation_bar(False)
-                self.progress.emit(result)
-
-            elif self.task_type == "set_dpi":
-                if hasattr(self, 'dpi_value'):
-                    self.progress.emit(f"📱 Đang đổi DPI sang {self.dpi_value}...")
-                    result = self.adb.set_display_density(self.dpi_value)
-                    self.progress.emit(result)
-
-            elif self.task_type == "show_fps_on":
-                 self.progress.emit("📈 Đang bật bộ đếm FPS...")
-                 result = self.adb.show_refresh_rate_overlay(True)
-                 self.progress.emit(result)
-
-            elif self.task_type == "show_fps_off":
-                 self.progress.emit("📉 Đang tắt bộ đếm FPS...")
-                 result = self.adb.show_refresh_rate_overlay(False)
-                 self.progress.emit(result)
-
-            elif self.task_type == "open_dev_options":
-                 self.progress.emit("⚙️ Đang mở Cài đặt nhà phát triển...")
-                 result = self.adb.open_developer_options()
-                 self.progress.emit(result)
-
-            elif self.task_type == "expert_optimize":
-                 self.progress.emit("🚀 Đang kích hoạt Tối ưu hóa Chuyên sâu (HyperOS 3+)...")
-                 result = self.adb.apply_performance_props()
-                 self.progress.emit(result)
-                 self.progress.emit("🔄 Đang tối ưu hóa Compiler (speed-profile)...")
-                 result = self.adb.compile_apps("speed-profile", timeout=300, callback=self.progress.emit)
-                 self.progress.emit(result)
-
-            elif self.task_type == "art_tuning":
-                 self.progress.emit("⚡ Đang tối ưu hóa ART (Full Speed)...")
-                 result = self.adb.compile_apps("speed", timeout=600, callback=self.progress.emit)
-                 self.progress.emit(result)
-
-        except Exception as e:
-            err_str = str(e)
-            if "SecurityException" in err_str:
-                self.progress.emit("⚠️ Lỗi: Thiếu quyền Bảo mật Xiaomi")
-                details = (
-                    "Hệ thống báo lỗi bảo mật:\n\n"
-                    f"{err_str}\n\n"
-                    "👉 Hãy chắc chắn bạn đã bật cả 2 dòng trong Tùy chọn nhà phát triển:\n"
-                    "1. Gỡ lỗi USB\n"
-                    "2. Gỡ lỗi USB (Cài đặt bảo mật) [- Cần SIM]"
-                )
-                self.error_occurred.emit("Thiếu Quyền Bảo Mật", details)
-            else:
-                self.progress.emit(f"❌ Lỗi: {e}")
-                
-        self.finished.emit()
-
-
-# Module Level Constants
-BLOATWARE_DICT = {
-    "Dịch vụ Quảng cáo & Theo dõi 🚫": [
-        "com.miui.analytics",
-        "com.miui.msa.global",
-        "com.xiaomi.joyose", 
-        "com.google.android.gms.location.history",
-        "com.miui.systemadsolution",
-        "com.miui.hybrid.accessory",
-        "com.xiaomi.discover",
-        "com.miui.daemon",
-        "com.xiaomi.vipaccount",
-    ],
-    "Ứng dụng Rác Hệ thống (An toàn) 🗑️": [
-        "com.miui.calculator",
-        "com.miui.compass",
-        "com.miui.fm",
-        "com.miui.notes",
-        "com.miui.screenrecorder",
-        "com.miui.videoplayer",
-        "com.miui.player",
-        "com.android.email",
-        "com.miui.yellowpage",
-        "com.miui.bugreport",
-        "com.miui.miservice",
-        "com.miui.cleanmaster",
-        "com.xiaomi.mipicks",
-        "com.xiaomi.glgm",
-    ],
-    "Xiaomi Cloud & Sync ☁️": [
-        "com.miui.cloudservice",
-        "com.miui.cloudbackup",
-        "com.miui.micloudsync",
-        "com.xiaomi.midrop", 
-        "com.miui.virtualsim",
-        "com.xiaomi.payment",
-        "com.miui.micloudsync",
-    ],
-    "Partner Apps & Facebook 👎": [
-        "com.facebook.appmanager",
-        "com.facebook.services",
-        "com.facebook.system",
-        "com.netflix.partner.activation",
-        "com.ebay.carrier",
-        "com.ebay.mobile",
-        "com.linkedin.android",
-        "com.duokan.phone.remotecontroller",
-    ]
-}
-
 
 class XiaomiBaseWidget(QWidget):
     """Base widget with shared helper methods"""
@@ -356,6 +117,26 @@ class XiaomiBaseWidget(QWidget):
     def show_error(self, title, message):
         # Use LogManager instead of Popup
         LogManager.log(title, message, "error")
+        
+        # Smart Alert for Security Permission
+        if "Bảo Mật" in title or "Security" in title:
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle(title)
+            # Strip markdown for MessageBox
+            clean_msg = message.replace("**", "").replace("`", "")
+            msg.setText(clean_msg)
+            
+            btn_open = msg.addButton("Mở Cài đặt Developer ⚙️", QMessageBox.ActionRole)
+            msg.addButton("Đóng", QMessageBox.RejectRole)
+            msg.exec()
+            
+            if msg.clickedButton() == btn_open:
+                try:
+                    self.adb.open_developer_options()
+                    LogManager.log("System", "Đã gửi lệnh mở Cài đặt nhà phát triển", "info")
+                except Exception as e:
+                    LogManager.log("Error", f"Không thể mở cài đặt: {e}", "error")
     
     def check_device(self, status_label):
         """Helper to update a status label with device info"""
@@ -613,8 +394,18 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
             gradient_colors=["#84fab0", "#8fd3f4"]
         )
         grid.addWidget(card_art, 2, 0)
+        
+        # New Social App Fix Card
+        card_social = ModernCard(
+            "Fix Thông Báo & Pin (Social)",
+            "Chạy nền & Không giới hạn pin cho: Facebook, Messenger, Zalo, MicroG.",
+            "🔔",
+            self.run_fix_social_notifications,
+            gradient_colors=["#ff9a9e", "#fecfef"]
+        )
+        grid.addWidget(card_social, 2, 1)
 
-        grid.setRowStretch(2, 1) # Push to top
+        grid.setRowStretch(3, 1) # Push to top
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
@@ -624,6 +415,17 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
             return
         self.opt_worker = OptimizationWorker(self.adb, "animations")
         self.opt_worker.progress.connect(lambda msg: LogManager.log("Animations", msg, "info"))
+        self.opt_worker.error_occurred.connect(self.show_error)
+        self.opt_worker.start()
+
+    def run_fix_social_notifications(self):
+        """Fix notifications for social apps"""
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
+            
+        self.opt_worker = OptimizationWorker(self.adb, "fix_social_notifications")
+        self.opt_worker.progress.connect(lambda msg: LogManager.log("Fix Social", msg, "info"))
         self.opt_worker.error_occurred.connect(self.show_error)
         self.opt_worker.start()
 

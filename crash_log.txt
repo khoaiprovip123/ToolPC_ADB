@@ -4,9 +4,16 @@ Traceback (most recent call last):
   File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\main.py", line 50, in main
     window = MainWindow(adb)
              ^^^^^^^^^^^^^^^
-  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\ui\main_window.py", line 296, in __init__
+  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\ui\main_window.py", line 305, in __init__
     self.setup_ui()
-  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\ui\main_window.py", line 318, in setup_ui
-    QApplication.instance().installEventFilter(self)
-    ^^^^^^^^^^^^
-NameError: name 'QApplication' is not defined
+  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\ui\main_window.py", line 349, in setup_ui
+    self.add_pages()
+  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\ui\main_window.py", line 491, in add_pages
+    self.app_manager = AppManagerWidget(self.adb)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\ui\widgets\app_manager.py", line 41, in __init__
+    self.setup_ui()
+  File "D:\BT\AndroidTOOL\Xiaomi_ADB_Commander\src\ui\widgets\app_manager.py", line 94, in setup_ui
+    self.search_input.textChanged.connect(self.filter_apps)
+                                          ^^^^^^^^^^^^^^^^
+AttributeError: 'AppManagerWidget' object has no attribute 'filter_apps'

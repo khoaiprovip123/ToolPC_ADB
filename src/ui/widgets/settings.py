@@ -154,12 +154,13 @@ class SettingsWidget(QWidget):
             self.theme_combo.setCurrentIndex(index)
             
         self.theme_combo.setStyleSheet(ThemeManager.get_input_style())
-        self.theme_combo.currentIndexChanged.connect(self.change_theme)
+        self.theme_combo.currentIndexChanged.connect(self.on_theme_changed) # Auto-save
         general_layout.addRow("Giao diện:", self.theme_combo)
         
         self.lang_combo = QComboBox()
         self.lang_combo.addItems(["Tiếng Việt", "Tiếng Anh"])
         self.lang_combo.setStyleSheet(ThemeManager.get_input_style())
+        # self.lang_combo.currentIndexChanged.connect(...) # Future
         general_layout.addRow("Ngôn ngữ:", self.lang_combo)
         
         content_layout.addWidget(general_group)
@@ -177,41 +178,50 @@ class SettingsWidget(QWidget):
         self.advanced_menu_checkbox = QCheckBox("⚡ Hiện menu 'Nâng Cao' / Show 'Advanced' menu")
         show_advanced = self.settings.value("show_advanced_menu", True, type=bool)
         self.advanced_menu_checkbox.setChecked(show_advanced)
-        self.advanced_menu_checkbox.stateChanged.connect(self.on_menu_changed_preview) # Optional: just track change if needed, or do nothing
+        self.advanced_menu_checkbox.stateChanged.connect(self.on_advanced_menu_changed) # Auto-save
         self.advanced_menu_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px; padding: 5px;")
         menu_layout.addWidget(self.advanced_menu_checkbox)
         
         content_layout.addWidget(menu_group)
         content_layout.addStretch()
         
-        # Global Save Button
-        save_btn = QPushButton("💾 Lưu Cài Đặt / Save Settings")
-        save_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
-        save_btn.setFixedHeight(45)
-        save_btn.clicked.connect(self.save_general_settings)
-        content_layout.addWidget(save_btn)
-
         return page
-    
-    def on_menu_changed_preview(self, state):
-        # Optional: Enable Save button if it was disabled
-        pass
 
-    def save_general_settings(self):
-        """Save and apply all general settings"""
-        # 1. Advanced Menu Visibility
-        show_advanced = self.advanced_menu_checkbox.isChecked()
-        self.settings.setValue("show_advanced_menu", show_advanced)
-        
-        # Notify main window to update sidebar
-        if self.window() and hasattr(self.window(), 'update_menu_visibility'):
-            self.window().update_menu_visibility('advanced', show_advanced)
+    def _save_setting(self, key, value, feedback_msg=None):
+        """Helper to save setting with feedback"""
+        self.settings.setValue(key, value)
+        if feedback_msg:
+            self.show_toast(feedback_msg)
             
-        # 2. Language (Placeholder for now)
-        # lang = self.lang_combo.currentText()
-        # self.settings.setValue("language", lang)
+    def show_toast(self, message):
+        """Show a small feedback message (Toast)"""
+        # For now, use QToolTip as a simple non-blocking toast
+        # Position it near the cursor or center of widget
+        from PySide6.QtWidgets import QToolTip
+        from PySide6.QtGui import QCursor
+        QToolTip.showText(QCursor.pos(), f"✅ {message}", self)
+
+    def on_theme_changed(self, index):
+        """Handle theme change with auto-save"""
+        theme_key = self.theme_combo.itemData(index)
+        if theme_key:
+            ThemeManager.set_theme(theme_key)
+            # Update UI immediately
+            if self.window():
+                try:
+                    self.window().apply_theme()
+                    self.setStyleSheet("") # Force refresh
+                    self._save_setting("theme", theme_key, f"Đã đổi giao diện: {self.theme_combo.currentText()}")
+                except: pass
+
+    def on_advanced_menu_changed(self, state):
+        """Handle advanced menu toggle with auto-save"""
+        is_checked = self.advanced_menu_checkbox.isChecked()
+        self._save_setting("show_advanced_menu", is_checked, "Đã lưu cài đặt Menu")
         
-        QMessageBox.information(self, "Đã Lưu", "Cài đặt đã được lưu và áp dụng thành công! ✅")
+        # Notify main window
+        if self.window() and hasattr(self.window(), 'update_menu_visibility'):
+            self.window().update_menu_visibility('advanced', is_checked)
 
     def create_adb_page(self):
         """Create the ADB configuration page"""
@@ -235,12 +245,15 @@ class SettingsWidget(QWidget):
         browse_btn.setStyleSheet(ThemeManager.get_button_style("outline"))
         adb_path_layout.addWidget(browse_btn)
         
+        adb_path_layout.addWidget(browse_btn)
+        
         adb_layout.addLayout(adb_path_layout)
         
-        save_adb_btn = QPushButton("Lưu đường dẫn ADB")
-        save_adb_btn.clicked.connect(self.save_adb_path)
-        save_adb_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
-        adb_layout.addWidget(save_adb_btn)
+        # Auto-save ADB Path on editing finished
+        self.adb_path_input.editingFinished.connect(self.save_adb_path_auto)
+        
+        # Connect Browse button to update input AND save
+        # (Already connected to browse_adb, need to update browse_adb to save too)
         
         # Fix Connection Button
         fix_btn = QPushButton("🛠️ Sửa lỗi kết nối USB (Fix Connection)")
@@ -284,10 +297,14 @@ class SettingsWidget(QWidget):
         
         layout.addLayout(path_layout)
         
-        save_btn = QPushButton("Lưu Cấu hình Cloud")
-        # save_btn.clicked.connect(self.save_cloud_config) # Implement save later
-        save_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
-        layout.addWidget(save_btn)
+        browse_btn.clicked.connect(self.browse_cloud_folder)
+        browse_btn.setStyleSheet(ThemeManager.get_button_style("outline"))
+        path_layout.addWidget(browse_btn)
+        
+        layout.addLayout(path_layout)
+        
+        # Auto-save Cloud Path
+        self.cloud_path_input.editingFinished.connect(self.save_cloud_path_auto)
         
         content_layout.addWidget(group)
         content_layout.addStretch()
@@ -321,26 +338,21 @@ class SettingsWidget(QWidget):
         update_layout.addWidget(separator)
         
         # Auto-check settings
-        # Auto-check settings
         self.auto_check_checkbox = QCheckBox("Tự động kiểm tra khi khởi động")
         auto_check = self.settings.value("auto_check_updates", True, type=bool)
         self.auto_check_checkbox.setChecked(auto_check)
-        # self.auto_check_checkbox.stateChanged.connect(self.toggle_auto_check) # Removed immediate save
+        self.auto_check_checkbox.stateChanged.connect(self.save_update_settings_auto) 
         self.auto_check_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px;")
         update_layout.addWidget(self.auto_check_checkbox)
         
         self.prerelease_checkbox = QCheckBox("Bao gồm phiên bản beta (pre-release)")
         include_prerelease = self.settings.value("include_prerelease", True, type=bool)
         self.prerelease_checkbox.setChecked(include_prerelease)
-        # self.prerelease_checkbox.stateChanged.connect(self.toggle_prerelease) # Removed immediate save
+        self.prerelease_checkbox.stateChanged.connect(self.save_update_settings_auto)
         self.prerelease_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px;")
         update_layout.addWidget(self.prerelease_checkbox)
         
-        # Save Button for Update Settings
-        save_update_btn = QPushButton("💾 Lưu Cài Đặt Cập Nhật")
-        save_update_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
-        save_update_btn.clicked.connect(self.save_update_settings)
-        update_layout.addWidget(save_update_btn)
+        # Removed Save Button
         
         # Last check info
         last_check = self.settings.value("last_update_check", None)
@@ -454,29 +466,17 @@ class SettingsWidget(QWidget):
         progress_dialog.start_download()
         progress_dialog.exec()
     
-    def manual_check_update(self):
-        """Manually check for updates"""
-        # ... existing implementation ...
+
     
-    def save_update_settings(self):
-        """Save and apply update settings"""
+    def save_update_settings_auto(self, state=None):
+        """Auto save update settings"""
         auto_check = self.auto_check_checkbox.isChecked()
         include_prerelease = self.prerelease_checkbox.isChecked()
         
         self.settings.setValue("auto_check_updates", auto_check)
         self.settings.setValue("include_prerelease", include_prerelease)
         
-        QMessageBox.information(self, "Đã Lưu", "Cài đặt cập nhật đã được lưu thành công! ✅")
-
-    def toggle_auto_check(self, state):
-        """Toggle auto-check updates setting - DEPRECATED (Kept for compatibility if needed or removed)"""
-        # Now handled by save_update_settings
-        pass
-    
-    def toggle_prerelease(self, state):
-        """Toggle include pre-release setting - DEPRECATED"""
-        # Now handled by save_update_settings
-        pass
+        self.show_toast("Đã lưu cài đặt cập nhật")
 
     def create_about_page(self):
         """Create the detailed about page"""
@@ -511,14 +511,14 @@ class SettingsWidget(QWidget):
         changelog_group.setStyleSheet(self.get_group_style())
         changelog_layout = QVBoxLayout(changelog_group)
         
-        # Release Notes v2.5.2.0 mapped content
+        # Release Notes v2.5.3.0 mapped content
         changelog_html = """
-        <h3 style="margin-bottom: 5px;">🔧 Fixes & Optimizations (v2.5.2.0)</h3>
+        <h3 style="margin-bottom: 5px;">✨ App Manager Refactor (v2.5.3.0)</h3>
         <ul style="margin-top: 0px; margin-bottom: 10px; margin-left: -20px; color: #333;">
-            <li>✅ <b>Dashboard Fix:</b> Resolved "Checking..." freeze and missing data display.</li>
-            <li>✅ <b>ART Tuning:</b> Fixed crash and added real-time progress for app optimization.</li>
-            <li>✅ <b>Log System:</b> Added file logging (app_log.txt) for better debugging.</li>
-            <li>✅ <b>Stability:</b> Fixed random crashes during long-running tasks.</li>
+            <li>🎨 <b>Premium Glass UI:</b> Giao diện quản lý ứng dụng mới cực đẹp với hiệu ứng kính.</li>
+            <li>🔘 <b>Floating Action Bar:</b> Thanh công cụ nổi thông minh tự động xuất hiện khi chọn app.</li>
+            <li>🇻🇳 <b>Tiếng Việt:</b> Dịch toàn bộ trạng thái app (Đã bật, Đã tắt, Hệ thống, Người dùng).</li>
+            <li>🚀 <b>Performance:</b> Tối ưu hóa tốc độ tải danh sách và xử lý lệnh ADB.</li>
         </ul>
         """
         if ThemeManager.get_theme() == "dark":
@@ -602,21 +602,30 @@ class SettingsWidget(QWidget):
         path, _ = QFileDialog.getOpenFileName(self, "Chọn tập tin thực thi ADB", "", "Executables (*.exe);;All Files (*)")
         if path:
             self.adb_path_input.setText(path)
+            self.save_adb_path_auto() # Auto save after browse
             
     def browse_cloud_folder(self):
         """Browse for Cloud Sync folder"""
         path = QFileDialog.getExistingDirectory(self, "Chọn thư mục đồng bộ Cloud")
         if path:
             self.cloud_path_input.setText(path)
-            
-    def save_adb_path(self):
-        """Save ADB path"""
+            self.save_cloud_path_auto()
+
+    def save_adb_path_auto(self):
+        """Auto save ADB path"""
         path = self.adb_path_input.text().strip()
         if os.path.exists(path):
             self.adb.adb_path = path
-            QMessageBox.information(self, "Thành công", "Đã cập nhật đường dẫn ADB")
+            self._save_setting("adb_path", path, "Đã lưu đường dẫn ADB")
         else:
-            QMessageBox.warning(self, "Lỗi", "Đường dẫn không hợp lệ")
+            # Only warn if not empty (user might be clearing it)
+            if path:
+                QMessageBox.warning(self, "Lỗi", "Đường dẫn ADB không hợp lệ")
+
+    def save_cloud_path_auto(self):
+        """Auto save Cloud path"""
+        path = self.cloud_path_input.text().strip()
+        self._save_setting("cloud_sync_path", path, "Đã lưu đường dẫn Cloud")
 
     def fix_connection(self):
         """Run ADB Fix Connection"""
