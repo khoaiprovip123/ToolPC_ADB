@@ -1,3 +1,18 @@
+## [2.5.3.1] - 2025-12-30
+### Added
+- **Cleanup Script**: Tạo `scripts/cleanup.py` - công cụ tự động dọn dẹp file thừa, cache và build artifacts
+  - Tự động xóa tất cả `__pycache__/` và `*.pyc` files
+  - Dọn dẹp build artifacts (`build/`, `dist/`)
+  - Làm sạch log files cũ
+  - Báo cáo chi tiết dung lượng tiết kiệm được
+
+### Changed
+- **Project Optimization**: Tối ưu hóa dung lượng dự án
+  - Giảm từ 265.66 MB xuống 95.59 MB (tiết kiệm 170.07 MB - 64%)
+  - Xóa các file debug không cần thiết (`debug_import.py`, `debug_import_no_app.py`)
+  - Xóa log files cũ (`crash_log.txt`, `launch_log.txt`)
+  - Cập nhật `.gitignore` để tránh track debug files và logs trong tương lai
+
 ## [2.5.3.0] - 2025-12-26
 ### Added
 - **App Manager UX Overhaul (Premium Glass UI)**:
