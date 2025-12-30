@@ -82,3 +82,12 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+
+# Debug files
+debug_*.py
+*_log.txt
+crash_log.txt
+launch_log.txt
+
+# Task tracking
+task.md
