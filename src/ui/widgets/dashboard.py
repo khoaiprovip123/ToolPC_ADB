@@ -620,7 +620,14 @@ class DashboardWidget(QWidget):
             if 'model' in self.rows:
                 self.rows['model'].set_value(info.get('model', 'Unknown'))
             if 'device_name' in self.rows: # Codename
-                self.rows['device_name'].set_value(info.get('device_name', 'Unknown'))
+                friendly_name = info.get('device_friendly_name', info.get('device_name', 'Unknown'))
+                codename = info.get('device_name', '').lower()
+                # Show friendly name with codename in parentheses if different
+                if friendly_name != codename and codename != friendly_name.lower():
+                    display = f"{friendly_name}"
+                else:
+                    display = friendly_name
+                self.rows['device_name'].set_value(display)
             if 'soc_name' in self.rows: # Chipset
                 self.rows['soc_name'].set_value(soc_name if soc_name else info.get('board', 'Unknown'))
             

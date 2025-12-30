@@ -637,10 +637,14 @@ class ADBManager:
             # CODENAME / PRODUCT
             # ro.product.name or ro.build.product often holds the codename
             device_codename = props.get("ro.product.name", props.get("ro.build.product", "Unknown"))
+            
+            # Resolve friendly device name from database
+            device_friendly = self._resolve_device_name(device_codename)
 
             return {
                 "model": props.get("ro.product.model", "Unknown"),
                 "device_name": device_codename, # Codename
+                "device_friendly_name": device_friendly if device_friendly else device_codename, # Friendly name from database
                 "manufacturer": props.get("ro.product.manufacturer", "Unknown"),
                 "brand": props.get("ro.product.brand", "Unknown"),
                 "board": board,
@@ -944,14 +948,27 @@ class ADBManager:
         # Partial matches for Hardware
         if hardware:
             if "mt" in hardware or "dimensity" in hardware:
-                 return f"MediaTek {hardware.title()}"
+                return f"MediaTek {hardware.title()}"
             if "sm" in hardware or "sd" in hardware:
-                 return f"Snapdragon {hardware.upper()}"
+                return f"Snapdragon {hardware.upper()}"
         
         # Fallback
         if soc_model:
             return f"Snapdragon {soc_model}" if "SM" in soc_model else soc_model
             
+        return None
+
+    def _resolve_device_name(self, codename):
+        """Map codename to commercial device name"""
+        if not codename:
+            return None
+            
+        codename = codename.lower().strip()
+        
+        # Direct lookup from device_mappings
+        if hasattr(self, 'device_mappings') and codename in self.device_mappings:
+            return self.device_mappings[codename]
+        
         return None
 
     # ==================== Fastboot & Power ====================
