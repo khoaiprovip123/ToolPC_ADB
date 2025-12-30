@@ -44,14 +44,20 @@ class AppListDelegate(QStyledItemDelegate):
         # Background (Hover/Select)
         rect = option.rect
         if option.state & QStyle.State_Selected:
-            painter.fillRect(rect, QColor(ThemeManager.COLOR_ACCENT + "15")) 
+            # Create a light version of the accent color
+            bg_color = QColor(ThemeManager.COLOR_ACCENT)
+            bg_color.setAlpha(40) # Slightly more visible for selection
+            painter.fillRect(rect, bg_color) 
             # Left Accent Bar
             accent_bar = rect.adjusted(0, 4, -rect.width()+4, -4)
             painter.setBrush(QColor(ThemeManager.COLOR_ACCENT))
             painter.setPen(Qt.NoPen)
             painter.drawRoundedRect(accent_bar, 2, 2)
         elif option.state & QStyle.State_MouseOver:
-            painter.fillRect(rect, QColor(ThemeManager.COLOR_BG_SECONDARY))
+            # Even lighter for hover
+            hover_color = QColor(ThemeManager.COLOR_ACCENT)
+            hover_color.setAlpha(15) 
+            painter.fillRect(rect, hover_color)
 
         app: AppInfo = index.data(Qt.UserRole)
         if not app:
@@ -364,10 +370,11 @@ class AppManagerWidget(QWidget):
         table.setStyleSheet(f"""
             QTableWidget {{
                 background-color: transparent;
-                alternate-background-color: rgba(0,0,0,0.02);
+                alternate-background-color: rgba(255, 255, 255, 0.3);
                 border: none;
                 gridline-color: transparent;
-                selection-background-color: {ThemeManager.COLOR_ACCENT}15;
+                selection-background-color: rgba(0, 122, 255, 0.15);
+                outline: none;
             }}
             QHeaderView::section {{
                 background-color: transparent;

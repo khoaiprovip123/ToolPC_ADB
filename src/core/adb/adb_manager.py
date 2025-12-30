@@ -1751,3 +1751,8 @@ class ADBManager:
             if "SecurityException" in str(e):
                 return "❌ Lỗi: Cần bật 'Gỡ lỗi USB (Cài đặt bảo mật)' trong Tùy chọn nhà phát triển."
             return f"❌ Lỗi can thiệp hệ thống: {e}"
+
+    def toggle_screen(self):
+        """Toggle screen on/off using power button keyevent"""
+        self.shell("input keyevent 26", check=False)
+
