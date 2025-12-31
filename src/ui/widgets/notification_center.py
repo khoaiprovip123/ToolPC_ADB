@@ -196,7 +196,7 @@ class NotificationCenter(QFrame):
         self.create_toggle_btn(grid, "Settings", "⚙️", lambda: self.adb.shell("am start -a android.settings.SETTINGS"), 2, 0)
         self.create_toggle_btn(grid, "Dev Ops", "🛠️", lambda: self.adb.shell("am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS"), 2, 1)
         self.create_toggle_btn(grid, "Reboot", "↻", self.adb.reboot, 2, 2)
-        self.create_toggle_btn(grid, "Power", "⏻", self.adb.shutdown, 2, 3)
+        self.create_toggle_btn(grid, "Màn hình", "📺", self.adb.toggle_screen, 2, 3)
         scroll_l.addLayout(grid)
         
         scroll_l.addStretch()

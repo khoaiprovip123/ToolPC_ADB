@@ -1,3 +1,17 @@
+# Changelog
+
+## [2.5.3.2] - 2025-12-30
+
+### Added
+- Expanded SOC database with 200+ devices (Xiaomi, Samsung, OPPO, vivo, Realme, Pixel).
+- Display friendly marketing names (e.g., "Xiaomi 11 Lite 5G NE") in Dashboard.
+- New "Screen Toggle" button (📺) in Control Center (virtual power button).
+
+### Changed
+- Dashboard Hero section now prioritizes marketing names over model codes.
+- Simplified Dashboard hardware specs (removed redundant device name label).
+- Refined App Manager UI: Light/Theme-consistent selection and hover highlights (removed dark overlays).
+
 ## [2.5.3.1] - 2025-12-30
 ### Added
 - **Cleanup Script**: Tạo `scripts/cleanup.py` - công cụ tự động dọn dẹp file thừa, cache và build artifacts

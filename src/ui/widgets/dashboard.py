@@ -593,7 +593,9 @@ class DashboardWidget(QWidget):
             
         try:
             # 1. Update Hero Section
-            self.device_name_lbl.setText(info.get("model", "Device"))
+            # Show friendly device name instead of just model
+            device_friendly = info.get('device_friendly_name', info.get('model', 'Device'))
+            self.device_name_lbl.setText(device_friendly)
             self.os_lbl.setText(info.get("os_version", "Android"))
             
             # Update Circles
@@ -616,10 +618,9 @@ class DashboardWidget(QWidget):
             soc_name = info.get("soc_name", "Unknown Processor")
             self.card_cpu.update_value(soc_name)
             
-            # 3. Details
             if 'model' in self.rows:
                 self.rows['model'].set_value(info.get('model', 'Unknown'))
-            if 'device_name' in self.rows: # Codename
+            if 'device_name' in self.rows: # Codename - keep original
                 self.rows['device_name'].set_value(info.get('device_name', 'Unknown'))
             if 'soc_name' in self.rows: # Chipset
                 self.rows['soc_name'].set_value(soc_name if soc_name else info.get('board', 'Unknown'))
