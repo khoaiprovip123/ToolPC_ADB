@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.5.3.3] - 2025-12-31
+### Changed
+- Cập nhật phiên bản bảo trì và tối ưu hóa hệ thống.
+- Cải thiện độ ổn định.
+
 ## [2.5.3.2] - 2025-12-30
 
 ### Added
