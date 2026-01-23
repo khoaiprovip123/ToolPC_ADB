@@ -19,9 +19,11 @@ from PySide6.QtWidgets import QDialog
 # Imports from refactored modules
 from src.workers.debloat_worker import DebloatWorker
 from src.workers.optimization_worker import OptimizationWorker
+from src.workers.generic_worker import GenericShellWorker
 from src.data.bloatware_data import BLOATWARE_DICT
 
 # Reuse GradientCard logic or import if shared (Defining here for simplicity/independence)
+# Updated for stability check
 class ModernCard(QFrame):
     def __init__(self, title, desc, icon, callback, gradient_colors=None, parent=None):
         super().__init__(parent)
@@ -316,8 +318,15 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
         )
         
         if confirm == QMessageBox.Yes:
-            self.worker = DebloatWorker(self.adb, selected)
-            self.worker.progress.connect(lambda msg: LogManager.log("Debloater", msg, "info"))
+            cmds = [f"pm uninstall --user 0 {package}" for package in selected]
+            self.worker = GenericShellWorker(self.adb, cmds, "Dọn dẹp Bloatware")
+            
+            pd = QProgressDialog("Đang xử lý dọn dẹp...", "Hủy", 0, 0, self)
+            pd.setWindowModality(Qt.WindowModal)
+            pd.show()
+            
+            self.worker.progress.connect(pd.setLabelText)
+            self.worker.finished.connect(lambda s, m: [pd.close(), QMessageBox.information(self, "Kết quả", m)])
             self.worker.start()
             
     def reset(self):
@@ -405,7 +414,45 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
         )
         grid.addWidget(card_social, 2, 1)
 
-        grid.setRowStretch(3, 1) # Push to top
+        # Row 3: Visual Tweaks
+        card_nolabel = ModernCard(
+            "Ẩn Tên Ứng Dụng (No Word)",
+            "Ẩn toàn bộ tên ứng dụng ngoài màn hình chính (Chỉ hiện Icon). Reset máy để áp dụng.",
+            "📝",
+            self.run_remove_app_label,
+            gradient_colors=["#a18cd1", "#fbc2eb"]
+        )
+        grid.addWidget(card_nolabel, 3, 0)
+
+        card_blur = ModernCard(
+            "Kích Hoạt Blur (Device Level)",
+            "Ép buộc bật hiệu ứng Blur (Làm mờ) cho Folder và Đa nhiệm trên máy yếu.",
+            "💧",
+            self.run_force_blur_level,
+            gradient_colors=["#84fab0", "#8fd3f4"]
+        )
+        grid.addWidget(card_blur, 3, 1)
+
+        # Row 4: Unlock Features
+        card_superwall = ModernCard(
+            "Mở Khóa Super Wallpaper",
+            "Mở khóa tính năng Siêu hình nền (Cần cài đặt APK SuperWallpaper trước).",
+            "🪐",
+            self.run_unlock_super_wallpaper,
+            gradient_colors=["#f093fb", "#f5576c"]
+        )
+        grid.addWidget(card_superwall, 4, 0)
+
+        card_record = ModernCard(
+            "Ghi Âm Cuộc Gọi (Native)",
+            "Kích hoạt ghi âm cuộc gọi gốc (Gỡ bỏ Overlay chặn của Google/Global ROM).",
+            "📞",
+            self.run_enable_call_recording,
+            gradient_colors=["#fa709a", "#fee140"]
+        )
+        grid.addWidget(card_record, 4, 1)
+
+        grid.setRowStretch(5, 1) # Push to top
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
@@ -437,6 +484,44 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
         self.opt_worker.progress.connect(lambda msg: LogManager.log("Smart Blur", msg, "info"))
         self.opt_worker.error_occurred.connect(self.show_error)
         self.opt_worker.start()
+
+    def run_remove_app_label(self):
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
+        self.opt_worker = OptimizationWorker(self.adb, "remove_app_label")
+        self.opt_worker.progress.connect(lambda msg: LogManager.log("No Label", msg, "info"))
+        self.opt_worker.start()
+
+    def run_force_blur_level(self):
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
+        self.opt_worker = OptimizationWorker(self.adb, "force_blur_level")
+        self.opt_worker.progress.connect(lambda msg: LogManager.log("Force Blur", msg, "info"))
+        self.opt_worker.start()
+
+    def run_unlock_super_wallpaper(self):
+        if self.opt_worker and self.opt_worker.isRunning():
+            LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+            return
+        self.opt_worker = OptimizationWorker(self.adb, "unlock_super_wallpaper")
+        self.opt_worker.progress.connect(lambda msg: LogManager.log("Super Wallpaper", msg, "info"))
+        self.opt_worker.start()
+
+    def run_enable_call_recording(self):
+        confirm = QMessageBox.question(
+            self, "Xác nhận", 
+            "Lệnh này sẽ gỡ bỏ lớp phủ (overlay) của MIUI Global/Google nhằm khôi phục trình gọi điện gốc (hoặc tính năng bị ẩn).\nTiếp tục?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if confirm == QMessageBox.Yes:
+            if self.opt_worker and self.opt_worker.isRunning():
+                LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
+                return
+            self.opt_worker = OptimizationWorker(self.adb, "enable_call_recording")
+            self.opt_worker.progress.connect(lambda msg: LogManager.log("Call Recording", msg, "info"))
+            self.opt_worker.start()
 
     def run_hyperos_stacked_recent(self):
         try:

@@ -19,7 +19,8 @@ from PySide6.QtGui import QIcon, QColor, QCursor
 from src.ui.theme_manager import ThemeManager
 from src.core.adb.adb_manager import DeviceStatus
 from src.data.app_data import AppInfo
-from src.workers.app_worker import InstallerThread, BackupThread, AppScanner, RestoreThread
+from src.workers.app_worker import InstallerThread, BackupThread, AppScanner, RestoreThread, BatchInstallerThread
+from src.workers.generic_worker import GenericShellWorker
 import webbrowser
 
 # OneDrive APK Repository
@@ -163,6 +164,66 @@ class AppListDelegate(QStyledItemDelegate):
 
 # --- End Delegate ---
 
+class BackupOptionsDialog(QWidget):
+    """Dialog for Super Backup Options"""
+    def __init__(self, count, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Super Backup")
+        # Remove direct window flags if embedded or use QDialog if separate. 
+        # Since this is a QWidget internal helper often, we can use it as a persistent window or dialog.
+        # But for simplicity in this context, let's make it a standard QMessageBox-like wrapper or just a Dialog.
+        # Wait, proper way is QDialog.
+        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        self.setFixedSize(400, 300)
+        self.setStyleSheet(f"background-color: white; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Header
+        lbl_head = QLabel(f"Sao lưu {count} ứng dụng")
+        lbl_head.setStyleSheet("font-size: 18px; font-weight: bold; color: #2d3436;")
+        layout.addWidget(lbl_head)
+        
+        lbl_sub = QLabel("Chọn thành phần muốn sao lưu:")
+        lbl_sub.setStyleSheet("color: #636e72;")
+        layout.addWidget(lbl_sub)
+        
+        # Options
+        from PySide6.QtWidgets import QCheckBox
+        self.chk_apk = QCheckBox("📦 File cài đặt (APK/Split-APKs)")
+        self.chk_apk.setChecked(True)
+        self.chk_apk.setStyleSheet("font-size: 14px; padding: 5px;")
+        
+        self.chk_data = QCheckBox("💾 Dữ liệu ứng dụng (ADB Backup)")
+        self.chk_data.setToolTip("Cần xác nhận trên màn hình điện thoại. Không đảm bảo 100% với Android 12+.")
+        self.chk_data.setStyleSheet("font-size: 14px; padding: 5px;")
+        
+        layout.addWidget(self.chk_apk)
+        layout.addWidget(self.chk_data)
+        
+        # Info Box
+        info = QLabel("ℹ️ Dữ liệu sẽ được lưu vào thư mục 'Backups' theo ngày giờ.")
+        info.setWordWrap(True)
+        info.setStyleSheet("background: #f1f2f6; padding: 10px; border-radius: 6px; color: #7f8fa6; font-size: 12px;")
+        layout.addWidget(info)
+        
+        layout.addStretch()
+        
+        # Buttons
+        btns = QHBoxLayout()
+        btn_cancel = QPushButton("Hủy")
+        btn_cancel.clicked.connect(self.close)
+        btn_cancel.setStyleSheet(ThemeManager.get_button_style("outline"))
+        
+        self.btn_ok = QPushButton("Bắt đầu")
+        self.btn_ok.setStyleSheet(ThemeManager.get_button_style("primary"))
+        
+        btns.addWidget(btn_cancel)
+        btns.addWidget(self.btn_ok)
+        layout.addLayout(btns)
+
 class AppManagerWidget(QWidget):
     """
     App Manager V2: Modern, Clean, and Stable.
@@ -174,11 +235,12 @@ class AppManagerWidget(QWidget):
         
         # Data Stores
         self.apps_user: List[AppInfo] = []
-        self.apps_system: List[AppInfo] = []
-        self.current_tab = "manager" # manager, restore, install
+        self.apps_archived: List[AppInfo] = []
+        self.current_tab = "manager" # manager, restore, install, backup_restore
         
         self.scanner = None
         self.install_thread = None
+        self.batch_install_thread = None
         
         self.setup_ui()
         
@@ -186,7 +248,7 @@ class AppManagerWidget(QWidget):
         # 0. Global Layout for self
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
-        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
         
         # 1. Header Frame (Search & Stats)
@@ -252,11 +314,13 @@ class AppManagerWidget(QWidget):
         """)
         
         self.table_user = self.create_table()
-        self.table_system = self.create_table()
+        self.table_archived = self.create_table()
         self.page_install = self.create_install_page()
+        self.page_backup = self.create_backup_restore_page()
         
         self.tabs.addTab(self.table_user, "📱 QUẢN LÝ")
-        self.tabs.addTab(self.table_system, "♻️ KHÔI PHỤC")
+        self.tabs.addTab(self.page_backup, "💾 SAO LƯU & KHÔI PHỤC")
+        self.tabs.addTab(self.table_archived, "🗑️ ĐÃ GỠ / KHÔI PHỤC")
         self.tabs.addTab(self.page_install, "🔌 CÀI ĐẶT APK")
         
         self.tabs.currentChanged.connect(self.on_tab_changed)
@@ -309,7 +373,7 @@ class AppManagerWidget(QWidget):
         return shadow
 
     def on_tab_changed(self, index):
-        tab_ids = ["manager", "restore", "install"]
+        tab_ids = ["manager", "backup_restore", "restore", "install"]
         if index < len(tab_ids):
             self.current_tab = tab_ids[index]
         
@@ -322,6 +386,11 @@ class AppManagerWidget(QWidget):
         if self.current_tab in ["manager", "restore"]:
             # Logic handled by refresh or user click
             pass
+        
+        if self.current_tab == "backup_restore":
+            # Auto load backups if needed
+            self.refresh_backups()
+
 
     def switch_tab(self, tab_id):
         """Programmatic tab switching"""
@@ -495,6 +564,194 @@ class AppManagerWidget(QWidget):
         
         return page
 
+    def create_backup_restore_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        
+        # --- SECTION 1: ONE CLICK BACKUP ---
+        top_card = QFrame()
+        top_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {ThemeManager.COLOR_GLASS_WHITE};
+                border-radius: 16px;
+                border: 1px solid rgba(255,255,255,0.6);
+            }}
+        """)
+        top_layout = QHBoxLayout(top_card)
+        top_layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Info
+        info_l = QVBoxLayout()
+        t1 = QLabel("Sao Lưu Tự Động")
+        t1.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
+        t2 = QLabel("Sao lưu toàn bộ ứng dụng người dùng (User Apps) chỉ với 1 click.")
+        t2.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY};")
+        info_l.addWidget(t1)
+        info_l.addWidget(t2)
+        top_layout.addLayout(info_l)
+        
+        # Button
+        btn_auto = QPushButton("🚀 Backup All User Apps")
+        btn_auto.setFixedSize(180, 45)
+        btn_auto.setCursor(Qt.PointingHandCursor)
+        btn_auto.setStyleSheet(ThemeManager.get_button_style("primary"))
+        btn_auto.clicked.connect(self.auto_backup_all)
+        top_layout.addWidget(btn_auto)
+        layout.addWidget(top_card)
+        
+        # --- SECTION 2: RESTORE LIBRARY ---
+        lbl_lib = QLabel("📚 KHO LƯU TRỮ (Restore Library)")
+        lbl_lib.setStyleSheet(f"font-weight: 700; color: {ThemeManager.COLOR_TEXT_SECONDARY}; letter-spacing: 0.5px;")
+        layout.addWidget(lbl_lib)
+        
+        # Path Selector
+        path_row = QHBoxLayout()
+        self.backup_path_input = QLineEdit()
+        self.backup_path_input.setPlaceholderText("Đường dẫn thư mục Backup...")
+        # Default path: ./Backups
+        default_bak = os.path.abspath(os.path.join(os.getcwd(), "Backups"))
+        if not os.path.exists(default_bak): os.makedirs(default_bak)
+        self.backup_path_input.setText(default_bak)
+        
+        btn_path = QPushButton("📂")
+        btn_path.setFixedSize(40, 30)
+        btn_path.clicked.connect(self.choose_backup_folder)
+        
+        btn_scan = QPushButton("🔄 Quét")
+        btn_scan.setFixedSize(60, 30)
+        btn_scan.clicked.connect(self.refresh_backups)
+        
+        path_row.addWidget(self.backup_path_input)
+        path_row.addWidget(btn_path)
+        path_row.addWidget(btn_scan)
+        layout.addLayout(path_row)
+        
+        # Backup Table
+        self.table_backups = QTableWidget()
+        self.table_backups.setColumnCount(3)
+        self.table_backups.setHorizontalHeaderLabels(["TÊN ỨNG DỤNG / GÓI", "LOẠI", "DUNG LƯỢNG"])
+        self.table_backups.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table_backups.verticalHeader().setVisible(False)
+        self.table_backups.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table_backups.setStyleSheet(self.table_user.styleSheet()) # Reuse style
+        layout.addWidget(self.table_backups)
+        
+        # Action Restore
+        btn_restore_sel = QPushButton("♻️ Khôi Phục (Đã chọn)")
+        btn_restore_sel.setFixedHeight(45)
+        btn_restore_sel.setStyleSheet(ThemeManager.get_button_style("success"))
+        btn_restore_sel.clicked.connect(self.restore_selected_backups)
+        layout.addWidget(btn_restore_sel)
+        
+        return page
+
+    def choose_backup_folder(self):
+        d = QFileDialog.getExistingDirectory(self, "Chọn thư mục chứa Backup")
+        if d:
+            self.backup_path_input.setText(d)
+            self.refresh_backups()
+
+    def refresh_backups(self):
+        path = self.backup_path_input.text()
+        if not os.path.isdir(path): return
+        
+        self.table_backups.setRowCount(0)
+        
+        # Scan logic: Look for folders or APKs
+        # Supported format from Super Backup: Folder "Name_Pkg", inside "base.apk"
+        # Or just APK files
+        
+        items = []
+        try:
+            for entry in os.scandir(path):
+                # 1. Folder (Split APK or App Folder)
+                if entry.is_dir():
+                    # Check if it looks like an app backup (contains .apk)
+                    apks = [f for f in os.listdir(entry.path) if f.endswith('.apk')]
+                    if apks:
+                        size = sum(os.path.getsize(os.path.join(entry.path, f)) for f in apks)
+                        items.append({
+                            "name": entry.name, 
+                            "path": entry.path, 
+                            "type": "Folder / Split APK", 
+                            "size": size
+                        })
+                # 2. File (Single APK)
+                elif entry.is_file() and entry.name.endswith('.apk'):
+                    items.append({
+                            "name": entry.name, 
+                            "path": entry.path, 
+                            "type": "Single APK", 
+                            "size": entry.stat().st_size
+                    })
+        except Exception as e:
+            print(e)
+            
+        # Fill Table
+        for item in items:
+            row = self.table_backups.rowCount()
+            self.table_backups.insertRow(row)
+            
+            t0 = QTableWidgetItem(item['name'])
+            t0.setData(Qt.UserRole, item['path']) # Store path
+            self.table_backups.setItem(row, 0, t0)
+            
+            self.table_backups.setItem(row, 1, QTableWidgetItem(item['type']))
+            self.table_backups.setItem(row, 2, QTableWidgetItem(f"{item['size']/1024/1024:.1f} MB"))
+
+    def restore_selected_backups(self):
+        rows = set(i.row() for i in self.table_backups.selectedItems())
+        if not rows:
+            QMessageBox.warning(self, "Chưa chọn", "Vui lòng chọn ít nhất 1 ứng dụng để khôi phục!")
+            return
+            
+        paths = []
+        names = []
+        for r in rows:
+             path = self.table_backups.item(r, 0).data(Qt.UserRole)
+             paths.append(path)
+             names.append(os.path.basename(path))
+             
+        if QMessageBox.question(self, "Xác nhận", f"Khôi phục {len(paths)} ứng dụng?\n\n{', '.join(names[:3])}...") == QMessageBox.Yes:
+            self.batch_install_thread = BatchInstallerThread(self.adb, paths)
+            
+            pd = QProgressDialog("Đang khôi phục...", "Ẩn", 0, 0, self)
+            pd.setWindowModality(Qt.WindowModal)
+            pd.show()
+            
+            self.batch_install_thread.progress.connect(pd.setLabelText)
+            self.batch_install_thread.finished.connect(lambda s,m: [pd.close(), QMessageBox.information(self, "Kết quả", m)])
+            self.batch_install_thread.start()
+
+    def auto_backup_all(self):
+        # 1. Check if we have app list
+        if not self.apps_user:
+            QMessageBox.warning(self, "Chưa có dữ liệu", "Vui lòng đợi quét danh sách ứng dụng ở tab Quản Lý trước!")
+            # Switch to manager and refresh?
+            self.tabs.setCurrentIndex(0)
+            self.refresh_data()
+            return
+
+        count = len(self.apps_user)
+        msg = f"Tìm thấy {count} ứng dụng người dùng.\nBạn có muốn tự động sao lưu TOÀN BỘ vào thư mục mặc định không?"
+        if QMessageBox.question(self, "Auto Backup", msg) == QMessageBox.Yes:
+            # Default path
+            bk_path = os.path.abspath(os.path.join(os.getcwd(), "Backups"))
+            if not os.path.exists(bk_path): os.makedirs(bk_path)
+            
+            self.backup_thread = BackupThread(self.adb, self.apps_user, bk_path, True, False) # APK Only for speed
+            
+            pd = QProgressDialog("Đang Auto-Backup...", "Hủy", 0, 0, self)
+            pd.show()
+            
+            self.backup_thread.progress.connect(pd.setLabelText)
+            self.backup_thread.finished.connect(lambda s,m: [pd.close(), QMessageBox.information(self, "Xong", m), self.refresh_backups()])
+            self.backup_thread.start()
+
+
+
     def choose_apk_file_ui(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Chọn File Cài Đặt", "", "Android Apps (*.apk *.apks *.xapk *.zip)")
         if files:
@@ -577,7 +834,7 @@ class AppManagerWidget(QWidget):
         self.update_tables()
         
     def refresh_data(self, force=True):
-        if not self.adb.current_device: return
+        if not self.adb.current_device or not self.adb.is_online(): return
         
         if self.scanner and self.scanner.isRunning(): return
 
@@ -591,7 +848,7 @@ class AppManagerWidget(QWidget):
     def on_scan_done(self, apps_raw):
         self.btn_refresh.setDisabled(False)
         self.apps_user.clear()
-        self.apps_system.clear()
+        self.apps_archived.clear()
         
         for app in apps_raw:
             # Separation Logic:
@@ -599,12 +856,12 @@ class AppManagerWidget(QWidget):
             # Restore: All ARCHIVED apps (Uninstalled System Apps)
             
             if app.is_archived:
-                self.apps_system.append(app) # Use 'system' list for Restore Tab
+                self.apps_archived.append(app) # Use 'archived' list for Restore Tab
             else:
                 self.apps_user.append(app) # Use 'user' list for Manager Tab
         
         self.update_tables()
-        self.lbl_stats.setText(f"Installed: {len(self.apps_user)} | Restore: {len(self.apps_system)}")
+        self.lbl_stats.setText(f"Installed: {len(self.apps_user)} | Archived: {len(self.apps_archived)}")
         
     def update_tables(self):
         search = self.remove_accents(self.search_input.text().lower())
@@ -646,7 +903,7 @@ class AppManagerWidget(QWidget):
             table.setSortingEnabled(True)
 
         populate(self.table_user, self.apps_user, is_restore_tab=False)
-        populate(self.table_system, self.apps_system, is_restore_tab=True)
+        populate(self.table_archived, self.apps_archived, is_restore_tab=True)
         
     def update_selection(self):
         if not hasattr(self, 'action_bar'): return
@@ -654,7 +911,7 @@ class AppManagerWidget(QWidget):
         if self.current_tab == 'manager':
             items = self.table_user.selectedItems()
         elif self.current_tab == 'restore':
-            items = self.table_system.selectedItems()
+            items = self.table_archived.selectedItems()
         else:
             self.action_bar.hide()
             return
@@ -686,7 +943,7 @@ class AppManagerWidget(QWidget):
         if self.current_tab == 'manager':
             table = self.table_user
         else:
-            table = self.table_system
+            table = self.table_archived
             
         apps = []
         rows = set(i.row() for i in table.selectedItems())
@@ -700,35 +957,53 @@ class AppManagerWidget(QWidget):
         if not apps: return
         msg = f"Gỡ cài đặt {len(apps)} ứng dụng?\n" + "\n".join([a.name for a in apps[:5]])
         if QMessageBox.question(self, "Xác nhận", msg) == QMessageBox.Yes:
-            # Logic to uninstall
-            for app in apps:
-                self.adb.shell(f"pm uninstall --user 0 {app.package}")
-            QMessageBox.information(self, "Xong", "Đã gửi lệnh gỡ cài đặt.")
-            self.refresh_data()
+            cmds = [f"pm uninstall --user 0 {app.package}" for app in apps]
+            
+            self.generic_worker = GenericShellWorker(self.adb, cmds, "Gỡ cài đặt")
+            
+            pd = QProgressDialog("Đang gỡ cài đặt...", "Ẩn", 0, 0, self)
+            pd.setWindowModality(Qt.WindowModal)
+            pd.show()
+            
+            self.generic_worker.progress.connect(pd.setLabelText)
+            self.generic_worker.finished.connect(lambda s, m: [pd.close(), QMessageBox.information(self, "Xong", m), self.refresh_data()])
+            self.generic_worker.start()
 
     def action_disable(self):
         apps = self.get_selected_app_infos()
-        count = 0
-        for app in apps:
-            if app.is_enabled:
-                 self.adb.shell(f"pm disable-user --user 0 {app.package}")
-                 count += 1
-        if count > 0:
-            QMessageBox.information(self, "Xong", f"Đã tắt {count} ứng dụng.")
-            self.refresh_data()
-        else:
+        to_disable = [a for a in apps if a.is_enabled]
+        if not to_disable:
             QMessageBox.information(self, "Info", "Không có ứng dụng nào cần tắt (đã tắt rồi).")
+            return
+            
+        cmds = [f"pm disable-user --user 0 {app.package}" for app in to_disable]
+        self.generic_worker = GenericShellWorker(self.adb, cmds, "Tắt ứng dụng")
+        
+        pd = QProgressDialog("Đang tắt ứng dụng...", "Ẩn", 0, 0, self)
+        pd.setWindowModality(Qt.WindowModal)
+        pd.show()
+        
+        self.generic_worker.progress.connect(pd.setLabelText)
+        self.generic_worker.finished.connect(lambda s, m: [pd.close(), QMessageBox.information(self, "Xong", m), self.refresh_data()])
+        self.generic_worker.start()
 
     def action_enable(self):
         apps = self.get_selected_app_infos()
-        count = 0
-        for app in apps:
-            if not app.is_enabled:
-                 self.adb.shell(f"pm enable {app.package}")
-                 count += 1
-        if count > 0:
-            QMessageBox.information(self, "Xong", f"Đã bật {count} ứng dụng.")
-            self.refresh_data()
+        to_enable = [a for a in apps if not a.is_enabled]
+        if not to_enable:
+            QMessageBox.information(self, "Info", "Không có ứng dụng nào cần bật (đã bật rồi).")
+            return
+            
+        cmds = [f"pm enable {app.package}" for app in to_enable]
+        self.generic_worker = GenericShellWorker(self.adb, cmds, "Bật ứng dụng")
+        
+        pd = QProgressDialog("Đang bật ứng dụng...", "Ẩn", 0, 0, self)
+        pd.setWindowModality(Qt.WindowModal)
+        pd.show()
+        
+        self.generic_worker.progress.connect(pd.setLabelText)
+        self.generic_worker.finished.connect(lambda s, m: [pd.close(), QMessageBox.information(self, "Xong", m), self.refresh_data()])
+        self.generic_worker.start()
             
     def action_restore(self):
          apps = self.get_selected_app_infos()
@@ -742,8 +1017,48 @@ class AppManagerWidget(QWidget):
          
     def action_backup(self):
         apps = self.get_selected_app_infos()
-        # Backup Logic placeholder
-        QMessageBox.information(self, "Backup", f"Sao lưu {len(apps)} app (Chưa implement deep logic)")
+        if not apps: return
+        
+        # Show Options Dialog
+        dialog = BackupOptionsDialog(len(apps), self)
+        
+        def start_backup():
+            backup_apk = dialog.chk_apk.isChecked()
+            backup_data = dialog.chk_data.isChecked()
+            
+            if not backup_apk and not backup_data:
+                QMessageBox.warning(self, "Lỗi", "Vui lòng chọn ít nhất một tùy chọn!")
+                return
+            
+            dialog.close()
+            
+            # Select Folder
+            dest = QFileDialog.getExistingDirectory(self, "Chọn nơi lưu Backup")
+            if not dest: return
+            
+            # Start Thread
+            self.backup_thread = BackupThread(self.adb, apps, dest, backup_apk, backup_data)
+            
+            # Setup Progress Dialog
+            pd = QProgressDialog("Đang sao lưu...", "Hủy", 0, 0, self)
+            pd.setWindowModality(Qt.WindowModal)
+            pd.setMinimumDuration(0)
+            pd.show()
+            
+            def handle_progress(msg):
+                pd.setLabelText(msg)
+                
+            def handle_finish(success, msg):
+                pd.close()
+                icon = QMessageBox.Information if success else QMessageBox.Warning
+                QMessageBox.information(self, "Kết quả", msg)
+                
+            self.backup_thread.progress.connect(handle_progress)
+            self.backup_thread.finished.connect(handle_finish)
+            self.backup_thread.start()
+            
+        dialog.btn_ok.clicked.connect(start_backup)
+        dialog.show()
 
     def choose_apk_file(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Chọn APK", "", "APK (*.apk)")
@@ -766,16 +1081,46 @@ class AppManagerWidget(QWidget):
 
     def install_files(self, files):
         self.install_thread = InstallerThread(self.adb, files, False)
-        self.install_thread.finished.connect(lambda s, m: QMessageBox.information(self, "Install", m))
+        
+        def on_install_done(success, msg):
+            if success:
+                QMessageBox.information(self, "Thành công", msg)
+            else:
+                # Check for Conflict Signal
+                if msg.startswith("[CONFLICT:"):
+                    # Format: [CONFLICT:com.package.name]
+                    pkg = msg.split(":")[1].replace("]", "").strip()
+                    
+                    reply = QMessageBox.question(
+                        self, 
+                        "Sai chữ ký (Signature Mismatch)",
+                        f"Phát hiện ứng dụng '{pkg}' đã được cài đặt nhưng lệch chữ ký (thường do cài đè bản Mod lên bản Gốc).\n\n"
+                        "Bạn có muốn GỠ BẢN CŨ và CÀI BẢN MỚI không?",
+                        QMessageBox.Yes | QMessageBox.No
+                    )
+                    
+                    if reply == QMessageBox.Yes:
+                        # 1. Uninstall
+                        self.adb.shell(f"pm uninstall {pkg}")
+                        # 2. Retry Install
+                        self.install_files(files)
+                        return
+                    else:
+                        return # Cancelled
+                
+                # Normal Error
+                QMessageBox.warning(self, "Lỗi cài đặt", msg)
+        
+        self.install_thread.finished.connect(on_install_done)
         self.install_thread.start()
 
     def reset(self):
         """Reset state (Called by MainWindow)"""
         self.search_input.clear()
         self.apps_user.clear()
-        self.apps_system.clear()
+        self.apps_archived.clear()
         self.table_user.setRowCount(0)
-        self.table_system.setRowCount(0)
+        self.table_archived.setRowCount(0)
         self.lbl_stats.setText("Sẵn sàng")
         self.action_bar.hide()
         

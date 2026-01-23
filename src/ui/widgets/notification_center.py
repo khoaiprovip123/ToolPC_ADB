@@ -530,45 +530,56 @@ class NotificationCenter(QFrame):
         self.add_notification("Screenshot", "Đã chụp màn hình", "success")
 
     def add_notification(self, title, message, type="info"):
-        item = QListWidgetItem()
-        widget = QWidget()
-        l = QVBoxLayout(widget)
-        l.setContentsMargins(10, 8, 10, 8)
-        l.setSpacing(2)
-        
-        t = QLabel(title)
-        col = ThemeManager.COLOR_TEXT_PRIMARY
-        if type == "error": col = ThemeManager.COLOR_DANGER
-        elif type == "success": col = ThemeManager.COLOR_SUCCESS
-        
-        # Add timestamp
-        import datetime
-        time_str = datetime.datetime.now().strftime("%H:%M:%S")
-        t.setText(f"{title}  <span style='color:#999; font-weight:normal; font-size:10px;'>{time_str}</span>")
-        t.setTextFormat(Qt.RichText)
-        
-        t.setStyleSheet(f"font-weight: 700; font-size: 13px; color: {col};")
-        
-        m = QLabel(message)
-        m.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 11px;")
-        m.setWordWrap(True)
-        
-        l.addWidget(t)
-        l.addWidget(m)
-        
-        widget.adjustSize()
-        item.setSizeHint(QSize(self.notif_list.width() - 25, widget.sizeHint().height() + 10))
-        
-        self.notif_list.addItem(item)
-        self.notif_list.setItemWidget(item, widget)
-        
-        self.notif_list.scrollToBottom()
+        try:
+            item = QListWidgetItem()
+            widget = QWidget()
+            l = QVBoxLayout(widget)
+            l.setContentsMargins(10, 8, 10, 8)
+            l.setSpacing(2)
+            
+            t = QLabel(title)
+            col = ThemeManager.COLOR_TEXT_PRIMARY
+            if type == "error": col = ThemeManager.COLOR_DANGER
+            elif type == "success": col = ThemeManager.COLOR_SUCCESS
+            
+            # Add timestamp
+            import datetime
+            time_str = datetime.datetime.now().strftime("%H:%M:%S")
+            t.setText(f"{title}  <span style='color:#999; font-weight:normal; font-size:10px;'>{time_str}</span>")
+            t.setTextFormat(Qt.RichText)
+            
+            t.setStyleSheet(f"font-weight: 700; font-size: 13px; color: {col};")
+            
+            m = QLabel(message)
+            m.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 11px;")
+            m.setWordWrap(True)
+            
+            l.addWidget(t)
+            l.addWidget(m)
+            
+            widget.adjustSize()
+            item.setSizeHint(QSize(self.notif_list.width() - 25, widget.sizeHint().height() + 10))
+            
+            self.notif_list.addItem(item)
+            self.notif_list.setItemWidget(item, widget)
+            
+            self.notif_list.scrollToBottom()
 
-        # [AUTO-OPEN] Automatically open notification tab on new message
-        if not self.isVisible():
-            self.toggle(tab_index=1)
-        elif self.stack.currentIndex() != 1:
-            self.switch_tab(1)
+            # [AUTO-OPEN] Automatically open notification tab on new message
+            # Check if C++ object is still valid
+            try:
+                if not self.isVisible():
+                    self.toggle(tab_index=1)
+                elif self.stack.currentIndex() != 1:
+                    self.switch_tab(1)
+            except RuntimeError:
+                pass # Object deleted
+            except AttributeError:
+                pass 
+                
+        except Exception as e:
+            # print(f"Error adding notification: {e}") # Silent fail
+            pass
 
     def clear_notifications(self):
         self.notif_list.clear()

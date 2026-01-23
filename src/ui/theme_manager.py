@@ -392,6 +392,16 @@ class ThemeManager:
                 border-radius: 6px;
                 font-size: 12px;
             }}
+            QMessageBox, QDialog {{
+                background-color: {theme['COLOR_BG_MAIN']};
+            }}
+            QMessageBox QLabel, QDialog QLabel {{
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                font-size: 14px;
+            }}
+            QMessageBox QPushButton, QDialog QPushButton {{
+                min-width: 80px;
+            }}
         """
 
     @classmethod

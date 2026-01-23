@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QComboBox, QStatusBar, QMessageBox, QGraphicsDropShadowEffect,
     QApplication
 )
-from PySide6.QtCore import Qt, QSize, QTimer, QEvent
+from PySide6.QtCore import Qt, QSize, QTimer, QEvent, Signal, QThread
 from PySide6.QtGui import QIcon, QColor, QFont, QPixmap
 
 # Import Core
@@ -311,46 +311,46 @@ class MainWindow(QMainWindow):
         if auto_check:
             # Delay 3 seconds to let UI load first
             QTimer.singleShot(3000, self.check_for_updates_startup)
-    
+
     def apply_theme(self):
         """Apply main theme"""
         self.setStyleSheet(ThemeManager.get_main_window_style())
-    
+
     def setup_ui(self):
         """Setup main UI layout"""
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         # Install Global Event Filter for robust Auto-Hide (catches clicks on other widgets)
         QApplication.instance().installEventFilter(self)
-        
+
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
-        
+
         # Sidebar
         self.sidebar = Sidebar()
         for btn in self.sidebar.buttons:
             btn.clicked.connect(self.on_nav_clicked)
         main_layout.addWidget(self.sidebar)
-        
+
         # Content Area
         content_area = QWidget()
         content_layout = QVBoxLayout(content_area)
         content_layout.setContentsMargins(28, 28, 28, 28)
         content_layout.setSpacing(20)
-        
+
         # Header
         header = self.create_header()
         content_layout.addWidget(header)
-        
+
         # Pages Stack
         self.pages = QStackedWidget()
         self.add_pages()
         content_layout.addWidget(self.pages)
-        
+
         main_layout.addWidget(content_area)
-        
+
         # Status Bar
         theme = ThemeManager.get_theme()
         self.status_bar = QStatusBar()
@@ -382,17 +382,17 @@ class MainWindow(QMainWindow):
                 border: 1px solid {theme['COLOR_BORDER_LIGHT']};
             }}
         """)
-        
+
         # Add shadow
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(20)
         shadow.setColor(QColor(0, 0, 0, 20))
         shadow.setOffset(0, 4)
         header.setGraphicsEffect(shadow)
-        
+
         layout = QHBoxLayout(header)
         layout.setContentsMargins(24, 18, 24, 18)
-        
+
         # Page Title
         self.page_title = QLabel("Tổng Quan")
         self.page_title.setStyleSheet(f"""
@@ -403,21 +403,21 @@ class MainWindow(QMainWindow):
             font-family: {ThemeManager.FONT_FAMILY};
         """)
         layout.addWidget(self.page_title)
-        
+
         layout.addStretch()
-        
+
         # Connection indicator
         self.conn_indicator = QLabel("●")
         self.conn_indicator.setStyleSheet("font-size: 12px; color: #10B981; background: transparent;")
         layout.addWidget(self.conn_indicator)
         layout.addSpacing(8)
-        
+
         # Device Selector
         self.device_selector = DeviceSelector()
         self.device_selector.currentIndexChanged.connect(self.on_device_changed)
         layout.addWidget(self.device_selector)
         layout.addSpacing(12)
-        
+
         # Refresh Button with icon
         refresh_btn = QPushButton("↻")
         refresh_btn.setToolTip("Làm mới danh sách thiết bị")
@@ -439,7 +439,7 @@ class MainWindow(QMainWindow):
                 color: {ThemeManager.COLOR_ACCENT};
             }}
         """)
-        
+
         # Control Center Button
         ctrl_btn = QPushButton()
         ctrl_btn.setFixedSize(44, 44)
@@ -447,7 +447,7 @@ class MainWindow(QMainWindow):
         ctrl_btn.setToolTip("Trung tâm Điều khiển")
         ctrl_btn.clicked.connect(lambda checked: self.toggle_notification_center(0))
         ctrl_btn.setStyleSheet(refresh_btn.styleSheet())
-        
+
         # Load control center icon
         import os
         ctrl_icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icons', 'control_center.png')
@@ -456,7 +456,7 @@ class MainWindow(QMainWindow):
             ctrl_btn.setIconSize(QSize(24, 24))
         else:
             ctrl_btn.setText("🎛️")
-        
+
         # Notification Button
         notif_btn = QPushButton()
         notif_btn.setFixedSize(44, 44)
@@ -464,7 +464,7 @@ class MainWindow(QMainWindow):
         notif_btn.setToolTip("Thông báo")
         notif_btn.clicked.connect(lambda checked: self.toggle_notification_center(1))
         notif_btn.setStyleSheet(refresh_btn.styleSheet())
-        
+
         # Load notification icon
         notif_icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icons', 'notification.png')
         if os.path.exists(notif_icon_path):
@@ -472,131 +472,154 @@ class MainWindow(QMainWindow):
             notif_btn.setIconSize(QSize(24, 24))
         else:
             notif_btn.setText("🔔")
-        
+
         layout.addWidget(refresh_btn)
         layout.addSpacing(10)
         layout.addWidget(ctrl_btn)
         layout.addSpacing(10)
         layout.addWidget(notif_btn)
-        
+
         return header
-    
+
     def add_pages(self):
         """Initialize and add pages"""
         # 0. Dashboard
         self.dashboard = DashboardWidget(self.adb)
         self.pages.addWidget(self.dashboard)
-        
+
         # 1. App Manager
         self.app_manager = AppManagerWidget(self.adb)
         self.pages.addWidget(self.app_manager)
-        
+
         # 2. File Manager
         self.file_manager = FileManagerWidget(self.adb)
         self.pages.addWidget(self.file_manager)
-        
+
         # 3. Xiaomi Suite
         self.xiaomi_suite = XiaomiSuiteWidget(self.adb)
         self.pages.addWidget(self.xiaomi_suite)
-        
+
         # 4. General Tools
         self.general_tools = GeneralToolsWidget(self.adb)
         self.pages.addWidget(self.general_tools)
-        
+
         # 5. Settings
         self.settings_widget = SettingsWidget(self.adb)
         self.pages.addWidget(self.settings_widget)
-    
+
     def setup_timers(self):
         """Setup background timers"""
         self.device_timer = QTimer()
         self.device_timer.timeout.connect(self.check_device_status)
         self.device_timer.start(5000)
-    
+
     def on_nav_clicked(self):
         """Handle navigation"""
         btn = self.sender()
         index = btn.property("page_index")
         self.pages.setCurrentIndex(index)
-        
+
         text = btn.text().strip().split("    ")[-1].strip()
         self.page_title.setText(text)
         self.status_bar.showMessage(f"✓ {text}")
-    
-    def refresh_devices(self):
-        """Refresh connected devices list"""
-        try:
-            # 1. Try ADB
-            adb_devices = self.adb.get_devices()
-            current_serial = self.device_selector.currentData()
-            
-            self.device_selector.clear()
-            
-            detected_devices = []
-            mode = "ADB"
 
-            if adb_devices:
-                for serial, status in adb_devices:
-                    icon = "🟢" if status == DeviceStatus.ONLINE else "🔴"
-                    detected_devices.append((f"{icon} {serial}", serial))
-                self.conn_indicator.setStyleSheet("font-size: 12px; color: #10B981; background: transparent;")
+    def refresh_devices(self):
+        """Refresh connected devices list in background"""
+        if hasattr(self, '_refresh_worker') and self._refresh_worker.isRunning():
+            return
+
+        class RefreshWorker(QThread):
+            result_ready = Signal(list, str)
+            def __init__(self, adb):
+                super().__init__()
+                self.adb = adb
+            def run(self):
+                try:
+                    adb_devices = self.adb.get_devices()
+                    mode = "ADB"
+                    detected = []
+                    if adb_devices:
+                        for serial, status in adb_devices:
+                            icon = "🟢" if status == DeviceStatus.ONLINE else "🔴"
+                            detected.append((f"{icon} {serial}", serial))
+                    else:
+                        fastboot_devices = self.adb.get_fastboot_devices()
+                        if fastboot_devices:
+                            mode = "Fastboot"
+                            for serial in fastboot_devices:
+                                detected.append((f"⚡ {serial} (Fastboot)", serial))
+                    self.result_ready.emit(detected, mode)
+                except Exception as e:
+                    self.result_ready.emit([], str(e))
+
+        self._refresh_worker = RefreshWorker(self.adb)
+        self._refresh_worker.result_ready.connect(self.on_refresh_finished)
+        self._refresh_worker.start()
+
+    def on_refresh_finished(self, detected_devices, mode_or_error):
+        if not isinstance(detected_devices, list): # Error occurred
+            self.status_bar.showMessage(f"⚠ Lỗi: {mode_or_error}")
+            return
+
+        current_serial = self.device_selector.currentData()
+        self.device_selector.clear()
+
+        if detected_devices:
+            for text, serial in detected_devices:
+                self.device_selector.addItem(text, serial)
             
+            if current_serial:
+                index = self.device_selector.findData(current_serial)
+                if index >= 0:
+                    self.device_selector.setCurrentIndex(index)
+            elif self.device_selector.count() > 0:
+                self.device_selector.setCurrentIndex(0)
+            
+            # Check for unauthorized
+            is_unauth = any("🔴" in t for t, s in detected_devices)
+            if is_unauth:
+                self.status_bar.showMessage(f"⚠ Có thiết bị chưa được ủy quyền! Vui lòng chấp nhận trên điện thoại.")
             else:
-                # 2. Try Fastboot Fallback
-                fastboot_devices = self.adb.get_fastboot_devices()
-                if fastboot_devices:
-                    mode = "Fastboot"
-                    for serial in fastboot_devices:
-                        detected_devices.append((f"⚡ {serial} (Fastboot)", serial))
-                    self.conn_indicator.setStyleSheet("font-size: 12px; color: #3B82F6; background: transparent;")
-            
-            # Populate Selector
-            if detected_devices:
-                for text, serial in detected_devices:
-                    self.device_selector.addItem(text, serial)
-                
-                # Restore selection
-                if current_serial:
-                    index = self.device_selector.findData(current_serial)
-                    if index >= 0:
-                        self.device_selector.setCurrentIndex(index)
-                elif self.device_selector.count() > 0:
-                    self.device_selector.setCurrentIndex(0)
-                
-                self.status_bar.showMessage(f"✓ Tìm thấy {len(detected_devices)} thiết bị ({mode})")
-            
-            else:
-                # No devices found
-                self.device_selector.addItem("⚪ Không có thiết bị", None)
-                self.conn_indicator.setStyleSheet("font-size: 12px; color: #EF4444; background: transparent;")
-                self.status_bar.showMessage("⚠ Không có thiết bị kết nối")
-                if hasattr(self, 'dashboard'):
-                    self.dashboard.stop_updates()
-            
-        except Exception as e:
-            self.status_bar.showMessage(f"⚠ Lỗi: {str(e)}")
+                self.status_bar.showMessage(f"✓ Tìm thấy {len(detected_devices)} thiết bị ({mode_or_error})")
+        else:
+            self.device_selector.addItem("⚪ Không có thiết bị", None)
+            self.conn_indicator.setStyleSheet("font-size: 12px; color: #EF4444; background: transparent;")
+            self.status_bar.showMessage("⚠ Không có thiết bị kết nối")
+            if hasattr(self, 'dashboard'):
+                self.dashboard.stop_updates()
     
     def check_device_status(self):
-        """Periodic device check"""
-        try:
-            adb_devices = self.adb.get_devices()
-            fastboot_devices = []
-            if not adb_devices:
-                fastboot_devices = self.adb.get_fastboot_devices()
-                
-            real_count = len(adb_devices) + len(fastboot_devices)
-            
-            # UI State
+        """Periodic device check (Background to prevent UI stutter)"""
+        if hasattr(self, '_check_worker') and self._check_worker.isRunning():
+            return
+
+        class CheckWorker(QThread):
+            count_ready = Signal(int)
+            def __init__(self, adb):
+                super().__init__()
+                self.adb = adb
+            def run(self):
+                try:
+                    adb_devices = self.adb.get_devices()
+                    fastboot_devices = []
+                    if not adb_devices:
+                        fastboot_devices = self.adb.get_fastboot_devices()
+                    self.count_ready.emit(len(adb_devices) + len(fastboot_devices))
+                except:
+                    self.count_ready.emit(-1)
+
+        self._check_worker = CheckWorker(self.adb)
+        
+        def on_check_finished(real_count):
+            if real_count == -1: return
             ui_count = self.device_selector.count()
-            
-            # Check if UI has "No device" placeholder (count=1, data=None)
             is_placeholder = (ui_count == 1 and self.device_selector.itemData(0) is None)
             ui_real_count = 0 if is_placeholder else ui_count
-            
             if real_count != ui_real_count:
                 self.refresh_devices()
-        except:
-            pass
+
+        self._check_worker.count_ready.connect(on_check_finished)
+        self._check_worker.start()
  
     def on_device_changed(self, index):
         """Handle device selection change"""
@@ -636,6 +659,19 @@ class MainWindow(QMainWindow):
     
     def closeEvent(self, event):
         """Handle app close"""
+        # Stop timers
+        if hasattr(self, 'device_timer'):
+            self.device_timer.stop()
+            
+        # Stop workers if running
+        if hasattr(self, '_refresh_worker') and self._refresh_worker.isRunning():
+            self._refresh_worker.terminate()
+            self._refresh_worker.wait()
+            
+        if hasattr(self, '_check_worker') and self._check_worker.isRunning():
+            self._check_worker.terminate()
+            self._check_worker.wait()
+
         if hasattr(self, 'dashboard'):
             self.dashboard.stop_updates()
         if hasattr(self, 'notif_center'):
@@ -687,18 +723,16 @@ class MainWindow(QMainWindow):
                     
                     # Identify toggle buttons by property or object
                     # We can iterate sidebar buttons or check tooltip "Thông báo" / "Trung tâm Điều khiển"
-                     if isinstance(widget_under_mouse, QPushButton):
-                         tip = widget_under_mouse.toolTip()
-                         if tip in ["Thông báo", "Trung tâm Điều khiển"]:
-                             is_toggle_btn = True
-                         # Also check icon parents if QIcon? (No, widget is button)
+                    if isinstance(widget_under_mouse, QPushButton):
+                        tip = widget_under_mouse.toolTip()
+                        if tip in ["Thông báo", "Trung tâm Điều khiển"]:
+                            is_toggle_btn = True
+                        # Also check icon parents if QIcon? (No, widget is button)
                 
                 if not is_inside and not is_toggle_btn:
                     # Clicked outside!
                     self.notif_center.toggle()
                     # Do not consume event, let it trigger the background click
-        
-        return super().eventFilter(obj, event)
         
         return super().eventFilter(obj, event)
 

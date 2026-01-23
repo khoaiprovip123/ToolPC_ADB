@@ -59,6 +59,10 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         import traceback
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open("crash_log.txt", "w", encoding="utf-8") as f:
+            f.write(f"--- Crash Report {timestamp} ---\n")
             f.write(traceback.format_exc())
+            f.write("\n--------------------------------\n")
         print(f"CRASH: {e}")

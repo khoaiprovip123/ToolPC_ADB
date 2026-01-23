@@ -74,13 +74,58 @@ class InstallerThread(QThread):
                 # Single APK
                 for path in self.paths:
                     self.progress.emit(f"Đang cài đặt {os.path.basename(path)}...")
-                    # Secure install execution
-                    res = self.adb.execute(["install", "-r", path])
+                    # Secure install execution with downgrade and replace flags
+                    try:
+                        res = self.adb.execute(["install", "-r", "-d", "-g", path])
+                    except Exception as install_error:
+                        res = str(install_error)
                     
                     if "Success" in res:
                         continue
                     else:
-                        self.finished.emit(False, f"Lỗi khi cài {os.path.basename(path)}: {res}")
+                        # Friendly Error Handling
+                        msg = f"Lỗi khi cài {os.path.basename(path)}: {res}"
+                        
+                        if "INSTALL_FAILED_UPDATE_INCOMPATIBLE" in res:
+                            # Extract package name if possible (often not in output, but we can try)
+                            # Or just use the known package if we entered via a mode that knows it.
+                            # Since we are installing an APK, we might need to parse the APK to get the package name,
+                            # OR we rely on the error message which sometimes contains it.
+                            # Standard error: "signatures do not match the previously installed version; ignoring!"
+                            # It doesn't always give the package name.
+                            
+                            # Better approach: We need the package name to uninstall.
+                            # We can try to use aapt or a helper to get package name from the APK file.
+                            # But we don't have aapt easily. 
+                            # Alternative: Let the UI handle the "Reinstall" logic by just signaling CONFLICT.
+                            # The UI might ask the worker to "Get Package Name" first?
+                            
+                            # Let's try to get package name from the file using build-tools if available?
+                            # Or simpler: The user knows what they are installing? No, we need to uninstall the SPECIFIC package.
+                            
+                            # Let's use aapt dump badging if possible, OR use the 'aapt' from the adb directory?
+                            # Actually, we can use the 'AppScanner' logic to parse? No that's for installed.
+                            
+                            # Quick hack: parsing the error MIGHT show "Existing package com.foo.bar signatures..."
+                            # Output in previous turn: "Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.miui.home signatures...]"
+                            # YES! It contains the package name.
+                            
+                            match = re.search(r'Existing package ([a-zA-Z0-9_\.]+) signatures', res)
+                            if match:
+                                pkg = match.group(1)
+                                msg = f"[CONFLICT:{pkg}]"
+                            else:
+                                # If we can't find it, we can't auto-uninstall. Fallback to generic text.
+                                msg = (
+                                    "Lỗi: Chữ ký không khớp (Signature Mismatch).\n"
+                                    "Không thể xác định tên gói ứng dụng để gỡ tự động.\n"
+                                    "Vui lòng gỡ thủ công phiên bản cũ trước."
+                                )
+
+                        elif "INSTALL_FAILED_VERSION_DOWNGRADE" in res:
+                            msg = "Lỗi: Phiên bản cài đặt thấp hơn phiên bản hiện có (Downgrade blocked)."
+                            
+                        self.finished.emit(False, msg)
                         return
                 
                 self.finished.emit(True, "Cài đặt thành công!")
@@ -101,82 +146,109 @@ class InstallerThread(QThread):
 
 
 class BackupThread(QThread):
-    """Background thread for backing up apps"""
+    """
+    Super Backup Worker
+    Supports:
+    - Single APK
+    - Split APKs (saved as folder)
+    - App Data (via adb backup)
+    """
     progress = Signal(str)
-    finished = Signal(bool, str)
+    finished = Signal(bool, str) # Success, Summary
     
-    def __init__(self, adb_manager, apps: List[AppInfo], dest_folder: str, mode: str = "apk"):
+    def __init__(self, adb_manager, apps: List[AppInfo], dest_folder: str, backup_apk: bool = True, backup_data: bool = False):
         super().__init__()
         self.adb = adb_manager
         self.apps = apps
         self.dest_folder = dest_folder
-        self.mode = mode # 'apk' or 'data'
+        self.backup_apk = backup_apk
+        self.backup_data = backup_data
         self._is_running = True
         
     def run(self):
         try:
             total = len(self.apps)
             success_count = 0
+            fail_count = 0
             
-            if self.mode == "data":
-                # ADB Backup Mode (.ab file)
+            # Create timestamped folder for this batch
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            batch_folder = os.path.join(self.dest_folder, f"Backup_{timestamp}")
+            os.makedirs(batch_folder, exist_ok=True)
+            
+            # 1. OPTIONAL: Data Backup (Batch)
+            if self.backup_data:
+                self.progress.emit("⏳ Đang chuẩn bị sao lưu dữ liệu (ADB Backup)...")
                 packages = [app.package for app in self.apps]
-                pkg_str = " ".join(packages)
-                timestamp = int(time.time())
+                backup_file = os.path.join(batch_folder, "FullData.ab")
                 
-                # Single backup file for all (or loop?)
-                # 'adb backup' for multiple packages creates one .ab file
-                backup_file = os.path.join(self.dest_folder, f"backup_{timestamp}.ab")
+                self.progress.emit("⚠️ CẢNH BÁO: Kiểm tra màn hình điện thoại!\nNhấn 'Back up my data' để cho phép sao lưu.")
                 
-                self.progress.emit("⚠️ Đang chờ xác nhận TRÊN ĐIỆN THOẠI...\nVui lòng mở khóa và nhấn 'Back up my data'!")
+                # Command: adb backup -f file.ab -apk -obb -shared -all (if all) or specific packages
+                # We intentionally DON'T use -apk here if we are pulling AKPs manually, 
+                # but 'adb backup' is often safer for compact restore. 
+                # Let's use -noapk to just get data, since we handle APKs separately and better.
+                cmd = ["backup", "-f", backup_file, "-noapk", "-obb", "-shared"] + packages
                 
-                # Command: adb backup -apk -shared -all -f file.ab (for all)
-                # For specific: adb backup -apk -shared -f file.ab pkg1 pkg2
-                # Including -shared to try and get external data (images)
+                # This blocks until user accepts or timeout
+                res = self.adb.execute(cmd, timeout=300) 
                 
-                cmd_list = ["backup", "-apk", "-shared", "-f", backup_file] + packages
-                res = self.adb.execute(cmd_list, timeout=300) # Long timeout for user interaction
-                
-                if "error" not in res.lower():
-                    self.finished.emit(True, f"Đã gửi lệnh Backup Data!\nFile: {os.path.basename(backup_file)}\n\nLưu ý: Kiểm tra file .ab có dung lượng > 0KB không.")
+                if os.path.exists(backup_file) and os.path.getsize(backup_file) > 1024:
+                    self.progress.emit("✅ Sao lưu dữ liệu thành công!")
                 else:
-                    self.finished.emit(False, f"Lỗi: {res}")
-                return
+                    self.progress.emit("⚠️ Sao lưu dữ liệu có thể đã bị hủy hoặc rỗng.")
 
-            # APK Mode (Default)
-            for i, app in enumerate(self.apps):
-                if not self._is_running: break
-                
-                self.progress.emit(f"Đang sao lưu ({i+1}/{total}): {app.name}...")
-                
-                # Get paths
-                out = self.adb.shell(f"pm path {app.package}")
-                paths = []
-                for line in out.splitlines():
-                    if line.startswith("package:"):
-                        paths.append(line.replace("package:", "").strip())
-                
-                if not paths:
-                    continue # Skip if no path found
-                
-                if len(paths) == 1:
-                    src = paths[0]
-                    dst_name = f"{app.package}_{app.version_code}.apk" if app.version_code else f"{app.package}.apk"
-                    dst = os.path.join(self.dest_folder, dst_name)
-                    self.adb.pull_file(src, dst)
-                else:
-                    # Split APKs
-                    save_dir = os.path.join(self.dest_folder, f"{app.package}_backup")
-                    os.makedirs(save_dir, exist_ok=True)
+            # 2. APK Backup (Individual Loop)
+            if self.backup_apk:
+                for i, app in enumerate(self.apps):
+                    if not self._is_running: break
                     
-                    for src in paths:
-                        fname = os.path.basename(src)
-                        dst = os.path.join(save_dir, fname)
-                        self.adb.pull_file(src, dst)
+                    self.progress.emit(f"📦 Đang trích xuất ({i+1}/{total}): {app.name}...")
+                    
+                    try:
+                        # Get paths
+                        out = self.adb.shell(f"pm path {app.package}")
+                        paths = []
+                        for line in out.splitlines():
+                            if line.startswith("package:"):
+                                paths.append(line.replace("package:", "").strip())
                         
-                success_count += 1
-            
-            self.finished.emit(True, f"Đã sao lưu hoàn tất {success_count}/{total} ứng dụng!")
+                        if not paths:
+                            fail_count += 1
+                            continue 
+                        
+                        # Determine Destination
+                        # Group by app name for cleanliness
+                        app_save_dir = os.path.join(batch_folder, f"{app.name}_{app.package}")
+                        os.makedirs(app_save_dir, exist_ok=True)
+                        
+                        if len(paths) == 1:
+                            # Single APK
+                            src = paths[0]
+                            dst = os.path.join(app_save_dir, "base.apk")
+                            result = self.adb.pull_file(src, dst)
+                            if "error" in result.lower(): raise Exception(result)
+                            
+                        else:
+                            # Split APKs - Pull all parts
+                            for src in paths:
+                                fname = os.path.basename(src)
+                                dst = os.path.join(app_save_dir, fname)
+                                result = self.adb.pull_file(src, dst)
+                                if "error" in result.lower(): raise Exception(result)
+                                
+                        # Save metadata
+                        with open(os.path.join(app_save_dir, "info.txt"), "w", encoding="utf-8") as f:
+                            f.write(f"Name: {app.name}\nPackage: {app.package}\nVersion: {app.version}\nType: Split" if len(paths)>1 else "Type: Single")
+                            
+                        success_count += 1
+                        
+                    except Exception as e:
+                        print(f"Failed to backup {app.package}: {e}")
+                        fail_count += 1
+
+            self.finished.emit(True, f"🎉 Hoàn tất!\n\nThành công: {success_count}\nThất bại: {fail_count}\n\nLưu tại: {batch_folder}")
             
         except Exception as e:
             self.finished.emit(False, str(e))
@@ -393,4 +465,97 @@ class AppScanner(QThread):
     
     def stop(self):
         """Stop scanning"""
+        self._is_running = False
+
+
+class BatchInstallerThread(QThread):
+    """
+    Background thread for batch installing apps from files/folders
+    Target: Restore from Backup
+    """
+    progress = Signal(str)
+    finished = Signal(bool, str) # Success, Summary
+    
+    def __init__(self, adb_manager, items: List[str]):
+        """
+        items: List of absolute paths. 
+               If path is directory -> Treat as Split APK (install-multiple)
+               If path is file -> Treat as Single APK
+        """
+        super().__init__()
+        self.adb = adb_manager
+        self.items = items
+        self._is_running = True
+        
+    def run(self):
+        try:
+            total = len(self.items)
+            success = 0
+            fail = 0
+            
+            for i, path in enumerate(self.items):
+                if not self._is_running: break
+                
+                name = os.path.basename(path)
+                self.progress.emit(f"🔄 Đang cài đặt ({i+1}/{total}): {name}...")
+                
+                res = ""
+                if os.path.isdir(path):
+                    # Split APK Install
+                    apks = [os.path.join(path, f) for f in os.listdir(path) if f.lower().endswith('.apk')]
+                    if not apks:
+                        fail += 1
+                        continue
+                        
+                    # Push all
+                    remote_paths = []
+                    try:
+                        for local_apk in apks:
+                            fname = os.path.basename(local_apk)
+                            remote = f"/data/local/tmp/{fname}"
+                            self.adb.push_file(local_apk, remote)
+                            remote_paths.append(remote)
+                            
+                        # Session Install
+                        session_out = self.adb.shell("pm install-create -r")
+                        session_id = 0
+                        match = re.search(r'(\d+)', session_out)
+                        if match:
+                             session_id = match.group(1)
+                        else:
+                             raise Exception(f"Failed to create session: {session_out}")
+                        
+                        for idx, remote in enumerate(remote_paths):
+                            size = os.path.getsize(apks[idx])
+                            self.adb.shell(f"pm install-write -S {size} {session_id} {idx}.apk {remote}")
+                            
+                        res = self.adb.shell(f"pm install-commit {session_id}")
+                        
+                        # Cleanup
+                        for remote in remote_paths: self.adb.shell(f"rm {remote}")
+                        
+                        if "Success" in res:
+                            success += 1
+                        else:
+                            fail += 1
+                            
+                    except Exception as e:
+                        res = str(e)
+                        fail += 1
+                else:
+                    # Single APK
+                    res = self.adb.execute(["install", "-r", path])
+                    if "Success" in res:
+                         success += 1
+                    else:
+                         fail += 1
+            
+            self.finished.emit(True, f"✅ Đã khôi phục xong!\nThành công: {success}\nThất bại: {fail}")
+            
+        except Exception as e:
+            self.finished.emit(False, str(e))
+        
+        self._is_running = False
+
+    def stop(self):
         self._is_running = False

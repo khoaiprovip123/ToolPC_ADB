@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.5.4.0] - 2026-01-23
+### Added
+- **Xiaomi Brevent Tools**: Integrates 4 new optimization codes:
+  - **No App Label**: Hide app names on home screen (`miui_home_no_word_model`).
+  - **Device Blur**: Force enable high-end blur for folders & recents (`deviceLevelList`).
+  - **Super Wallpaper**: Unlock Super Wallpaper feature (`aod_using_super_wallpaper`).
+  - **Native Call Recording**: Uninstall overlay to restore native call recording (`com.android.phone.cust.overlay.miui`).
+- **Status Bar Alert**: Shows "Unauthorized" warning directly on the status bar if device is connected but not allowed.
+
+### Changed
+- **Performance Optimization**: 
+  - Offloaded ALL ADB tasks (Uninstall, Debloat, Device Check, Refresh) to background threads.
+  - Eliminated UI freezing/lag during device operations.
+  - Optimized app startup and shutdown sequence (safe thread termination).
+- **UI Improvements**:
+  - Fixed "Invisible Text" (White text on White background) in QMessageBox for all themes.
+  - Suppressed intrusive "ADB Unauthorized/Offline" popup errors (now logs silently).
+
 ## [2.5.3.3] - 2025-12-31
 ### Changed
 - Cập nhật phiên bản bảo trì và tối ưu hóa hệ thống.

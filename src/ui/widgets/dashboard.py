@@ -354,19 +354,19 @@ class DashboardWidget(QWidget):
         grid.setSpacing(20)
         
         # RAM Card (Cyan) - Shows Total Capacity
-        self.card_ram = StatCard("RAM", "Checking...", self.get_icon_path("ram.png"), ["#4facfe", "#00f2fe"])
+        self.card_ram = StatCard("RAM", "Đang tải...", self.get_icon_path("ram.png"), ["#4facfe", "#00f2fe"])
         grid.addWidget(self.card_ram, 0, 0)
         
         # CPU Card (Purple) - Shows Chipset
-        self.card_cpu = StatCard("CPU", "Checking...", self.get_icon_path("cpu.png"), ["#a18cd1", "#fbc2eb"])
+        self.card_cpu = StatCard("CPU", "Đang tải...", self.get_icon_path("cpu.png"), ["#a18cd1", "#fbc2eb"])
         grid.addWidget(self.card_cpu, 0, 1)
         
         # Android (Green)
-        self.card_android = StatCard("Android", "Checking...", self.get_icon_path("android.png"), ["#43e97b", "#38f9d7"])
+        self.card_android = StatCard("Android", "Đang tải...", self.get_icon_path("android.png"), ["#43e97b", "#38f9d7"])
         grid.addWidget(self.card_android, 1, 0)
         
         # Security (Orange/Yellow - Xiaomi Vibe)
-        self.card_os = StatCard("Bảo mật", "Checking...", self.get_icon_path("shield.png"), ["#fa709a", "#fee140"])
+        self.card_os = StatCard("Bảo mật", "Đang tải...", self.get_icon_path("shield.png"), ["#fa709a", "#fee140"])
         grid.addWidget(self.card_os, 1, 1)
         
         self.content_layout.addLayout(grid)
@@ -446,12 +446,12 @@ class DashboardWidget(QWidget):
         self.content_layout.addWidget(self.details_card)
         
     def add_hardware_spec(self, title, key, icon, layout):
-        item = SpecItem(title, "Scanning...", icon)
+        item = SpecItem(title, "Đang quét...", icon)
         layout.addWidget(item)
         self.rows[key] = item
 
     def add_software_spec(self, title, key, icon, layout):
-        item = SpecItem(title, "Scanning...", icon)
+        item = SpecItem(title, "Đang quét...", icon)
         layout.addWidget(item)
         self.rows[key] = item
         
@@ -593,9 +593,11 @@ class DashboardWidget(QWidget):
             
         try:
             # 1. Update Hero Section
-            # Show friendly device name instead of just model
-            device_friendly = info.get('device_friendly_name', info.get('model', 'Device'))
-            self.device_name_lbl.setText(device_friendly)
+            if 'device_friendly_name' in info:
+                self.device_name_lbl.setText(info['device_friendly_name'])
+            else:
+                self.device_name_lbl.setText(info.get('model', 'Thiết bị'))
+                
             self.os_lbl.setText(info.get("os_version", "Android"))
             
             # Update Circles
@@ -604,7 +606,7 @@ class DashboardWidget(QWidget):
             
             store_used_p = info.get("storage_percent", 0)
             self.storage_circle.set_value(store_used_p)
-            self.storage_circle.title = f"Bộ nhớ ({info.get('storage_used', '0')} used)"
+            self.storage_circle.title = f"Bộ nhớ ({info.get('storage_used', '0')} đã dùng)"
             
             # 2. Update Stats Grid
             # RAM: Just Total Capacity as requested
@@ -615,22 +617,26 @@ class DashboardWidget(QWidget):
             self.card_os.update_value(info.get("security_patch", "N/A"))
             
             # CPU: Show Manufacturer/Branding + Model if possible
-            soc_name = info.get("soc_name", "Unknown Processor")
+            soc_name = info.get("soc_name", "Không rõ")
             self.card_cpu.update_value(soc_name)
             
             if 'model' in self.rows:
-                self.rows['model'].set_value(info.get('model', 'Unknown'))
+                self.rows['model'].set_value(info.get('model', 'Không rõ'))
             if 'device_name' in self.rows: # Codename - keep original
-                self.rows['device_name'].set_value(info.get('device_name', 'Unknown'))
+                self.rows['device_name'].set_value(info.get('device_name', 'Không rõ'))
             if 'soc_name' in self.rows: # Chipset
-                self.rows['soc_name'].set_value(soc_name if soc_name else info.get('board', 'Unknown'))
+                self.rows['soc_name'].set_value(soc_name if soc_name else info.get('board', 'Không rõ'))
             
             if 'build_id' in self.rows:
-                self.rows['build_id'].set_value(info.get('build_id', 'Unknown'))
+                self.rows['build_id'].set_value(info.get('build_id', 'Không rõ'))
             if 'security_patch' in self.rows:
-                self.rows['security_patch'].set_value(info.get('security_patch', 'Unknown'))
+                self.rows['security_patch'].set_value(info.get('security_patch', 'Không rõ'))
             if 'kernel' in self.rows:
-                self.rows['kernel'].set_value(info.get('kernel', 'Unknown'))
+                self.rows['kernel'].set_value(info.get('kernel', 'Không rõ'))
             
         except Exception as e:
             print(f"Error updating Dashboard: {e}")
+            
+    def closeEvent(self, event):
+        self.stop_updates()
+        super().closeEvent(event)

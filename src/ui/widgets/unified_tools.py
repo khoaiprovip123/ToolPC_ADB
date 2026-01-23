@@ -44,7 +44,7 @@ class BaseTabbedWidget(QWidget):
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5) # Compact margins
+        layout.setContentsMargins(20, 20, 20, 20) # Standard margins
         layout.setSpacing(0)
         
         # Tabs - Header-less for space
@@ -106,7 +106,7 @@ class XiaomiSuiteWidget(BaseTabbedWidget):
         self.opt_manager = OptimizationManager(adb_manager)
         
         self.add_tab(GeneralTweaksWidget(adb_manager, self.opt_manager), "Tối Ưu", "🚀")
-        self.add_tool(XiaomiDebloaterWidget, "Gỡ App", "🗑️")
+        self.add_tool(XiaomiDebloaterWidget, "Gỡ Rác (Batch)", "🗑️")
         self.add_tool(XiaomiQuickToolsWidget, "Tiện Ích", "✨")
         self.add_tool(XiaomiAdvancedWidget, "Nâng Cao", "⚙️")
         self.add_tool(FastbootToolboxWidget, "Fastboot", "🔌")

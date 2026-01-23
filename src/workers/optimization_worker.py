@@ -171,6 +171,33 @@ class OptimizationWorker(QThread):
                          pass
                  
                  self.progress.emit(f"✅ Đã tối ưu hóa {count} ứng dụng!")
+                 
+            elif self.task_type == "remove_app_label":
+                self.progress.emit("📝 Đang ẩn tên ứng dụng trên màn hình chính...")
+                self.adb.shell("settings put system miui_home_no_word_model 1")
+                self.adb.shell("am force-stop com.miui.home")
+                self.progress.emit("✅ Đã ẩn tên ứng dụng (Launcher đã được khởi động lại)")
+
+            elif self.task_type == "force_blur_level":
+                self.progress.emit("💧 Đang ép buộc hiệu ứng Blur cao cấp (Device Level)...")
+                # v:1 (High End), c:3 (Blur Level), g:3 (Graphics)
+                self.adb.shell("settings put system deviceLevelList v:1,c:3,g:3")
+                self.adb.shell("am force-stop com.miui.home")
+                self.progress.emit("✅ Đã kích hoạt Blur Folder & Background")
+
+            elif self.task_type == "unlock_super_wallpaper":
+                self.progress.emit("🪐 Đang mở khóa Super Wallpaper...")
+                self.adb.shell("settings put secure aod_using_super_wallpaper 1")
+                self.progress.emit("✅ Đã mở khóa tính năng Super Wallpaper")
+
+            elif self.task_type == "enable_call_recording":
+                self.progress.emit("📞 Đang kích hoạt Ghi âm cuộc gọi...")
+                # Try to uninstall the overlay that hides native features
+                result = self.adb.shell("pm uninstall -k --user 0 com.android.phone.cust.overlay.miui")
+                if "Success" in result:
+                    self.progress.emit("✅ Đã gỡ bỏ giới hạn (Overlay Uninstalled)")
+                else:
+                    self.progress.emit(f"ℹ️ Kết quả: {result.strip()} (Có thể đã gỡ trước đó)")
 
         except Exception as e:
             err_str = str(e)

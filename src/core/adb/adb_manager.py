@@ -333,6 +333,11 @@ class ADBManager:
             
             full_cmd = f'"{self.adb_path}" {command}' if os.path.isabs(self.adb_path) else f'{self.adb_path} {command}'
         
+        # Windows: Suppress terminal window
+        creation_flags = 0
+        if os.name == 'nt':
+            creation_flags = 0x08000000  # CREATE_NO_WINDOW
+
         try:
             result = subprocess.run(
                 full_cmd,
@@ -341,7 +346,8 @@ class ADBManager:
                 text=True,
                 timeout=timeout,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                creationflags=creation_flags
             )
             
             if check and result.returncode != 0:
@@ -373,8 +379,19 @@ class ADBManager:
             cmd_str = command if isinstance(command, str) else " ".join(command)
             
             # Filter noise
-            if log_error and "dumpsys" not in cmd_str and "getprop" not in cmd_str:
-                 LogManager.log("ADB Error", f"Cmd: {cmd_str}\n{err_msg}", "error")
+            if log_error:
+                # 1. Filter specific noisy commands
+                noise_cmds = ["dumpsys", "getprop", "df", "pm list"]
+                is_noise = any(cmd in cmd_str for cmd in noise_cmds)
+                
+                # 2. Filter unauthorized errors (log once per run/reset)
+                is_unauth = any(x in err_msg.lower() for x in ["unauthorized", "offline", "not found", "no devices"])
+                
+                if not is_noise and not is_unauth:
+                     LogManager.log("ADB Error", f"Cmd: {cmd_str}\n{err_msg}", "error")
+                elif is_unauth:
+                     # Only print to console to avoid cluttering UI logs
+                     print(f"ADB Connection Issue ({cmd_str}): {err_msg}")
             
             if check:
                 raise RuntimeError(f"Failed to execute: {cmd_str}\nError: {err_msg}")
@@ -399,6 +416,11 @@ class ADBManager:
         full_cmd = f'{self.adb_path} {device_arg} shell "{safe_command}"'
         
         try:
+            # Windows: Suppress terminal window
+            creation_flags = 0
+            if os.name == 'nt':
+                creation_flags = 0x08000000  # CREATE_NO_WINDOW
+
             process = subprocess.Popen(
                 full_cmd,
                 shell=False,
@@ -407,7 +429,8 @@ class ADBManager:
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                bufsize=1
+                bufsize=1,
+                creationflags=creation_flags
             )
             
             start_time = time.time()
@@ -442,6 +465,9 @@ class ADBManager:
                 status_str = parts[1].strip()
                 
                 # Map status string to enum
+                if serial.startswith('"') and serial.endswith('"'):
+                    serial = serial.strip('"')
+                
                 status_map = {
                     'device': DeviceStatus.ONLINE,
                     'offline': DeviceStatus.OFFLINE,
@@ -457,10 +483,26 @@ class ADBManager:
     
     def select_device(self, serial: str):
         """Set current device for operations"""
+        if serial:
+            serial = serial.strip().strip('"').strip("'")
+            
         if self.current_device != serial:
             self.current_device = serial
             # Cache will be invalidated if serial mismatch found in _get_device_properties
         self.logger.log("ADB", f"Đã chọn thiết bị: {serial}", "info")
+
+    def is_online(self) -> bool:
+        """Check if current device is online and authorized"""
+        if not self.current_device: return False
+        try:
+            # Quick check if device is in 'device' state
+            devices = self.get_devices()
+            for s, status in devices:
+                if s == self.current_device and status == DeviceStatus.ONLINE:
+                    return True
+        except:
+             pass
+        return False
     
     def get_device_info(self) -> DeviceInfo:
         """
@@ -1021,9 +1063,11 @@ class ADBManager:
         """Get devices in fastboot mode"""
         output = self.fastboot_command("devices")
         devices = []
+        devices = []
         for line in output.split('\n'):
             if 'fastboot' in line:
-                devices.append(line.split()[0])
+                serial = line.split()[0].strip().strip('"').strip("'")
+                devices.append(serial)
         return devices
 
     def fastboot_reboot(self):
@@ -1580,21 +1624,36 @@ class ADBManager:
         """
         Skip Android Setup Wizard (Bypass FRP/Account Login after reset).
         """
+        log = []
         try:
             # 1. Mark setup as complete
             self.shell("settings put secure user_setup_complete 1")
             self.shell("settings put global device_provisioned 1")
+            log.append("Marked user_setup_complete & device_provisioned")
             
             # 2. Try to disable setup wizard packages (Google & Xiaomi)
-            # This prevents it from popping up again
-            self.shell("pm disable-user --user 0 com.google.android.setupwizard")
-            self.shell("pm disable-user --user 0 com.android.provision")
-            self.shell("pm disable-user --user 0 com.miui.provision")
+            # This prevents it from popping up again. Use check=False to avoid crashing if Permission Denied.
+            packages = [
+                "com.google.android.setupwizard",
+                "com.android.provision",
+                "com.miui.provision"
+            ]
             
+            for pkg in packages:
+                try:
+                    res = self.shell(f"pm disable-user --user 0 {pkg}", check=False, log_error=False)
+                    if "SecurityException" in res:
+                        log.append(f"⚠️ Failed to disable {pkg} (Security Restricted)")
+                    else:
+                        log.append(f"Disabled {pkg}")
+                except:
+                    log.append(f"Failed to disable {pkg}")
+
             # 3. Force go to Home Screen
             self.shell("am start -c android.intent.category.HOME -a android.intent.action.MAIN")
+            log.append("Sent HOME intent")
             
-            return "✅ Đã bỏ qua Setup Wizard! (Nếu chưa vào được màn hình chính, hãy khởi động lại)"
+            return "✅ Đã gửi lệnh bỏ qua Setup Wizard! (Kiểm tra lại màn hình chính)"
         except Exception as e:
             return f"❌ Lỗi: {e}"
 
