@@ -330,7 +330,7 @@ class GeneralTweaksWidget(QWidget):
             QLineEdit {{
                 background: {ThemeManager.COLOR_GLASS_CARD}; 
                 border: 1px solid {ThemeManager.COLOR_BORDER}; 
-                border-radius: 6px; 
+                border-radius: 0px; 
                 padding: 4px 8px;
                 color: {ThemeManager.COLOR_TEXT_PRIMARY};
             }}
@@ -371,7 +371,7 @@ class GeneralTweaksWidget(QWidget):
             QLineEdit {{
                 background: {ThemeManager.COLOR_GLASS_CARD}; 
                 border: 1px solid {ThemeManager.COLOR_BORDER}; 
-                border-radius: 6px; 
+                border-radius: 0px; 
                 padding: 4px 8px;
                 color: {ThemeManager.COLOR_TEXT_PRIMARY};
             }}

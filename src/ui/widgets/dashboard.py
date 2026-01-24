@@ -14,58 +14,6 @@ from PySide6.QtGui import QIcon, QAction, QCursor, QColor, QFont, QLinearGradien
 from src.ui.theme_manager import ThemeManager
 import datetime
 
-class CircularProgress(QWidget):
-    """Circular Progress Bar - Xiaomi Style"""
-    def __init__(self, title, value, color, suffix="%", parent=None):
-        super().__init__(parent)
-        self.title = title
-        self.value = value
-        self.color = color
-        self.suffix = suffix
-        self.setFixedSize(160, 160)
-        
-    def set_value(self, value):
-        self.value = value
-        self.update()
-        
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        
-        # Dimensions
-        width = self.width()
-        height = self.height()
-        rect = QRectF(10, 10, width-20, height-20)
-        
-        # Draw Background Circle
-        pen = QPen()
-        pen.setWidth(10)
-        pen.setColor(QColor(ThemeManager.get_theme()['COLOR_BORDER']))
-        pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(pen)
-        painter.drawArc(rect, 0, 360 * 16)
-        
-        # Draw Progress Arc
-        pen.setColor(QColor(self.color))
-        painter.setPen(pen)
-        angle = int(-self.value * 3.6 * 16) # Negative for clockwise
-        painter.drawArc(rect, 90 * 16, angle)
-        
-        # Draw Text
-        painter.setPen(QColor(ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']))
-        font = QFont(ThemeManager.FONT_FAMILY, 24, QFont.Bold)
-        painter.setFont(font)
-        painter.drawText(rect, Qt.AlignCenter, f"{self.value}{self.suffix}")
-        
-        # Draw Title
-        painter.setPen(QColor(ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']))
-        font.setPointSize(10)
-        font.setBold(False)
-        painter.setFont(font)
-        # Offset text slightly down
-        text_rect = QRectF(rect)
-        text_rect.adjust(0, 45, 0, 0)
-        painter.drawText(text_rect, Qt.AlignCenter, self.title)
 
 class StatCard(QFrame):
     """Modern Glass Card for Stats"""
@@ -209,15 +157,25 @@ class DashboardWorker(QThread):
         self._stop_requested = False
         
     def run(self):
+        print(f"Worker: Starting system info check for {self.adb.current_device}...")
         try:
             if self._stop_requested or self.isInterruptionRequested():
+                print("Worker: Stop requested.")
                 return
+            
+            # Start fetch
             info = self.adb.get_detailed_system_info()
+            print(f"Worker: Info fetched. Keys: {list(info.keys()) if info else 'None'}")
+            
             if not self._stop_requested and not self.isInterruptionRequested():
                 self.data_ready.emit(info)
+            else:
+                print("Worker: Interrupted after fetch.")
         except Exception as e:
             if not self._stop_requested:
-                print(f"Error getting system info: {e}")
+                print(f"Worker Error: {e}")
+                import traceback
+                traceback.print_exc()
                 self.data_ready.emit({})
     
     def stop(self):
@@ -229,6 +187,7 @@ class DashboardWidget(QWidget):
     def __init__(self, adb_manager):
         super().__init__()
         self.adb = adb_manager
+        print("Dashboard: Initializing UI...")
         self.setup_ui()
         
         # Worker and Timer
@@ -286,70 +245,258 @@ class DashboardWidget(QWidget):
         self.setup_fab()
         
     def setup_hero(self):
-        """Xiaomi Style Hero Section"""
-        hero = QFrame()
-        hero.setStyleSheet(f"""
+        """Xiaomi Style Hero Section - Modern Revamp (Fixed)"""
+        self.hero = QFrame()
+        self.hero.setFixedHeight(220)
+        # Force Dark Premium Look regardless of app theme to match S23 Ultra reference
+        self.hero.setStyleSheet(f"""
             QFrame {{
-                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
-                border-radius: 24px;
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #141e30, stop:1 #243b55);
+                border-radius: 20px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
             }}
         """)
         # Shadow
-        shadow = QGraphicsDropShadowEffect(hero)
-        shadow.setBlurRadius(25)
-        shadow.setColor(QColor(0, 0, 0, 20))
-        shadow.setOffset(0, 8)
-        hero.setGraphicsEffect(shadow)
+        shadow = QGraphicsDropShadowEffect(self.hero)
+        shadow.setBlurRadius(30)
+        shadow.setColor(QColor(0, 0, 0, 80)) 
+        shadow.setOffset(0, 10)
+        self.hero.setGraphicsEffect(shadow)
         
-        layout = QHBoxLayout(hero)
-        layout.setContentsMargins(35, 30, 35, 30)
+        layout = QHBoxLayout(self.hero)
+        layout.setContentsMargins(40, 30, 40, 30)
+        layout.setSpacing(30)
         
-        # Left: Device Info
+        # --- COL 1: Device Image ---
+        img_container = QLabel()
+        img_container.setFixedSize(110, 160)
+        # Removed border, added subtle glow/bg
+        img_container.setStyleSheet(f"""
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+        """)
+        img_container.setAlignment(Qt.AlignCenter)
+        img_label = QLabel("📱")
+        img_label.setStyleSheet("font-size: 60px; background: transparent; border: none;") # Increased size
+        img_layout = QVBoxLayout(img_container)
+        img_layout.addWidget(img_label)
+        img_layout.setAlignment(Qt.AlignCenter)
+        
+        layout.addWidget(img_container)
+        
+        # --- COL 2: Info Section ---
         info_layout = QVBoxLayout()
         info_layout.setSpacing(10)
+        info_layout.setAlignment(Qt.AlignVCenter) # Center vertically
         
-        # Brand Pill
-        brand_pill = QLabel("  XIAOMI   ")
-        brand_pill.setStyleSheet(f"background-color: #ff6700; color: white; border-radius: 6px; font-weight: bold; font-size: 11px; padding: 4px;")
-        brand_pill.setFixedHeight(22)
-        brand_pill.setFixedWidth(70)
+        # Title and Clock Row
+        title_row = QHBoxLayout()
+        self.device_name_lbl = QLabel("Checking Device...")
+        self.device_name_lbl.setStyleSheet(f"font-size: 30px; font-weight: 800; color: white; background: transparent; border: none; letter-spacing: 0.5px;")
         
-        self.device_name_lbl = QLabel("My Xiaomi")
-        self.device_name_lbl.setStyleSheet(f"font-size: 32px; font-weight: 800; color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']}; background: transparent; font-family: {ThemeManager.FONT_FAMILY}; border: none;")
+        self.time_lbl = QLabel("--:--:--")
+        self.time_lbl.setStyleSheet("font-size: 16px; color: rgba(255, 255, 255, 0.4); font-weight: 600; font-family: 'Consolas', monospace;")
         
-        self.os_lbl = QLabel("HyperOS | Android 14")
-        self.os_lbl.setStyleSheet(f"font-size: 18px; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 500; background: transparent; border: none;")
+        title_row.addWidget(self.device_name_lbl)
+        title_row.addStretch()
+        title_row.addWidget(self.time_lbl)
+        info_layout.addLayout(title_row)
         
-        # Clock (Small)
-        self.time_lbl = QLabel("--:--")
-        # Explicit background: transparent and adjusted color
-        self.time_lbl.setStyleSheet(f"font-size: 14px; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-family: {ThemeManager.FONT_FAMILY_MONO}; margin-top: 10px; background: transparent; border: none;")
+        # Specs Row (Chip, Storage, Battery)
+        specs_row = QHBoxLayout()
+        specs_row.setSpacing(20)
         
-        info_layout.addWidget(brand_pill)
-        info_layout.addWidget(self.device_name_lbl)
-        info_layout.addWidget(self.os_lbl)
-        info_layout.addWidget(self.time_lbl)
-        info_layout.addStretch()
+        self.chip_lbl = self.create_hero_spec("chipset.png", "CPU")
+        self.storage_lbl = self.create_hero_spec("files.png", "Storage") 
+        self.batt_lbl = self.create_hero_spec("notification.png", "Battery") # Fallback
         
-        layout.addLayout(info_layout, 50)
+        specs_row.addWidget(self.chip_lbl)
+        specs_row.addWidget(self.storage_lbl)
+        specs_row.addWidget(self.batt_lbl)
+        specs_row.addStretch()
+        info_layout.addLayout(specs_row)
         
-        # Right: Circles
-        circles_layout = QHBoxLayout()
-        circles_layout.setSpacing(30)
+        # Badges Row
+        badges_row = QHBoxLayout()
+        badges_row.setSpacing(12)
+        badges_row.setContentsMargins(0, 5, 0, 0)
         
-        self.batt_circle = CircularProgress("Pin", 0, "#34C759", "%")
-        self.storage_circle = CircularProgress("Bộ nhớ", 0, "#FF9500", "%")
+        self.auth_badge = QLabel(" Unauthorized ")
+        self.auth_badge.setStyleSheet("background-color: rgba(255, 71, 87, 0.2); color: #ff6b81; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-size: 12px; border: 1px solid rgba(255, 71, 87, 0.4);")
         
-        circles_layout.addWidget(self.batt_circle)
-        circles_layout.addWidget(self.storage_circle)
+        self.android_badge = QLabel(" Android -- ")
+        self.android_badge.setStyleSheet("background-color: rgba(46, 134, 222, 0.2); color: #54a0ff; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-size: 12px; border: 1px solid rgba(46, 134, 222, 0.4);")
         
-        layout.addLayout(circles_layout)
+        badges_row.addWidget(self.auth_badge)
+        badges_row.addWidget(self.android_badge)
+        badges_row.addStretch()
+        info_layout.addLayout(badges_row)
         
-        self.content_layout.addWidget(hero)
+        layout.addLayout(info_layout, stretch=60)
+        
+        # --- COL 3: Actions ---
+        action_layout = QVBoxLayout()
+        action_layout.setSpacing(15)
+        action_layout.setAlignment(Qt.AlignVCenter)
+        
+        # Mirror Button (Blue Gradient)
+        btn_mirror = QPushButton(" Mirror Screen")
+        btn_mirror.setIcon(QIcon(self.get_icon_path("mirror.png")))
+        btn_mirror.setCursor(Qt.PointingHandCursor)
+        btn_mirror.setFixedHeight(50)
+        btn_mirror.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #2980b9, stop:1 #6dd5fa);
+                color: white;
+                border-radius: 12px;
+                font-weight: 700;
+                font-size: 13px;
+                padding: 0 20px;
+                border: none;
+                text-align: left;
+            }}
+            QPushButton:hover {{ 
+                 background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #3498db, stop:1 #87e0fd);
+            }}
+        """)
+        btn_mirror.clicked.connect(self.launch_scrcpy) 
+        
+        # WiFi Connect (Glass)
+        btn_wifi = QPushButton(" Connect via Wi-Fi")
+        btn_wifi.setIcon(QIcon(self.get_icon_path("cloud.png")))
+        btn_wifi.setCursor(Qt.PointingHandCursor)
+        btn_wifi.setFixedHeight(50)
+        btn_wifi.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba(255, 255, 255, 0.1);
+                color: rgba(255, 255, 255, 0.9);
+                border-radius: 12px;
+                font-weight: 600;
+                font-size: 13px;
+                padding: 0 20px;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                text-align: left;
+            }}
+            QPushButton:hover {{ 
+                background-color: rgba(255, 255, 255, 0.18);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+            }}
+        """)
+        btn_wifi.clicked.connect(self.switch_to_wireless_debug)
+        
+        action_layout.addWidget(btn_mirror)
+        action_layout.addWidget(btn_wifi)
+        
+        layout.addLayout(action_layout, stretch=25)
+        
+        self.content_layout.addWidget(self.hero)
+
+    def create_hero_spec(self, icon_name, placeholder):
+        container = QFrame()
+        container.setStyleSheet(f"""
+            QFrame {{
+                background-color: transparent;
+                border: none;
+            }}
+        """)
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 5, 10, 5)
+        layout.setSpacing(8)
+        
+        # Icon
+        icon_lbl = QLabel()
+        icon_lbl.setFixedSize(16, 16)
+        icon_lbl.setAlignment(Qt.AlignCenter)
+        
+        import os
+        icon_path = self.get_icon_path(icon_name)
+        if os.path.isfile(icon_path):
+            from PySide6.QtGui import QPixmap
+            pixmap = QPixmap(icon_path)
+            if not pixmap.isNull():
+                pixmap = pixmap.scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                icon_lbl.setPixmap(pixmap)
+        
+        layout.addWidget(icon_lbl)
+        
+        # Text
+        label = QLabel(placeholder)
+        label.setStyleSheet(f"color: rgba(255, 255, 255, 0.9); font-size: 12px; font-weight: 600; background: transparent; border: none;")
+        layout.addWidget(label)
+        
+        def set_text(text):
+            label.setText(text)
+        container.setText = set_text
+        
+        return container
+
+    def launch_scrcpy(self):
+        """Helper to find and launch scrcpy"""
+        if not self.adb.current_device:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Lỗi", "Vui lòng chọn hoặc kết nối thiết bị trước khi sử dụng Mirror Screen.")
+            return
+
+        import shutil
+        import os
+        scrcpy_path = shutil.which("scrcpy")
+        
+        # Check bundled locations
+        if not scrcpy_path:
+            local_paths = [
+                os.path.join(os.getcwd(), "resources", "scrcpy", "scrcpy.exe"),
+                os.path.join(os.getcwd(), "scripts", "scrcpy.exe"),
+                os.path.join(os.getcwd(), "scrcpy", "scrcpy.exe")
+            ]
+            for p in local_paths:
+                if os.path.exists(p):
+                    scrcpy_path = p
+                    break
+                    
+        if not scrcpy_path:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Lỗi", "Không tìm thấy scrcpy.exe. Vui lòng cài đặt scrcpy hoặc sao chép vào thư mục resources/scrcpy/")
+            return
+
+        # Simple launch
+        import subprocess
+        try:
+            # CREATE_NO_WINDOW (0x08000000) might hide errors, 
+            # but we usually want it to avoid cmd popup.
+            cmd = [scrcpy_path, "-s", self.adb.current_device, "--no-audio"]
+            subprocess.Popen(cmd, creationflags=0x08000000) 
+            self.window().statusBar().showMessage("✓ Đang khởi chạy Mirror Screen...", 3000)
+        except Exception as e:
+            print(f"Failed to launch scrcpy: {e}")
+
+    def switch_to_wireless_debug(self):
+        """Find main window and switch to wireless debug tab"""
+        parent = self.window()
+        
+        # Find QStackedWidget named 'pages' in MainWindow
+        if hasattr(parent, "pages"):
+            # Index 4 is General Tools
+            parent.pages.setCurrentIndex(4)
+            
+            # Find GeneralToolsWidget and its tabs
+            if hasattr(parent, "general_tools"):
+                # Index 5 is Wireless tab
+                parent.general_tools.tabs.setCurrentIndex(5)
+                parent.statusBar().showMessage("✓ Đã chuyển sang Kết nối không dây", 3000)
+        else:
+            # Fallback for complex nesting
+            # Try to find nav buttons in sidebar and click one
+            if hasattr(parent, "sidebar") and hasattr(parent.sidebar, "buttons"):
+                for btn in parent.sidebar.buttons:
+                    if "Công Cụ" in btn.text():
+                        btn.click()
+                        break
         
     def setup_stats_grid(self):
         """2x2 Grid of Stat Cards"""
+        if hasattr(self, 'stats_added'): return
+        self.stats_added = True
+        
         grid = QGridLayout()
         grid.setSpacing(20)
         
@@ -365,14 +512,17 @@ class DashboardWidget(QWidget):
         self.card_android = StatCard("Android", "Đang tải...", self.get_icon_path("android.png"), ["#43e97b", "#38f9d7"])
         grid.addWidget(self.card_android, 1, 0)
         
-        # Security (Orange/Yellow - Xiaomi Vibe)
-        self.card_os = StatCard("Bảo mật", "Đang tải...", self.get_icon_path("shield.png"), ["#fa709a", "#fee140"])
+        # OS Version (Orange/Yellow)
+        self.card_os = StatCard("Hệ điều hành", "Đang tải...", self.get_icon_path("shield.png"), ["#fa709a", "#fee140"])
         grid.addWidget(self.card_os, 1, 1)
         
         self.content_layout.addLayout(grid)
         
     def setup_details_section(self):
         """Detail Section"""
+        if hasattr(self, 'details_added'): return
+        self.details_added = True
+        
         self.details_card = QFrame()
         self.details_card.setStyleSheet(f"""
             QFrame {{
@@ -588,33 +738,69 @@ class DashboardWidget(QWidget):
 
     def on_data_ready(self, info):
         """Handle data from worker"""
+        # Always update authorization status first
+        is_online = self.adb.is_online()
+        if is_online:
+            self.auth_badge.setText(" DEVICE AUTHORIZED ")
+            self.auth_badge.setStyleSheet("background-color: rgba(46, 204, 113, 0.2); color: #2ecc71; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-size: 11px; border: 1px solid rgba(46, 204, 113, 0.4);")
+        else:
+            self.auth_badge.setText(" UNAUTHORIZED ")
+            self.auth_badge.setStyleSheet("background-color: rgba(255, 71, 87, 0.2); color: #ff6b81; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-size: 11px; border: 1px solid rgba(255, 71, 87, 0.4);")
+
         if not info:
+            if not is_online:
+                self.device_name_lbl.setText("Device Unauthorized")
+                self.chip_lbl.setText("Please check your phone screen")
             return
             
         try:
+            # DEBUG: Print received info keys
+            print(f"Dashboard Keys: {list(info.keys())}")
+            print(f"Dashboard Data: {info}")
+            
             # 1. Update Hero Section
-            if 'device_friendly_name' in info:
+            if 'device_friendly_name' in info and info['device_friendly_name']:
                 self.device_name_lbl.setText(info['device_friendly_name'])
+            elif 'model' in info:
+                self.device_name_lbl.setText(info.get('model', 'Unknown Device'))
             else:
-                self.device_name_lbl.setText(info.get('model', 'Thiết bị'))
+                self.device_name_lbl.setText("Unknown Device")
                 
-            self.os_lbl.setText(info.get("os_version", "Android"))
+            # Specs Row
+            soc = info.get("soc_name")
+            if not soc or soc == "Unknown":
+                soc = info.get("board", "Unknown SoC")
+            self.chip_lbl.setText(f"{soc}")
             
-            # Update Circles
+            ram = info.get('ram_total', '?')
+            store_used = info.get('storage_used', '0GB')
+            # If ram_total returns 0GB/?, check memory_info raw
+            if ram == "?" or ram == "0GB":
+                 # Fallback logic if needed, but UI just shows what it gets
+                 pass
+                 
+            self.storage_lbl.setText(f"{ram} | {store_used}")
+            # Note: storage_total might not be directly in 'info' as clean string, dependent on adb worker.
+            # Let's use specific keys if available or fallback
+            
             batt = info.get("battery_level", 0)
-            self.batt_circle.set_value(batt)
+            self.batt_lbl.setText(f"{batt}%")
             
-            store_used_p = info.get("storage_percent", 0)
-            self.storage_circle.set_value(store_used_p)
-            self.storage_circle.title = f"Bộ nhớ ({info.get('storage_used', '0')} đã dùng)"
+            android_ver = info.get("android_version", "--")
+            self.android_badge.setText(f" ANDROID {android_ver} ")
+            self.android_badge.setStyleSheet("background-color: rgba(25, 118, 210, 0.2); color: #64b5f6; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-size: 11px; border: 1px solid rgba(25, 118, 210, 0.4);")
+            
             
             # 2. Update Stats Grid
             # RAM: Just Total Capacity as requested
             ram_txt = f"{info.get('ram_total', '0GB')}"
             self.card_ram.update_value(ram_txt)
             
-            self.card_android.update_value(info.get("android_version", "N/A"))
-            self.card_os.update_value(info.get("security_patch", "N/A"))
+            self.card_android.update_value(str(android_ver))
+            
+            # OS Version (HyperOS / MIUI)
+            os_ver = info.get("os_version", "Unknown")
+            self.card_os.update_value(os_ver)
             
             # CPU: Show Manufacturer/Branding + Model if possible
             soc_name = info.get("soc_name", "Không rõ")

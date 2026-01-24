@@ -238,7 +238,7 @@ class ThemeManager:
     # ==================== IOS DIMENSIONS ====================
     RADIUS_CARD = "22px"      # Larger radius for cards
     RADIUS_BUTTON = "12px"    # Standard button radius
-    RADIUS_INPUT = "10px"
+    RADIUS_INPUT = "0px"
     BLUR_RADIUS = "20px"      # Standard Blur
     
     # ==================== HELPER METHODS ====================

@@ -197,7 +197,7 @@ class FastbootToolboxWidget(QWidget):
                 QLineEdit {{
                     padding: 8px;
                     border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
-                    border-radius: 6px;
+                    border-radius: 0px;
                     background: white;
                 }}
             """)

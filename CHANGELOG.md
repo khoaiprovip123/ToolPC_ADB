@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.5.4.1] - 2026-01-24
+### Added
+- **App Manager - Aggressive Cascade Strategy**: 
+  - System apps now automatically try multiple removal methods in sequence (disable-user → uninstall-user → disable → hide → clear data → force-stop) until one succeeds.
+  - Significantly improves success rate for stubborn HyperOS/MIUI system apps that previously failed to disable.
+
+### Changed
+- **Simplified Action Buttons**: 
+  - System apps now show only one "Xóa" (Remove) button instead of separate "Tắt" and "Gỡ" buttons.
+  - User apps now show only one "Gỡ" (Uninstall) button with cascade fallback.
+- **Clear Success Notifications**: 
+  - Notifications now explicitly state the method used (e.g., "đã được gỡ khỏi thiết bị" vs "đã được tắt" vs "đã được ẩn").
+  - Action results are crystal clear to users.
+- **Removed App Display Limit**: 
+  - App list now displays ALL filtered apps instead of only the first 100.
+  - Status bar shows accurate count (e.g., "Hiển thị 485/485" instead of "100/485").
+
+### Fixed
+- **Duplicate Error Notifications**: 
+  - Eliminated redundant error notifications for cascade attempts.
+  - Only final failures are reported, preventing notification spam.
+- **Refresh Crash Bug**: 
+  - Fixed application crash when clicking "Làm mới" (Refresh) multiple times rapidly.
+  - Properly stops and cleans up old scanner threads before starting new ones.
+
 ## [2.5.4.0] - 2026-01-23
 ### Added
 - **Xiaomi Brevent Tools**: Integrates 4 new optimization codes:

@@ -701,7 +701,7 @@ class ADBManager:
                 "baseband": baseband,
                 "cpu_cores": cpu_cores,
                 "cpu_freq": f"{max(cpu_info.get('frequencies', [0]))} MHz" if cpu_info.get('frequencies') else "Unknown",
-                "ram_total": f"{mem_info.get('total', 0) / 1024:.1f} GB",
+                "ram_total": f"{int(mem_info.get('total', 0) / 1024)}GB", # Removed .0 decimal
                 "ram_percent": int(mem_info.get('used', 0) / mem_info.get('total', 1) * 100) if mem_info.get('total') else 0,
                 "battery_level": battery_level,
                 "storage_used": storage_used,
@@ -925,20 +925,25 @@ class ADBManager:
         
         # Round total to nearest standard size (4GB, 6GB, 8GB, 12GB etc)
         # to look nicer on UI
+        # Standard sizes in MB:
         standard_sizes = [
             1024, 2048, 3072, 4096, 6144, 8192, 10240, 
-            12288, 16384, 18432, 24576, 32768
+            12288, 16384, 18432, 24576, 32768, 49152, 65536
         ]
         
         current_mb = info['total']
-        for size in standard_sizes:
-            if size >= current_mb:
-                # Only upgrade if it's within reasonable range (e.g. > 80% of target)
-                # To avoid mapping a weird 5GB virtual setup to 6GB?
-                # But for physical devices, simply finding the next bucket is usually correct.
-                info['total'] = size
-                break
-                
+        if current_mb > 0:
+            # Sort reverse to find the highest bucket that covers our current_mb
+            for size in sorted(standard_sizes, reverse=True):
+                # If current is fairly close to a standard size (e.g. within 18%)
+                # MemTotal is always less than physical RAM due to reserved regions.
+                # Example: 8GB device might show MemTotal: 7523MB
+                # 8192 * 0.82 = 6717. So 7523 > 6717 -> It's an 8GB device.
+                if current_mb >= (size * 0.82): 
+                    info['total'] = size
+                    break
+            
+            # If huge mismatch or super small, execute fallback? No, keep what we found.
         return info
     
     def get_cpu_info(self) -> Dict:

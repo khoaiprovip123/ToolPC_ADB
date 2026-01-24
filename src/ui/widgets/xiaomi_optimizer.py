@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QLabel, QPushButton, QCheckBox, QHeaderView, QMessageBox,
     QTabWidget, QTextEdit, QGroupBox, QProgressBar, QScrollArea, QFrame,
-    QGraphicsDropShadowEffect, QGridLayout
+    QGraphicsDropShadowEffect, QGridLayout, QLineEdit, QProgressDialog
 )
 from PySide6.QtCore import Qt, QThread, Signal, QSize
 from PySide6.QtGui import QColor, QIcon, QLinearGradient, QGradient
@@ -28,45 +28,45 @@ class ModernCard(QFrame):
     def __init__(self, title, desc, icon, callback, gradient_colors=None, parent=None):
         super().__init__(parent)
         self.callback = callback
+        self.gradient_colors = gradient_colors
         
-        bg_style = "background-color: white;"
-        text_color = ThemeManager.COLOR_TEXT_PRIMARY
-        desc_color = ThemeManager.COLOR_TEXT_SECONDARY
-        
-        if gradient_colors:
-            bg_style = f"background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 {gradient_colors[0]}, stop:1 {gradient_colors[1]});"
-            text_color = "white"
-            desc_color = "rgba(255,255,255,0.8)"
-            
+        # Base Style
         self.setObjectName("ModernCard")
-        self.setStyleSheet(f"""
-            #ModernCard {{
-                {bg_style}
-                border-radius: 16px;
-                border: 1px solid rgba(0,0,0,0.05);
-            }}
-        """)
+        self.setup_style()
         
         # Shadow
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(15)
-        shadow.setColor(QColor(0, 0, 0, 20))
-        shadow.setOffset(0, 4)
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        shadow.setOffset(0, 6)
         self.setGraphicsEffect(shadow)
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
         
-        # Header
+        # Header (Icon & Title)
         header = QHBoxLayout()
-        icon_lbl = QLabel(icon)
-        icon_lbl.setStyleSheet("font-size: 32px; background: transparent; border: none;")
+        header.setSpacing(15)
+        
+        # Icon Container
+        self.icon_lbl = QLabel(icon)
+        self.icon_lbl.setAlignment(Qt.AlignCenter)
+        self.icon_lbl.setFixedSize(48, 48)
+        
+        icon_bg = "rgba(255,255,255,0.1)" if gradient_colors else f"{ThemeManager.COLOR_ACCENT}15"
+        self.icon_lbl.setStyleSheet(f"""
+            font-size: 26px; 
+            background: {icon_bg}; 
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        """)
         
         title_lbl = QLabel(title)
-        title_lbl.setStyleSheet(f"font-size: 16px; font-weight: 800; color: {text_color}; background: transparent; border: none;")
+        title_color = "white" if gradient_colors else ThemeManager.COLOR_TEXT_PRIMARY
+        title_lbl.setStyleSheet(f"font-size: 17px; font-weight: 800; color: {title_color}; background: transparent; border: none;")
         
-        header.addWidget(icon_lbl)
-        header.addSpacing(10)
+        header.addWidget(self.icon_lbl)
         header.addWidget(title_lbl)
         header.addStretch()
         layout.addLayout(header)
@@ -74,37 +74,185 @@ class ModernCard(QFrame):
         # Description
         desc_lbl = QLabel(desc)
         desc_lbl.setWordWrap(True)
-        desc_lbl.setStyleSheet(f"font-size: 13px; color: {desc_color}; margin-top: 5px; background: transparent; border: none;")
+        desc_color = "rgba(255,255,255,0.85)" if gradient_colors else ThemeManager.COLOR_TEXT_SECONDARY
+        desc_lbl.setStyleSheet(f"font-size: 13.5px; color: {desc_color}; background: transparent; border: none; line-height: 1.4;")
         layout.addWidget(desc_lbl)
         
         layout.addStretch()
         
-        # Button
-        btn = QPushButton("Thực hiện 🚀")
+        # Action Row
+        action_row = QHBoxLayout()
+        
+        # Badge or Status (Optional)
+        self.status_badge = QLabel("Sẵn sàng")
+        badge_bg = "rgba(255,255,255,0.15)" if gradient_colors else "rgba(0,0,0,0.03)"
+        self.status_badge.setStyleSheet(f"""
+            font-size: 11px; 
+            font-weight: 700; 
+            color: {desc_color}; 
+            padding: 4px 10px; 
+            background: {badge_bg}; 
+            border-radius: 6px;
+        """)
+        action_row.addWidget(self.status_badge)
+        action_row.addStretch()
+        
+        btn = QPushButton("Bắt đầu")
         btn.setCursor(Qt.PointingHandCursor)
         btn.clicked.connect(self.on_click)
+        btn.setFixedSize(100, 36)
         
-        btn_bg = "rgba(255,255,255,0.2)" if gradient_colors else ThemeManager.COLOR_ACCENT
-        btn_text = "white"
-        
+        btn_style = "background: white; color: black;" if gradient_colors else f"background: {ThemeManager.COLOR_ACCENT}; color: white;"
         btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {btn_bg};
-                color: {btn_text};
-                border-radius: 8px;
-                padding: 8px 15px;
-                font-weight: bold;
+                {btn_style}
+                border-radius: 10px;
+                font-weight: 700;
+                font-size: 12px;
                 border: none;
             }}
             QPushButton:hover {{
-                background-color: rgba(255,255,255,0.3);
+                background: white;
+                opacity: 0.9;
             }}
         """)
-        layout.addWidget(btn)
+        action_row.addWidget(btn)
+        layout.addLayout(action_row)
+
+    def setup_style(self, hover=False):
+        bg_style = f"background: {ThemeManager.COLOR_GLASS_WHITE};"
+        border_color = "rgba(0,0,0,0.06)"
+        
+        if self.gradient_colors:
+            bg_style = f"background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 {self.gradient_colors[0]}, stop:1 {self.gradient_colors[1]});"
+            border_color = "rgba(255,255,255,0.2)"
+            
+        hover_transform = "margin-top: -5px;" if hover else ""
+        border_width = "2px" if hover else "1px"
+        
+        self.setStyleSheet(f"""
+            #ModernCard {{
+                {bg_style}
+                border-radius: 20px;
+                border: none;
+                {hover_transform}
+            }}
+        """)
+
+    def enterEvent(self, event):
+        self.setup_style(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.setup_style(False)
+        super().leaveEvent(event)
 
     def on_click(self):
         if self.callback:
             self.callback()
+
+class XiaomiHubWidget(QWidget):
+    """
+    Modern Hub for Xiaomi Tools
+    Displays high-level tiles and device status.
+    """
+    switch_page = Signal(int) # Signal to parent (index)
+
+    def __init__(self, adb_manager):
+        super().__init__()
+        self.adb = adb_manager
+        self.setup_ui()
+
+    def setup_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Add ScrollArea because outer scroll was removed
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("background: transparent;")
+        
+        content = QWidget()
+        content.setStyleSheet("background: transparent;")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(25)
+
+        # 1. Hero Banner
+        self.hero = QFrame()
+        self.hero.setFixedHeight(220)
+        self.hero.setStyleSheet(f"""
+            QFrame {{
+                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 {ThemeManager.COLOR_ACCENT}, stop:1 #6A11CB);
+                border-radius: 24px;
+            }}
+        """)
+        
+        hero_layout = QHBoxLayout(self.hero)
+        hero_layout.setContentsMargins(40, 0, 40, 0)
+        
+        text_layout = QVBoxLayout()
+        text_layout.setAlignment(Qt.AlignVCenter)
+        
+        welcome_lbl = QLabel("Xiaomi Turbo Suite")
+        welcome_lbl.setStyleSheet("font-size: 32px; font-weight: 800; color: white;")
+        
+        desc_lbl = QLabel("Tận dụng tối đa sức mạnh thiết bị MIUI/HyperOS của bạn.")
+        desc_lbl.setStyleSheet("font-size: 16px; color: rgba(255,255,255,0.8); margin-top: 8px;")
+        
+        text_layout.addWidget(welcome_lbl)
+        text_layout.addWidget(desc_lbl)
+        hero_layout.addLayout(text_layout)
+        hero_layout.addStretch()
+        
+        # Quick Optimization Button
+        scan_btn = QPushButton(" ⚡  Quét Hệ Thống")
+        scan_btn.setFixedSize(200, 56)
+        scan_btn.setCursor(Qt.PointingHandCursor)
+        scan_btn.setStyleSheet("""
+            QPushButton {
+                background: white;
+                color: #2575FC;
+                border-radius: 24px;
+                font-weight: 800;
+                font-size: 15px;
+            }
+            QPushButton:hover {
+                background: #f8f9fa;
+            }
+        """)
+        hero_layout.addWidget(scan_btn)
+        
+        layout.addWidget(self.hero)
+
+        # 2. Main Services Grid
+        grid_container = QWidget()
+        self.grid = QGridLayout(grid_container)
+        self.grid.setSpacing(20)
+        self.grid.setContentsMargins(0, 0, 0, 0)
+
+        # Service Tiles
+        # Service Tiles
+        self.add_tile("Gỡ Rác (Debloat)", "Giải phóng dung lượng, gỡ app thừa an toàn.", "🗑️", 1, ["#FF6B6B", "#FF8E53"])
+        self.add_tile("Tiện Ích Xiaomi", "Chỉnh FPS, Hz, Dark Mode, DPI...", "✨", 2, ["#4834D4", "#686DE0"])
+        self.add_tile("Tính Năng Nâng Cao", "Chặn OTA, Bỏ qua Setup, Fix Region.", "⚙️", 3, ["#22A6B3", "#7ED6DF"])
+        self.add_tile("Tải ROM & Apps", "Cập nhật HyperOS và tải App hệ thống.", "☁️", 4, ["#F093FB", "#F5576C"])
+        self.add_tile("Tối Ưu Hóa (Tweaks)", "Tăng tốc hiệu năng, tinh chỉnh Animation.", "🚀", 5, ["#11998e", "#38ef7d"])
+        self.add_tile("Fastboot Toolkit", "Flash ROM, Unlock Bootloader, Format.", "🔌", 6, ["#363795", "#005C97"])
+        self.add_tile("Kho Ứng Dụng", "Cài đặt file APK, XAPK nhanh chóng.", "📱", 7, ["#FF416C", "#FF4B2B"])
+
+        layout.addWidget(grid_container)
+        layout.addStretch()
+        
+        scroll.setWidget(content)
+        main_layout.addWidget(scroll)
+
+    def add_tile(self, title, desc, icon, index, colors):
+        card = ModernCard(title, desc, icon, lambda: self.switch_page.emit(index), gradient_colors=colors)
+        row = (index - 1) // 2
+        col = (index - 1) % 2
+        self.grid.addWidget(card, row, col)
 
 
 
@@ -173,7 +321,8 @@ class XiaomiBaseWidget(QWidget):
                 self.setEnabled(False)
         except Exception as e:
             status_label.setText(f"❓ Lỗi đọc thông tin: {str(e)}")
-            self.setEnabled(False)
+            # self.setEnabled(False) # Don't disable completely on read error, allow retry
+            self.setEnabled(True) 
             
     def show_status_dialog(self, status):
         msg = "<b>Trạng thái Ngôn ngữ & Vùng hiện tại:</b><br><br>"
@@ -183,156 +332,211 @@ class XiaomiBaseWidget(QWidget):
         msg += "<br><i>Vui lòng Khởi động lại nếu các thông số đã đúng nhưng chưa áp dụng.</i>"
         QMessageBox.information(self, "Kiểm tra Hệ thống", msg)
 
+class AppItemCard(QFrame):
+    """Modern Card for a single app in Debloater"""
+    toggled = Signal(bool, str)
+
+    def __init__(self, app_name, package_name="", category=""):
+        super().__init__()
+        self.app_name = app_name
+        self.package_name = package_name or app_name
+        
+        self.setStyleSheet(f"""
+            QFrame {{
+                background: {ThemeManager.COLOR_GLASS_WHITE};
+                border-radius: 12px;
+                border: 1px solid rgba(0,0,0,0.05);
+            }}
+            QFrame:hover {{
+                border: 1px solid {ThemeManager.COLOR_ACCENT}50;
+                background: rgba(255,255,255,0.8);
+            }}
+        """)
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(15, 12, 15, 12)
+        layout.setSpacing(15)
+        
+        # Icon / Initial
+        self.icon_lbl = QLabel(app_name[0].upper())
+        self.icon_lbl.setAlignment(Qt.AlignCenter)
+        self.icon_lbl.setFixedSize(40, 40)
+        self.icon_lbl.setStyleSheet(f"""
+            background: {ThemeManager.COLOR_ACCENT}15;
+            color: {ThemeManager.COLOR_ACCENT};
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 18px;
+        """)
+        layout.addWidget(self.icon_lbl)
+        
+        # Info
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(2)
+        
+        self.name_lbl = QLabel(app_name)
+        self.name_lbl.setStyleSheet(f"font-weight: 700; color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 14px; background:transparent;")
+        
+        self.pkg_lbl = QLabel(self.package_name)
+        self.pkg_lbl.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 11px; background:transparent;")
+        
+        info_layout.addWidget(self.name_lbl)
+        info_layout.addWidget(self.pkg_lbl)
+        layout.addLayout(info_layout)
+        
+        layout.addStretch()
+        
+        # Checkbox
+        self.cb = QCheckBox()
+        self.cb.setCursor(Qt.PointingHandCursor)
+        self.cb.setFixedSize(24, 24)
+        self.cb.stateChanged.connect(lambda s: self.toggled.emit(s == 2, self.package_name))
+        
+        theme = ThemeManager.get_theme()
+        self.cb.setStyleSheet(f"""
+            QCheckBox::indicator {{
+                width: 22px;
+                height: 22px;
+                border: 2px solid {theme['COLOR_BORDER']};
+                border-radius: 6px;
+                background: white;
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {ThemeManager.COLOR_ACCENT};
+                border-color: {ThemeManager.COLOR_ACCENT};
+            }}
+        """)
+        layout.addWidget(self.cb)
+    
+    def isChecked(self):
+        return self.cb.isChecked()
+    
+    def setChecked(self, checked):
+        self.cb.setChecked(checked)
 
 class XiaomiDebloaterWidget(XiaomiBaseWidget):
-    """Widget for removing bloatware"""
+    """REDESIGNED: Widget for removing bloatware using Modern Cards"""
     def __init__(self, adb_manager):
         super().__init__(adb_manager)
-        self.check_groups = {}
+        self.app_cards = {}
         self.setup_ui()
         self.check_device(self.status_label)
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(15)
         
-        # Header - Simplified for tab context
-        # self.setup_header(layout) # Only if standalone? Or reuse.
+        # Upper info row
+        header = QHBoxLayout()
+        header.setContentsMargins(20, 10, 20, 0)
         
-        # We add a status label here since we check device
         self.status_label = QLabel("Đang kiểm tra...")
-        self.status_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-weight: 600; margin-bottom: 10px;")
-        layout.addWidget(self.status_label)
+        self.status_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-weight: 600;")
+        header.addWidget(self.status_label)
         
+        # Add Refresh Button
+        btn_refresh = QPushButton("🔄")
+        btn_refresh.setFixedSize(32, 32)
+        btn_refresh.setCursor(Qt.PointingHandCursor)
+        btn_refresh.setToolTip("Làm mới trạng thái")
+        btn_refresh.clicked.connect(lambda: self.check_device(self.status_label))
+        header.addWidget(btn_refresh)
+        
+        header.addStretch()
+        
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Tìm kiếm ứng dụng...")
+        self.search_input.setFixedWidth(250)
+        self.search_input.setStyleSheet(ThemeManager.get_input_style() + "padding-left: 10px;")
+        self.search_input.textChanged.connect(self.filter_apps)
+        header.addWidget(self.search_input)
+        
+        layout.addLayout(header)
+        
+        # Main List
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setStyleSheet("background: transparent;")
         
-        content = QWidget()
-        content_layout = QVBoxLayout(content)
-        content_layout.setSpacing(20)
+        self.content = QWidget()
+        self.content.setStyleSheet("background: transparent;")
+        self.content_layout = QVBoxLayout(self.content)
+        self.content_layout.setContentsMargins(20, 10, 20, 20)
+        self.content_layout.setSpacing(10)
+        self.content_layout.setAlignment(Qt.AlignTop)
 
-        # App List Table logic
-        self.setup_app_table(content_layout)
-        
-        scroll.setWidget(content)
-        layout.addWidget(scroll)
-
-    def setup_app_table(self, layout):
-        label = QLabel("Gỡ ứng dụng rác (Debloater)")
-        label.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {ThemeManager.COLOR_TEXT_PRIMARY}; margin-top: 10px;")
-        layout.addWidget(label)
-        
-        container = QFrame()
-        container.setObjectName("DebloatContainer")
-        container.setStyleSheet(f"""
-            #DebloatContainer {{
-                background-color: {ThemeManager.COLOR_GLASS_WHITE};
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.6);
-            }}
-        """)
-        container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(20, 20, 20, 20)
-        
-        self.check_groups = {}
-        
-        # Use Global BLOATWARE_DICT
+        # Build App Cards from Data
+        from src.data.bloatware_data import BLOATWARE_DICT
         for category, apps in BLOATWARE_DICT.items():
-            group = QGroupBox(category)
-            group.setStyleSheet(f"""
-                QGroupBox {{
-                    font-weight: bold;
-                    border: 1px solid rgba(0,0,0,0.1);
-                    border-radius: 8px;
-                    margin-top: 10px;
-                    padding-top: 20px;
-                    color: {ThemeManager.COLOR_TEXT_PRIMARY};
-                    background: rgba(255,255,255,0.4);
-                }}
-                QGroupBox::title {{
-                    subcontrol-origin: margin;
-                    left: 10px;
-                    padding: 0 5px;
-                }}
-            """)
-            group_layout = QVBoxLayout(group)
+            cat_lbl = QLabel(category.upper())
+            cat_lbl.setStyleSheet(f"font-size: 11px; font-weight: 800; color: {ThemeManager.COLOR_TEXT_SECONDARY}; margin-top: 15px; margin-left: 5px;")
+            self.content_layout.addWidget(cat_lbl)
             
             for app in apps:
-                cb = QCheckBox(app)
-                cb.setCursor(Qt.PointingHandCursor)
-                theme = ThemeManager.get_theme()
-                cb.setStyleSheet(f"""
-                    QCheckBox {{
-                        color: {ThemeManager.COLOR_TEXT_PRIMARY};
-                        font-size: 14px;
-                        spacing: 12px;
-                    }}
-                    QCheckBox::indicator {{
-                        width: 22px;
-                        height: 22px;
-                        border: 2px solid {theme['COLOR_BORDER']};
-                        border-radius: 6px;
-                        background: white;
-                    }}
-                    QCheckBox::indicator:checked {{
-                        background-color: {ThemeManager.COLOR_ACCENT};
-                        border-color: {ThemeManager.COLOR_ACCENT};
-                        image: url(none);
-                    }}
-                    QCheckBox::indicator:hover {{
-                        border-color: {ThemeManager.COLOR_ACCENT};
-                    }}
-                """)
-                group_layout.addWidget(cb)
-                self.check_groups[app] = cb
-            
-            container_layout.addWidget(group)
-            
-        # Action Buttons
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
+                card = AppItemCard(app)
+                self.content_layout.addWidget(card)
+                self.app_cards[app] = card
         
-        btn_clean = QPushButton("🗑️ Gỡ bỏ các mục đã chọn")
+        scroll.setWidget(self.content)
+        layout.addWidget(scroll)
+        
+        # Bottom Actions Bar
+        actions_bar = QFrame()
+        actions_bar.setFixedHeight(80)
+        actions_bar.setStyleSheet(f"""
+            QFrame {{
+                background: {ThemeManager.COLOR_GLASS_WHITE};
+                border-top: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+            }}
+        """)
+        actions_layout = QHBoxLayout(actions_bar)
+        actions_layout.setContentsMargins(30, 0, 30, 0)
+        
+        self.stats_lbl = QLabel("0 ứng dụng được chọn")
+        self.stats_lbl.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-weight: 600;")
+        actions_layout.addWidget(self.stats_lbl)
+        
+        actions_layout.addStretch()
+        
+        btn_clean = QPushButton("🗑️ Gỡ bỏ ngay")
+        btn_clean.setFixedSize(180, 48)
+        btn_clean.setCursor(Qt.PointingHandCursor)
         btn_clean.setStyleSheet(ThemeManager.get_button_style("danger"))
-        btn_clean.setFixedSize(220, 45)
         btn_clean.clicked.connect(self.start_debloat)
+        actions_layout.addWidget(btn_clean)
         
-        btn_layout.addWidget(btn_clean)
-        container_layout.addLayout(btn_layout)
-        
-        layout.addWidget(container)
+        layout.addWidget(actions_bar)
 
+    def filter_apps(self, text):
+        search_text = text.lower()
+        for app_name, card in self.app_cards.items():
+            match = search_text in app_name.lower() or search_text in card.package_name.lower()
+            card.setVisible(match)
+            
     def start_debloat(self):
-        selected = [app for app, cb in self.check_groups.items() if cb.isChecked()]
-        
+        selected = [app for app, card in self.app_cards.items() if card.isChecked()]
         if not selected:
-            QMessageBox.warning(self, "Cảnh báo", "Vui lòng chọn ít nhất một ứng dụng")
+            LogManager.log("Cảnh báo", "Vui lòng chọn ít nhất một ứng dụng", "warning")
             return
             
         confirm = QMessageBox.warning(
-            self, "Xác nhận An toàn",
-            f"Bạn sắp gỡ bỏ {len(selected)} ứng dụng hệ thống.\nHãy chắc chắn bạn đã sao lưu!",
+            self, "Xác nhận",
+            f"Bạn sắp gỡ bỏ {len(selected)} ứng dụng rác.\nLưu ý: Một số app hệ thống quan trọng có thể gây treo logo if gỡ nhầm.\nBạn có chắc chắn?",
             QMessageBox.Yes | QMessageBox.No
         )
         
         if confirm == QMessageBox.Yes:
-            cmds = [f"pm uninstall --user 0 {package}" for package in selected]
-            self.worker = GenericShellWorker(self.adb, cmds, "Dọn dẹp Bloatware")
-            
-            pd = QProgressDialog("Đang xử lý dọn dẹp...", "Hủy", 0, 0, self)
-            pd.setWindowModality(Qt.WindowModal)
-            pd.show()
-            
-            self.worker.progress.connect(pd.setLabelText)
-            self.worker.finished.connect(lambda s, m: [pd.close(), QMessageBox.information(self, "Kết quả", m)])
-            self.worker.start()
+            self.opt_worker = DebloatWorker(self.adb, selected)
+            self.opt_worker.progress.connect(lambda m: LogManager.log("Debloater", m, "info"))
+            self.opt_worker.start()
             
     def reset(self):
         self.check_device(self.status_label)
-        for cb in self.check_groups.values():
-            cb.setChecked(False)
+        for card in self.app_cards.values():
+            card.setChecked(False)
+        self.stats_lbl.setText("0 ứng dụng được chọn")
 
 
 class XiaomiQuickToolsWidget(XiaomiBaseWidget):
