@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.5.5.1] - 2026-01-27
+### Fixed
+- **Hotfix ADB & UI**: Sửa lỗi không nhận ADB sau khi cập nhật và fix lỗi crash startup (mutex error).
+- **Cải thiện hiển thị**: Badge trạng thái ADB trên Dashboard hiển thị chính xác hơn.
+
 ## [2.5.5.0] - 2026-01-27
 ### Added
 - **System Tweaks UI Refactor**: Tái cấu trúc hoàn toàn Tab Tweaks đồng bộ phong cách "Xiaomi Hub" với hệ thống Card Gradient hiện đại.

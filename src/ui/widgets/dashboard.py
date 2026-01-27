@@ -784,12 +784,36 @@ class DashboardWidget(QWidget):
         
         # Always update authorization status first
         is_online = self.adb.is_online()
-        if is_online:
+        # Find real status for the current device from detected list if possible
+        # Or just use the status from info if get_detailed_system_info succeeded
+        
+        device_status = "UNKNOWN"
+        if info:
+            # If we got info, it's mostly online, but double check devices
+            devices = self.adb.get_devices()
+            for serial, status in devices:
+                if serial == self.adb.current_device:
+                    from src.core.adb.adb_manager import DeviceStatus
+                    if status == DeviceStatus.ONLINE:
+                        device_status = "ONLINE"
+                    elif status == DeviceStatus.UNAUTHORIZED:
+                        device_status = "UNAUTHORIZED"
+                    break
+        
+        if device_status == "ONLINE":
             self.auth_badge.setText(" DEVICE AUTHORIZED ")
             self.auth_badge.setStyleSheet("background-color: rgba(46, 204, 113, 0.2); color: #2ecc71; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-size: 11px; border: 1px solid rgba(46, 204, 113, 0.4);")
-        else:
+        elif device_status == "UNAUTHORIZED":
             self.auth_badge.setText(" UNAUTHORIZED ")
             self.auth_badge.setStyleSheet("background-color: rgba(255, 71, 87, 0.2); color: #ff6b81; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-size: 11px; border: 1px solid rgba(255, 71, 87, 0.4);")
+        else:
+             # Fallback if no specific status found but is_online (has serial)
+             if is_online:
+                 self.auth_badge.setText(" CONNECTED ")
+                 self.auth_badge.setStyleSheet("background-color: rgba(46, 134, 222, 0.2); color: #54a0ff; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-size: 11px; border: 1px solid rgba(46, 134, 222, 0.4);")
+             else:
+                 self.auth_badge.setText(" DISCONNECTED ")
+                 self.auth_badge.setStyleSheet("background-color: rgba(255, 71, 87, 0.2); color: #ff6b81; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-size: 11px; border: 1px solid rgba(255, 71, 87, 0.4);")
 
         if not info:
             if not is_online:

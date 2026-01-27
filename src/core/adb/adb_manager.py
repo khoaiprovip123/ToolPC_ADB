@@ -4,6 +4,7 @@ import re
 import platform
 from pathlib import Path
 from enum import Enum, auto
+import sys
 
 class DeviceStatus(Enum):
     ONLINE = auto()
@@ -20,19 +21,35 @@ class ADBManager:
         # Determine ADB Path
         self.adb_path = "adb" # Default to PATH
         
-        # Check bundled resources and common paths
-        root = Path(__file__).parent.parent.parent.parent
-        possible_paths = [
-            root / "resources" / "platform-tools" / "adb.exe",
-            root / "resources" / "adb" / "windows" / "adb.exe",
-            root / "assets" / "platform-tools" / "adb.exe",
-            root / "scripts" / "adb.exe",
-        ]
+        # Check bundled resources (PyInstaller)
+        if hasattr(sys, '_MEIPASS'):
+            base_path = Path(sys._MEIPASS)
+            possible_bundled = [
+                base_path / "assets" / "platform-tools" / "adb.exe",
+                base_path / "resources" / "platform-tools" / "adb.exe",
+            ]
+            for p in possible_bundled:
+                if p.exists():
+                    self.adb_path = str(p)
+                    break
         
-        for p in possible_paths:
-            if p.exists():
-                self.adb_path = str(p)
-                break
+        # Check local resources and common paths if not found in bundle or as fallback
+        if self.adb_path == "adb":
+            root = Path(__file__).parent.parent.parent.parent
+            possible_paths = [
+                root / "resources" / "platform-tools" / "adb.exe",
+                root / "resources" / "adb" / "windows" / "adb.exe",
+                root / "assets" / "platform-tools" / "adb.exe",
+                root / "scripts" / "adb.exe",
+            ]
+            
+            for p in possible_paths:
+                if p.exists():
+                    self.adb_path = str(p)
+                    break
+        
+        # Log resolution
+        print(f"ADBManager: Initialized with adb_path={self.adb_path}")
             
         self.current_device = None
         
@@ -64,7 +81,8 @@ class ADBManager:
                         status = DeviceStatus.RECOVERY
                         
                     devices.append((serial, status))
-        except:
+        except Exception as e:
+            print(f"ADBManager: Error getting devices: {e}")
             pass
         return devices
 
@@ -109,9 +127,9 @@ class ADBManager:
     def execute(self, command):
         """Execute ADB command (host side)"""
         if isinstance(command, list):
-            cmd_list = [self.adb_path] + command
+            cmd_list = [f'"{self.adb_path}"'] + command
         else:
-            cmd_list = f'{self.adb_path} {command}'
+            cmd_list = f'"{self.adb_path}" {command}'
             
         try:
             # Use shell=True for string command
