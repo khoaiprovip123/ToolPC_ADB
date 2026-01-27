@@ -629,12 +629,33 @@ class SettingsWidget(QWidget):
 
     def fix_connection(self):
         """Run ADB Fix Connection"""
-        QMessageBox.information(self, "Thông báo", "Đang tiến hành sửa lỗi kết nối...\nVui lòng đợi trong giây lát.")
+    def fix_connection(self):
+        """Run ADB Fix Connection"""
+        # QMessageBox.information(self, "Thông báo", "Đang tiến hành sửa lỗi kết nối...\nVui lòng đợi trong giây lát.")
         
-        # Run in background to avoid freezing UI? For now run directly as it's short
-        result = self.adb.fix_connection()
-        
-        QMessageBox.information(self, "Kết quả", result)
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        if self.window():
+            self.window().statusBar().showMessage("🛠️ Đang sửa lỗi kết nối ADB... Vui lòng đợi...")
+            QApplication.processEvents() # Force UI update
+            
+        try:
+            # Run in background to avoid freezing UI? For now run directly as it's short
+            result = self.adb.fix_connection()
+            
+            from PySide6.QtWidgets import QMessageBox
+            # Use a fresh message box with explicit style
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Kết quả")
+            msg.setText(result)
+            msg.setIcon(QMessageBox.Information)
+            msg.setStyleSheet(f"background-color: {ThemeManager.get_theme()['COLOR_BG_MAIN']}; color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};")
+            msg.exec()
+            
+        finally:
+            QApplication.restoreOverrideCursor()
+            if self.window():
+                self.window().statusBar().showMessage("✓ Đã hoàn tất")
 
     def change_theme(self, index):
         """Handle theme change"""

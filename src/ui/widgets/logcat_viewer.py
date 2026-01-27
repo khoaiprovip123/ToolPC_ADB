@@ -29,10 +29,6 @@ class LogcatWorker(QThread):
         # -v color is nice for terminal but we parse manually. -v time is good.
         cmd = f"{self.adb.adb_path} logcat -v time {self.filters}"
         
-        # If grep is specified, pipe it (simulated in python or shell)
-        # Using shell pipe is risky with cross-platform (PowerShell vs Bash)
-        # We will filter in Python for flexibility
-        
         try:
             # Creation flags for no window
             creation_flags = 0x08000000 if subprocess.os.name == 'nt' else 0
@@ -62,7 +58,9 @@ class LogcatWorker(QThread):
     def stop(self):
         self._is_running = False
         if hasattr(self, 'process'):
-            self.process.terminate()
+            try:
+                self.process.terminate()
+            except: pass
 
 class LogcatViewerWidget(QWidget):
     def __init__(self, adb_manager):
@@ -70,6 +68,11 @@ class LogcatViewerWidget(QWidget):
         self.adb = adb_manager
         self.worker = None
         self.current_app_pid = None
+        self.log_buffer = []  # Queue for batch processing
+        self.update_timer = QTimer()
+        self.update_timer.setInterval(100) # Update UI every 100ms
+        self.update_timer.timeout.connect(self.process_log_buffer)
+        
         self.setup_ui()
         
     def setup_ui(self):
@@ -128,6 +131,10 @@ class LogcatViewerWidget(QWidget):
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setLineWrapMode(QTextEdit.NoWrap) # Better performance
+        
+        # Optimize global font size if needed, but 11px is fine
+        self.log_view.document().setMaximumBlockCount(2000) # Limit lines to prevent memory overflow
+        
         self.log_view.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {ThemeManager.COLOR_GLASS_CARD};
@@ -181,6 +188,7 @@ class LogcatViewerWidget(QWidget):
         if self.worker and self.worker.isRunning():
             self.worker.stop()
             self.worker.wait()
+            self.update_timer.stop()
             self.btn_start.setText("▶️ Start")
             self.btn_start.setStyleSheet(ThemeManager.get_button_style("primary"))
             self.status_lbl.setText("Stopped")
@@ -188,6 +196,9 @@ class LogcatViewerWidget(QWidget):
             if not self.adb.current_device:
                 self.log_view.append("⚠️ Chưa kết nối thiết bị")
                 return
+            
+            # Reset buffer
+            self.log_buffer = []
             
             # Build filter
             level_map = {"Verbose": "V", "Debug": "D", "Info": "I", "Warning": "W", "Error": "E", "Fatal": "F"}
@@ -201,52 +212,66 @@ class LogcatViewerWidget(QWidget):
             if self.cb_smart_filter.isChecked():
                 pkg, pid = self.get_foreground_pid()
                 if pid:
-                    # Logcat --pid is supported in newer Android
-                    # But reliable way is filtering by PID in python or grep
-                    # Let's try grep for PID to be safe across versions if --pid not supported
-                    # Actually `logcat --pid` works well on Android 7+
                     adb_filter = f"--pid={pid} {adb_filter}"
                     self.status_lbl.setText(f"Filtering for App: {pkg} (PID: {pid})")
                 elif pkg:
-                    # Fallback to grep package name if PID failed
                     grep_keyword = pkg
                     self.status_lbl.setText(f"Filtering for Package: {pkg}")
                 else:
                     self.status_lbl.setText("Could not detect foreground app, showing all")
             
             self.worker = LogcatWorker(self.adb, adb_filter, grep_keyword)
-            self.worker.log_received.connect(self.on_log_received)
+            self.worker.log_received.connect(self.queue_log) # Connect to Queue
             self.worker.start()
+            self.update_timer.start()
             
             self.btn_start.setText("⏹️ Stop")
             self.btn_start.setStyleSheet(ThemeManager.get_button_style("danger"))
             
-    def on_log_received(self, text):
-        # Colorize
-        color = ThemeManager.COLOR_TEXT_PRIMARY
+    def queue_log(self, text):
+        """Add log to buffer instead of direct UI update"""
+        self.log_buffer.append(text)
         
-        # Check priority char usually at start or inside 
-        # Format depends on -v time: "01-01 12:00:00.000 I/Tag(123): Msg"
-        
-        if " E " in text or " F " in text or "/E" in text or "/F" in text: 
-            color = "#FF5252" # Red
-        elif " W " in text or "/W" in text: 
-            color = "#FFAB40" # Orange
-        elif " D " in text or "/D" in text: 
-            color = "#448AFF" # Blue
-        elif " I " in text or "/I" in text: 
-            color = "#69F0AE" # Green
+    def process_log_buffer(self):
+        """Flush buffer to UI"""
+        if not self.log_buffer:
+            return
             
-        # Highlight crash/exception keywords
-        if "exception" in text.lower() or "crash" in text.lower() or "fatal" in text.lower():
-            text = f"<b>{text}</b>"
-            color = "#FF1744" # Deep Red
+        # Process in chunks if too big
+        lines = self.log_buffer[:]
+        self.log_buffer = [] # Clear buffer
         
-        self.log_view.append(f'<span style="color:{color}">{text}</span>')
-        # Auto scroll logic (optional, disabling if user scrolled up?)
-        # For now, auto scroll
-        self.log_view.moveCursor(QTextCursor.End)
+        html_lines = []
+        for text in lines:
+            # Colorize
+            color = ThemeManager.COLOR_TEXT_PRIMARY
+            
+            if " E " in text or " F " in text or "/E" in text or "/F" in text: 
+                color = "#FF5252" # Red
+            elif " W " in text or "/W" in text: 
+                color = "#FFAB40" # Orange
+            elif " D " in text or "/D" in text: 
+                color = "#448AFF" # Blue
+            elif " I " in text or "/I" in text: 
+                color = "#69F0AE" # Green
+                
+            if "exception" in text.lower() or "crash" in text.lower() or "fatal" in text.lower():
+                text = f"<b>{text}</b>"
+                color = "#FF1744" # Deep Red
+            
+            html_lines.append(f'<span style="color:{color}">{text}</span>')
+            
+        # Bulk append
+        if html_lines:
+            cursor = self.log_view.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            # cursor.insertHtml("<br>".join(html_lines)) # Can be slow for huge chunks
+            # Better:
+            for line in html_lines:
+                 self.log_view.append(line)
+            self.log_view.moveCursor(QTextCursor.End)
         
     def clear_log(self):
         self.log_view.clear()
+        self.log_buffer = []
         self.adb.shell("logcat -c") # Clear buffer on device too

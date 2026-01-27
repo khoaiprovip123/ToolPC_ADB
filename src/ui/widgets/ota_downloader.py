@@ -115,7 +115,7 @@ class OTADownloaderWidget(QWidget):
         search_layout = QHBoxLayout(search_group)
         
         self.input_codename = QLineEdit()
-        self.input_codename.setPlaceholderText("Tên mã thiết bị (vd: alioth)")
+        self.input_codename.setPlaceholderText("Tên mã thiết bị (vd: Alioth)")
         self.input_codename.setStyleSheet(ThemeManager.get_input_style())
         search_layout.addWidget(QLabel("Thiết bị:"))
         search_layout.addWidget(self.input_codename)
@@ -198,8 +198,30 @@ class OTADownloaderWidget(QWidget):
         # Add the mandated HyperOS Updates link
         codename = self.input_codename.text().strip()
         
-        # Insert at the top
+        # Insert at the top (Priority Order)
+        
+        # 1. Author / Telegram Support
         results.insert(0, {
+            "version": "Mod bởi Thangnguyen",
+            "android": "-",
+            "region": "Telegram",
+            "type": "Community",
+            "size": "-",
+            "link": "https://t.me/nvthang2303"
+        })
+
+        # 2. HyperTN V3.2 (Direct Link)
+        results.insert(1, {
+            "version": "HyperTN V3.2",
+            "android": "14/15",
+            "region": "Global",
+            "type": "Custom ROM",
+            "size": "Check Link",
+            "link": f"https://hypertn.koyeb.app/ROM/V3.2/{codename.capitalize()}"
+        })
+
+        # 3. HyperOS Updates (Web)
+        results.insert(2, {
             "version": "HyperOSUpdates (Web)",
             "android": "-",
             "region": "All",
@@ -335,7 +357,7 @@ class HyperOSAppsWidget(QWidget):
         
         # Input for codename
         self.input_gcam_device = QLineEdit()
-        self.input_gcam_device.setPlaceholderText("Tên mã máy (vd: lisa)")
+        self.input_gcam_device.setPlaceholderText("Tên mã máy (vd: Lisa)")
         self.input_gcam_device.setAlignment(Qt.AlignCenter)
         self.input_gcam_device.setStyleSheet(ThemeManager.get_input_style())
         layout_gcam.addWidget(self.input_gcam_device)

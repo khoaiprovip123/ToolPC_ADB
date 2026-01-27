@@ -58,13 +58,7 @@ class Sidebar(QFrame):
         # Logo with Android Green Gradient
         logo_frame = QFrame()
         logo_frame.setFixedSize(44, 44)
-        logo_frame.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #3DDC84, stop:1 #32B36C);
-                border-radius: 14px;
-                border: 1px solid rgba(255,255,255,0.2);
-            }}
-        """)
+        logo_frame.setStyleSheet(ThemeManager.get_sidebar_logo_style())
         
         # Use custom logo image instead of emoji
         logo_lbl = QLabel(logo_frame)
@@ -88,14 +82,7 @@ class Sidebar(QFrame):
         
         theme = ThemeManager.get_theme()
         title_text = QLabel("ADB Commander")
-        title_text.setStyleSheet(f"""
-            font-size: 19px;
-            font-weight: 700;
-            color: {theme['COLOR_TEXT_PRIMARY']};
-            background: transparent;
-            font-family: {ThemeManager.FONT_FAMILY};
-            letter-spacing: -0.5px;
-        """)
+        title_text.setStyleSheet(ThemeManager.get_sidebar_title_style())
         title_layout.addWidget(title_text)
         title_layout.addStretch()
         layout.addWidget(title_container)
@@ -153,17 +140,7 @@ class Sidebar(QFrame):
     def add_group_label(self, text, layout):
         theme = ThemeManager.get_theme()
         label = QLabel(text)
-        label.setStyleSheet(f"""
-            color: {theme['COLOR_TEXT_SECONDARY']};
-            font-size: 11px;
-            font-weight: 600;
-            padding-left: 14px;
-            margin-bottom: 6px;
-            background: transparent;
-            font-family: {ThemeManager.FONT_FAMILY};
-            text-transform: uppercase;
-            opacity: 0.8;
-        """)
+        label.setStyleSheet(ThemeManager.get_sidebar_group_label_style())
         layout.addWidget(label)
     
     def add_nav_button(self, text, icon_key, index, layout, active=False):
@@ -190,40 +167,8 @@ class Sidebar(QFrame):
         btn.setCursor(Qt.PointingHandCursor)
         btn.setFixedHeight(50)
         
-        # iOS Button Style
-        hover_bg = theme['COLOR_GLASS_HOVER']
-        active_bg = ThemeManager.COLOR_ACCENT + "25" # Stronger active background
-        active_color = ThemeManager.COLOR_ACCENT
-        
-        # Padding adjustment for QIcon vs Text
-        padding_left = "16px" if has_icon else "16px" 
-        
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                text-align: left;
-                padding-left: {padding_left};
-                border: none;
-                border-radius: 12px;
-                font-size: 15px;
-                font-weight: 500;
-                color: {theme['COLOR_TEXT_PRIMARY']};
-                background: transparent;
-                font-family: {ThemeManager.FONT_FAMILY};
-                margin-left: 8px;
-                margin-right: 8px;
-            }}
-            QPushButton:hover {{
-                background-color: {hover_bg};
-            }}
-            QPushButton:checked {{
-                background-color: rgba(126, 217, 87, 0.5); /* Lime Green 50% Opacity */
-                color: {theme['COLOR_TEXT_PRIMARY']}; /* Keep text readable on light green */
-                font-weight: 700;
-                border: 1px solid rgba(126, 217, 87, 0.8);
-                border-left: 4px solid #7ed957; /* Solid accent on left */
-                padding-left: 12px;
-            }}
-        """)
+        padding_left = "16px" if has_icon else "16px"
+        btn.setStyleSheet(ThemeManager.get_nav_button_style(padding_left))
         
         if active:
             btn.setChecked(True)
@@ -245,29 +190,7 @@ class DeviceSelector(QComboBox):
     
     def apply_theme(self):
         theme = ThemeManager.get_theme()
-        self.setStyleSheet(f"""
-            QComboBox {{
-                background-color: {theme['COLOR_GLASS_CARD']};
-                border: 2px solid {theme['COLOR_BORDER']};
-                border-radius: 12px;
-                padding: 10px 16px;
-                font-size: 13px;
-                font-weight: 500;
-                color: {theme['COLOR_TEXT_PRIMARY']};
-                font-family: {ThemeManager.FONT_FAMILY};
-            }}
-            QComboBox:hover {{
-                border: 2px solid {ThemeManager.COLOR_ACCENT};
-                background-color: {theme['COLOR_GLASS_HOVER']};
-            }}
-            QComboBox:focus {{
-                border: 2px solid {ThemeManager.COLOR_ACCENT};
-            }}
-            QComboBox::drop-down {{
-                border: none;
-                padding-right: 12px;
-            }}
-        """)
+        self.setStyleSheet(ThemeManager.get_input_style())
 
 
 class MainWindow(QMainWindow):
@@ -354,16 +277,7 @@ class MainWindow(QMainWindow):
         # Status Bar
         theme = ThemeManager.get_theme()
         self.status_bar = QStatusBar()
-        self.status_bar.setStyleSheet(f"""
-            QStatusBar {{
-                background: {theme['COLOR_GLASS_WHITE']};
-                color: {theme['COLOR_TEXT_SECONDARY']};
-                border-top: 1px solid {theme['COLOR_BORDER']};
-                font-family: {ThemeManager.FONT_FAMILY};
-                padding: 8px 16px;
-                font-size: 12px;
-            }}
-        """)
+        self.status_bar.setStyleSheet(ThemeManager.get_statusbar_style())
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("✓ Sẵn sàng")
 
@@ -375,13 +289,7 @@ class MainWindow(QMainWindow):
         theme = ThemeManager.get_theme()
         header = QFrame()
         header.setObjectName("MainHeader")
-        header.setStyleSheet(f"""
-            #MainHeader {{
-                background-color: {theme['COLOR_GLASS_WHITE']};
-                border-radius: 16px;
-                border: 1px solid {theme['COLOR_BORDER_LIGHT']};
-            }}
-        """)
+        header.setStyleSheet(ThemeManager.get_header_frame_style())
 
         # Add shadow
         shadow = QGraphicsDropShadowEffect()
@@ -395,13 +303,7 @@ class MainWindow(QMainWindow):
 
         # Page Title
         self.page_title = QLabel("Tổng Quan")
-        self.page_title.setStyleSheet(f"""
-            font-size: 22px;
-            font-weight: 700;
-            color: {theme['COLOR_TEXT_PRIMARY']};
-            background: transparent;
-            font-family: {ThemeManager.FONT_FAMILY};
-        """)
+        self.page_title.setStyleSheet(ThemeManager.get_header_title_style())
         layout.addWidget(self.page_title)
 
         layout.addStretch()
@@ -424,21 +326,7 @@ class MainWindow(QMainWindow):
         refresh_btn.setFixedSize(44, 44)
         refresh_btn.clicked.connect(self.refresh_devices)
         refresh_btn.setCursor(Qt.PointingHandCursor)
-        refresh_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {theme['COLOR_GLASS_CARD']};
-                border-radius: 12px;
-                border: 2px solid {theme['COLOR_BORDER']};
-                font-size: 20px;
-                color: {theme['COLOR_TEXT_PRIMARY']};
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {ThemeManager.COLOR_ACCENT}15;
-                border: 2px solid {ThemeManager.COLOR_ACCENT};
-                color: {ThemeManager.COLOR_ACCENT};
-            }}
-        """)
+        refresh_btn.setStyleSheet(ThemeManager.get_icon_button_style())
 
         # Control Center Button
         ctrl_btn = QPushButton()
@@ -446,7 +334,7 @@ class MainWindow(QMainWindow):
         ctrl_btn.setCursor(Qt.PointingHandCursor)
         ctrl_btn.setToolTip("Trung tâm Điều khiển")
         ctrl_btn.clicked.connect(lambda checked: self.toggle_notification_center(0))
-        ctrl_btn.setStyleSheet(refresh_btn.styleSheet())
+        ctrl_btn.setStyleSheet(ThemeManager.get_icon_button_style())
 
         # Load control center icon
         import os
@@ -463,7 +351,7 @@ class MainWindow(QMainWindow):
         notif_btn.setCursor(Qt.PointingHandCursor)
         notif_btn.setToolTip("Thông báo")
         notif_btn.clicked.connect(lambda checked: self.toggle_notification_center(1))
-        notif_btn.setStyleSheet(refresh_btn.styleSheet())
+        notif_btn.setStyleSheet(ThemeManager.get_icon_button_style())
 
         # Load notification icon
         notif_icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icons', 'notification.png')
@@ -612,10 +500,30 @@ class MainWindow(QMainWindow):
         
         def on_check_finished(real_count):
             if real_count == -1: return
+            
+            # Smart comparison: Get current serials from UI
+            ui_serials = set()
+            for i in range(self.device_selector.count()):
+                data = self.device_selector.itemData(i)
+                if data: ui_serials.add(data)
+                
+            # We can't know the REAL serials from check_worker easily without changing it to return list
+            # But we can assume if real_count != ui_count, we refresh
+            # To avoid loop: Only refresh if count differs OR if valid items mismatch
+            
+            # Simple fix: Throttle refresh. If we just refreshed < 2s ago, don't refresh.
+            # But better: CheckWorker should return list.
+            
+            # However, since I cannot easily change CheckWorker signature without risk, 
+            # I will check against ui_count AND ensure we don't loop.
+            
             ui_count = self.device_selector.count()
+            # If selector has "No devices" placeholder, count is 0 for comparison
             is_placeholder = (ui_count == 1 and self.device_selector.itemData(0) is None)
             ui_real_count = 0 if is_placeholder else ui_count
+            
             if real_count != ui_real_count:
+                print(f"Device Check: Count mismatch (Real: {real_count} vs UI: {ui_real_count}). Refreshing...")
                 self.refresh_devices()
 
         self._check_worker.count_ready.connect(on_check_finished)

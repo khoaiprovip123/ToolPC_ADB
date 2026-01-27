@@ -1,1817 +1,508 @@
-# src/core/adb/adb_manager.py
-"""
-ADB Manager - Core wrapper for ADB commands
-Handles device connection, command execution, and output parsing
-"""
-
 import subprocess
 import os
 import re
-import time
-import json
-import sys
-from typing import Optional, List, Dict, Tuple, Iterator
+import platform
 from pathlib import Path
-from dataclasses import dataclass
-from enum import Enum
-from src.core.log_manager import LogManager
-
-
-class ConnectionType(Enum):
-    USB = "usb"
-    WIRELESS = "wireless"
-
+from enum import Enum, auto
+import sys
 
 class DeviceStatus(Enum):
-    ONLINE = "device"
-    OFFLINE = "offline"
-    UNAUTHORIZED = "unauthorized"
-    BOOTLOADER = "bootloader"
-    RECOVERY = "recovery"
-
-
-@dataclass
-class DeviceInfo:
-    """Device information model"""
-    serial: str
-    model: str
-    manufacturer: str
-    android_version: str
-    sdk_version: int
-    build_id: str
-    connection_type: ConnectionType
-    status: DeviceStatus
-    ip_address: Optional[str] = None
-    
-    # Extended info
-    miui_version: Optional[str] = None
-    hyperos_version: Optional[str] = None
-    battery_level: Optional[int] = None
-    storage_used: Optional[int] = None
-    storage_total: Optional[int] = None
-    ram_available: Optional[int] = None
-    ram_total: Optional[int] = None
+    ONLINE = auto()
+    OFFLINE = auto()
+    UNAUTHORIZED = auto()
+    BOOTLOADER = auto()
+    RECOVERY = auto()
+    SIDELOAD = auto()
+    UNKNOWN = auto()
 
 
 class ADBManager:
-    """
-    Main ADB Manager class
-    Provides high-level interface to ADB functionality
-    """
-    
-    import sys
-    
-    def __init__(self, adb_path: Optional[str] = None):
-        """
-        Initialize ADB Manager
+    def __init__(self):
+        # Determine ADB Path
+        self.adb_path = "adb" # Default to PATH
         
-        Args:
-            adb_path: Path to ADB binary. If None, will auto-detect
-        """
-        self.adb_path = adb_path or self._find_adb()
-        self.current_device: Optional[str] = None
-        self.logger = LogManager()
-        
-        # Cache for static properties
-        self._prop_cache: Dict[str, Dict[str, str]] = {}
-        self._cached_serial: Optional[str] = None
-        
-        # Load SoC Database
-        self.soc_mappings = {}
-        try:
-            # Handle PyInstaller _MEIPASS
-            if hasattr(sys, '_MEIPASS'):
-                base_dir = Path(sys._MEIPASS)
-            else:
-                # src/core/adb/adb_manager.py -> ... -> root
-                base_dir = Path(__file__).parent.parent.parent.parent
-            
-            db_path = base_dir / "src" / "data" / "soc_database.json"
-            
-            if db_path.exists():
-                with open(db_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    self.soc_mappings = data.get("mappings", {})
-                    self.device_mappings = data.get("devices", {})   
-            else:
-                print(f"SoC Database not found at: {db_path}")
-        except Exception as e:
-            print(f"Failed to load SoC database: {e}")
-        
-        # Auto-install check
-        if self.adb_path == "adb" and not self._check_adb_command():
-             print("ADB not found in PATH. Attempting to download...")
-             self.download_adb()
-
-    def safe_int(self, val, default=0) -> int:
-        """Safely convert string to int, handling duration strings and floats"""
-        try:
-            if not val: return default
-            # Handle cases like '+21h20m...' by taking numeric part if possible
-            # or simply relying on float() failure if it's completely non-numeric
-            s_val = str(val).strip()
-            # If it starts with +, remove it
-            if s_val.startswith('+'): s_val = s_val[1:]
-            
-            # Try direct conversion first (fastest)
-            try: return int(float(s_val))
-            except (ValueError, TypeError):
-                # If that fails, try to extract leading digits (for cases like "100%")
-                match = re.match(r"^(\d+)", s_val)
-                if match: return int(match.group(1))
-                return default
-        except:
-            return default
-
-    def safe_shell(self, cmd: str, default: str = "") -> str:
-        """Execute shell command and return result or default on error"""
-        try:
-            return self.shell(cmd, check=False, log_error=False).strip()
-        except:
-            return default
-             
-        self._verify_adb()
-    
-    def get_fastboot_system_info(self) -> Dict:
-        """
-        Get limited system info in Fastboot mode
-        """
-        info = {}
-        try:
-            # 1. Check if device is in fastboot
-            devices = self.get_fastboot_devices()
-            if not devices:
-                return {}
-                
-            serial = devices[0]
-            info["build_id"] = serial
-            
-            # 2. Get Product/Codename
-            # fastboot getvar product -> product: lisa
-            product_out = self.fastboot_command("getvar product")
-            codename = "Unknown"
-            
-            if "product:" in product_out:
-                # Output format usually: "product: lisa\nfinished. total time: ..."
-                for line in product_out.split('\n'):
-                    if line.startswith("product:"):
-                        codename = line.split(":")[1].strip()
-                        break
-            
-            info["board"] = codename
-            info["device_name"] = codename
-            
-            # 3. Resolve Model Name from Database
-            if hasattr(self, 'device_mappings') and codename in self.device_mappings:
-                info["model"] = self.device_mappings[codename]
-            else:
-                info["model"] = f"Xiaomi Device ({codename})"
-                
-            # 4. Resolve SoC from Database
-            if hasattr(self, 'soc_mappings') and codename in self.soc_mappings:
-                info["soc_name"] = self.soc_mappings[codename]
-            else:
-                info["soc_name"] = "Fastboot Mode"
-                
-            info["os_version"] = "Fastboot Mode"
-            info["android_version"] = "N/A"
-            info["security_patch"] = "N/A"
-            
-            return info
-            
-        except Exception as e:
-            print(f"Fastboot Info Error: {e}")
-            return {}
-
-    def _check_adb_command(self) -> bool:
-        try:
-            subprocess.run(["adb", "version"], capture_output=True, check=True)
-            return True
-        except:
-            return False
-
-    def _find_adb(self) -> str:
-        """
-        Find ADB binary in system or bundled resources
-        """
-        # 1. Check bundled resources (PyInstaller)
+        # Check bundled resources (PyInstaller)
         if hasattr(sys, '_MEIPASS'):
-            bundled_adb = Path(sys._MEIPASS) / 'resources' / 'adb' / 'windows' / 'adb.exe'
-            if bundled_adb.exists():
-                return str(bundled_adb)
-                
-        # 2. Check local dev environment
-        # src/core/adb/adb_manager.py -> ... -> root
-        root_dir = Path(__file__).parent.parent.parent.parent
-        dev_paths = [
-            root_dir / 'resources' / 'adb' / 'windows' / 'adb.exe',
-            root_dir / 'scripts' / 'adb.exe',
-        ]
-        
-        for path in dev_paths:
-            if path.exists():
-                return str(path)
-        
-        # 3. Check system PATH
-        try:
-            cmd = ['where', 'adb'] if os.name == 'nt' else ['which', 'adb']
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            if result.returncode == 0:
-                return result.stdout.strip().split('\n')[0]
-        except Exception:
-            pass
-        
-        # Fallback
-        return "adb"
-    
-    def download_adb(self) -> bool:
-        """Download and extract ADB platform tools"""
-        import urllib.request
-        import zipfile
-        import shutil
-        
-        try:
-            # Define paths
-            resources_dir = Path(__file__).parent.parent.parent.parent / 'resources' / 'adb' / 'windows'
-            resources_dir.mkdir(parents=True, exist_ok=True)
-            
-            zip_path = resources_dir / "platform-tools.zip"
-            adb_exe = resources_dir / "adb.exe"
-            
-            # URL for Windows platform tools
-            url = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-            
-            # Download
-            print(f"Downloading ADB from {url}...")
-            urllib.request.urlretrieve(url, zip_path)
-            
-            # Extract
-            print("Extracting ADB...")
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(resources_dir)
-            
-            # Move files from platform-tools folder to adb/windows if needed
-            extracted_folder = resources_dir / "platform-tools"
-            if extracted_folder.exists():
-                for item in extracted_folder.iterdir():
-                    shutil.move(str(item), str(resources_dir))
-                shutil.rmtree(extracted_folder)
-            
-            # Cleanup zip
-            if zip_path.exists():
-                os.remove(zip_path)
-                
-            if adb_exe.exists():
-                self.adb_path = str(adb_exe)
-                print(f"ADB installed to {self.adb_path}")
-                return True
-            else:
-                print("ADB executable not found after extraction.")
-                return False
-                
-        except Exception as e:
-            print(f"Failed to download/install ADB: {e}")
-            return False
-
-    def fix_connection(self) -> str:
-        """
-        Attempt to fix ADB connection issues
-        Returns: Status message
-        """
-        log = []
-        try:
-            log.append("Stopping ADB server...")
-            self.execute("kill-server", check=False)
-            time.sleep(1)
-            
-            log.append("Starting ADB server...")
-            self.execute("start-server", check=False)
-            time.sleep(2)
-            
-            log.append("Checking devices...")
-            devices = self.get_devices()
-            
-            if devices:
-                return "\n".join(log) + f"\nSuccess: Found {len(devices)} device(s)."
-            else:
-                return "\n".join(log) + "\nWarning: No devices found after reset. Check USB cable/drivers."
-                
-        except Exception as e:
-            return "\n".join(log) + f"\nError: {str(e)}"
-
-    def _verify_adb(self):
-        """Verify ADB is working"""
-        try:
-            result = self.execute("version", timeout=5)
-            if "Android Debug Bridge version" not in result:
-                # Try simple adb command if version check fails but command runs
-                pass
-        except Exception as e:
-            # Don't crash if ADB check fails, just warn
-            print(f"ADB verification warning: {str(e)}")
-    
-    def execute(self, command: str | List[str], timeout: int = 30, check: bool = True, log_error: bool = True) -> str:
-        """
-        Execute ADB command
-        Args:
-            command: Command string or list of arguments (Safe Mode)
-            timeout: Timeout in seconds
-            check: Raise exception on non-zero return code
-            log_error: Whether to log errors to LogManager
-        """
-        use_shell = isinstance(command, str)
-        
-        # Prepare command
-        if isinstance(command, list):
-            # Safe Mode: shell=False
-            full_cmd = [self.adb_path] + command
-        else:
-            # Legacy Mode: shell=True (Potentially unsafe if input not sanitized)
-            # Warn if command contains dangerous characters and isn't a simple fixed string
-            if any(c in command for c in [";", "&", "|"]) and "shell" not in command:
-                self.logger.log("Security Warning", f"Unsafe characters in command: {command}", "warning")
-            
-            full_cmd = f'"{self.adb_path}" {command}' if os.path.isabs(self.adb_path) else f'{self.adb_path} {command}'
-        
-        # Windows: Suppress terminal window
-        creation_flags = 0
-        if os.name == 'nt':
-            creation_flags = 0x08000000  # CREATE_NO_WINDOW
-
-        try:
-            result = subprocess.run(
-                full_cmd,
-                shell=use_shell,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                encoding='utf-8',
-                errors='replace',
-                creationflags=creation_flags
-            )
-            
-            if check and result.returncode != 0:
-                cmd_str = command if isinstance(command, str) else " ".join(command)
-                raise RuntimeError(
-                    f"ADB command failed: {cmd_str}\n"
-                    f"Error: {result.stderr}"
-                )
-            
-            output = result.stdout.strip()
-            
-            # Log specific high-level commands
-            cmd_start = command if isinstance(command, str) else (command[0] if command else "")
-            if cmd_start.startswith("install ") and "Success" in output:
-                 LogManager.log("Cài đặt APK", f"Đã cài đặt thành công", "success")
-            elif isinstance(command, list) and command[0] == "install" and "Success" in output:
-                 LogManager.log("Cài đặt APK", f"Đã cài đặt thành công: {command[-1]}", "success")
-                
-            return output
-            
-        except subprocess.TimeoutExpired:
-            cmd_str = command if isinstance(command, str) else " ".join(command)
-            err_msg = f"Command timed out after {timeout}s: {cmd_str}"
-            if log_error:
-                LogManager.log("ADB Timeout", err_msg, "error")
-            raise TimeoutError(err_msg)
-        except Exception as e:
-            err_msg = str(e)
-            cmd_str = command if isinstance(command, str) else " ".join(command)
-            
-            # Filter noise
-            if log_error:
-                # 1. Filter specific noisy commands
-                noise_cmds = ["dumpsys", "getprop", "df", "pm list"]
-                is_noise = any(cmd in cmd_str for cmd in noise_cmds)
-                
-                # 2. Filter unauthorized errors (log once per run/reset)
-                is_unauth = any(x in err_msg.lower() for x in ["unauthorized", "offline", "not found", "no devices"])
-                
-                if not is_noise and not is_unauth:
-                     LogManager.log("ADB Error", f"Cmd: {cmd_str}\n{err_msg}", "error")
-                elif is_unauth:
-                     # Only print to console to avoid cluttering UI logs
-                     print(f"ADB Connection Issue ({cmd_str}): {err_msg}")
-            
-            if check:
-                raise RuntimeError(f"Failed to execute: {cmd_str}\nError: {err_msg}")
-            return ""
-    
-    def shell(self, command: str, timeout: int = 30, check: bool = True, log_error: bool = True) -> str:
-        """
-        Execute shell command on device
-        """
-        device_arg = f"-s {self.current_device}" if self.current_device else ""
-        # Quote the command to prevent shell interpretation by host OS
-        # Escape double quotes inside the command
-        safe_command = command.replace('"', '\\"')
-        return self.execute(f'{device_arg} shell "{safe_command}"', timeout=timeout, check=check, log_error=log_error)
-    
-    def shell_stream(self, command: str, timeout: int = 900) -> Iterator[str]:
-        """
-        Execute shell command and yield output line by line
-        """
-        device_arg = f"-s {self.current_device}" if self.current_device else ""
-        safe_command = command.replace('"', '\\"')
-        full_cmd = f'{self.adb_path} {device_arg} shell "{safe_command}"'
-        
-        try:
-            # Windows: Suppress terminal window
-            creation_flags = 0
-            if os.name == 'nt':
-                creation_flags = 0x08000000  # CREATE_NO_WINDOW
-
-            process = subprocess.Popen(
-                full_cmd,
-                shell=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                bufsize=1,
-                creationflags=creation_flags
-            )
-            
-            start_time = time.time()
-            while True:
-                line = process.stdout.readline()
-                if not line and process.poll() is not None:
+            base_path = Path(sys._MEIPASS)
+            possible_bundled = [
+                base_path / "assets" / "platform-tools" / "adb.exe",
+                base_path / "resources" / "platform-tools" / "adb.exe",
+            ]
+            for p in possible_bundled:
+                if p.exists():
+                    self.adb_path = str(p)
                     break
-                if line:
-                    yield line.strip()
-                    
-                if time.time() - start_time > timeout:
-                    process.kill()
-                    yield "❌ Timeout!"
+        
+        # Check local resources and common paths if not found in bundle or as fallback
+        if self.adb_path == "adb":
+            root = Path(__file__).parent.parent.parent.parent
+            possible_paths = [
+                root / "resources" / "platform-tools" / "adb.exe",
+                root / "resources" / "adb" / "windows" / "adb.exe",
+                root / "assets" / "platform-tools" / "adb.exe",
+                root / "scripts" / "adb.exe",
+            ]
+            
+            for p in possible_paths:
+                if p.exists():
+                    self.adb_path = str(p)
                     break
-                    
-        except Exception as e:
-            yield f"❌ Error: {e}"
-    
-    # ==================== Device Management ====================
-    
-    def get_devices(self) -> List[Tuple[str, DeviceStatus]]:
-        """
-        Get list of connected devices
-        """
-        output = self.execute("devices")
+        
+        # Log resolution
+        print(f"ADBManager: Initialized with adb_path={self.adb_path}")
+            
+        self.current_device = None
+        
+    def select_device(self, serial):
+        self.current_device = serial
+        
+    def get_devices(self):
+        """Get list of connected ADB devices: [(serial, status), ...]"""
         devices = []
-        
-        for line in output.split('\n')[1:]:  # Skip header
-            if '\t' in line:
-                parts = line.split('\t')
-                serial = parts[0].strip()
-                status_str = parts[1].strip()
-                
-                # Map status string to enum
-                if serial.startswith('"') and serial.endswith('"'):
-                    serial = serial.strip('"')
-                
-                status_map = {
-                    'device': DeviceStatus.ONLINE,
-                    'offline': DeviceStatus.OFFLINE,
-                    'unauthorized': DeviceStatus.UNAUTHORIZED,
-                    'bootloader': DeviceStatus.BOOTLOADER,
-                    'recovery': DeviceStatus.RECOVERY,
-                }
-                status = status_map.get(status_str, DeviceStatus.OFFLINE)
-                
-                devices.append((serial, status))
-        
-        return devices
-    
-    def select_device(self, serial: str):
-        """Set current device for operations"""
-        if serial:
-            serial = serial.strip().strip('"').strip("'")
-            
-        if self.current_device != serial:
-            self.current_device = serial
-            # Cache will be invalidated if serial mismatch found in _get_device_properties
-        self.logger.log("ADB", f"Đã chọn thiết bị: {serial}", "info")
-
-    def is_online(self) -> bool:
-        """Check if current device is online and authorized"""
-        if not self.current_device: return False
         try:
-            # Quick check if device is in 'device' state
-            devices = self.get_devices()
-            for s, status in devices:
-                if s == self.current_device and status == DeviceStatus.ONLINE:
-                    return True
+            out = self.execute("devices")
+            lines = out.strip().split('\n')[1:] # Skip header
+            for line in lines:
+                parts = line.split()
+                if len(parts) >= 2:
+                    serial = parts[0]
+                    state_str = parts[1]
+                    
+                    status = DeviceStatus.UNKNOWN
+                    if state_str == 'device':
+                        status = DeviceStatus.ONLINE
+                    elif state_str == 'offline':
+                        status = DeviceStatus.OFFLINE
+                    elif state_str == 'unauthorized':
+                        status = DeviceStatus.UNAUTHORIZED
+                    elif state_str == 'sideloade':
+                        status = DeviceStatus.SIDELOAD
+                    elif state_str == 'recovery':
+                        status = DeviceStatus.RECOVERY
+                        
+                    devices.append((serial, status))
+        except Exception as e:
+            print(f"ADBManager: Error getting devices: {e}")
+            pass
+        return devices
+
+    def get_fastboot_devices(self):
+        """Get list of fastboot devices serials"""
+        devices = []
+        try:
+            # Fastboot uses same adb path? usually fastboot.exe in same folder
+            fastboot_path = self.adb_path.replace("adb.exe", "fastboot.exe").replace("adb", "fastboot")
+            
+            # If default adb used, try default fastboot
+            if "platform-tools" not in fastboot_path and "adb" == self.adb_path:
+                 fastboot_path = "fastboot"
+                 
+            cmd = f'{fastboot_path} devices'
+            
+            # Execute manually since self.execute uses adb_path
+            creation_flags = 0x08000000 if os.name == 'nt' else 0
+            out = subprocess.check_output(
+                cmd, shell=True, stderr=subprocess.STDOUT, 
+                creationflags=creation_flags, encoding='utf-8', errors='replace'
+            ).strip()
+            
+            lines = out.split('\n')
+            for line in lines:
+                parts = line.split()
+                if len(parts) >= 2 and parts[1] == 'fastboot':
+                    devices.append(parts[0])
         except:
              pass
-        return False
-    
-    def get_device_info(self) -> DeviceInfo:
-        """
-        Get comprehensive device information
-        """
-        if not self.current_device:
-            raise RuntimeError("No device selected")
-        
-        # Basic properties
-        props = self._get_device_properties()
-        
-        # Battery info
-        battery = self.get_battery_info()
-        
-        # Storage info
-        storage = self.get_storage_info()
-        
-        # Memory info
-        memory = self.get_memory_info()
-        
-        # Determine connection type
-        conn_type = (ConnectionType.WIRELESS 
-                    if ':' in self.current_device 
-                    else ConnectionType.USB)
-        
-        # Detect HyperOS 3+ or regular HyperOS/MIUI
-        hyperos_ver = props.get('ro.mi.os.version.name')
-        if not hyperos_ver:
-             # Try new HyperOS 3+ properties
-             os_code = props.get('ro.mi.os.version.code')
-             if os_code and os_code.startswith('3'):
-                  hyperos_ver = f"OS3.{props.get('ro.mi.os.version.incremental', '0')}"
-        
-        return DeviceInfo(
-            serial=self.current_device,
-            model=props.get('ro.product.model', 'Unknown'),
-            manufacturer=props.get('ro.product.manufacturer', 'Unknown'),
-            android_version=props.get('ro.build.version.release', 'Unknown'),
-            sdk_version=self.safe_int(props.get('ro.build.version.sdk', '0')),
-            build_id=props.get('ro.build.id', 'Unknown'),
-            connection_type=conn_type,
-            status=DeviceStatus.ONLINE,
-            ip_address=self._get_device_ip(),
-            miui_version=props.get('ro.miui.ui.version.name', None),
-            hyperos_version=hyperos_ver,
-            battery_level=battery.get('level'),
-            storage_used=storage.get('used'),
-            storage_total=storage.get('total'),
-            ram_available=memory.get('available'),
-            ram_total=memory.get('total'),
-        )
-    
-    def get_detailed_system_info(self) -> Dict:
-        """
-        Get detailed system specifications
-        Returns format: {model, board, soc, ram, ...}
-        """
-        # Try primary logic (ADB)
-        try:
-            if not self.get_devices():
-                 # No adb devices, maybe fastboot?
-                 fb_info = self.get_fastboot_system_info()
-                 return fb_info if fb_info else {}
-                 
-            # If devices exist but unexpected error
-            props = self._get_device_properties()
-            if not props:
-                return {}
-                
-            # Kernel Version
-            kernel = self.safe_shell("uname -r")
-            if "Unknown" in kernel or not kernel:
-                proc_ver = self.safe_shell("cat /proc/version")
-                if proc_ver:
-                    parts = proc_ver.split()
-                    if len(parts) > 2:
-                        kernel = parts[2]
-
-            # Baseband
-            baseband = props.get("gsm.version.baseband", "Unknown")
-            
-            # CPU / SoC
-            board = props.get("ro.board.platform", props.get("ro.product.board", "Unknown")).strip()
-            soc_man = self.shell("getprop ro.soc.manufacturer").strip().title()
-            soc_model = self.shell("getprop ro.soc.model").strip().upper()
-            
-            # Hardware field from cpuinfo
-            hardware = ""
-            try:
-                cpu_out = self.shell("cat /proc/cpuinfo")
-                for line in cpu_out.split('\n'):
-                    if "Hardware" in line:
-                         hardware = line.split(":")[1].strip()
-                         break
-            except:
-                pass
-                
-            # Resolve Commercial Name using Database
-            resolved_soc = self._resolve_soc_name(board, soc_model, hardware)
-            if not resolved_soc:
-                 # Fallback logic
-                 if soc_man:
-                     resolved_soc = f"{soc_man} {soc_model if soc_model else board}"
-                 else:
-                     resolved_soc = board.upper()
-
-            # CPU Details
-            cpu_info = self.get_cpu_info()
-            cpu_cores = self.safe_shell("cat /proc/cpuinfo | grep processor | wc -l")
-            
-            # RAM Extended
-            mem_info = self.get_memory_info()
-            
-            # Battery Level
-            battery_level = 0
-            try:
-                # Use exact matching to avoid duration strings (mBatteryLevelUpdateTime)
-                dumpsys_batt = self.shell("dumpsys battery")
-                for line in dumpsys_batt.split('\n'):
-                    if "level:" in line.lower():
-                        parts = line.split(":")
-                        if len(parts) > 1:
-                            battery_level = self.safe_int(parts[1].strip())
-                            break
-            except:
-                pass
-
-            # Storage Info
-            storage_used = "0GB"
-            storage_total = "0GB"
-            storage_percent = 0
-            try:
-                df = self.shell("df -h /data")
-                lines = df.split('\n')
-                if len(lines) > 1:
-                    parts = lines[1].split()
-                    if len(parts) >= 5:
-                        storage_total = parts[1]
-                        storage_used = parts[2]
-                        storage_percent = self.safe_int(parts[4].replace('%', ''))
-            except:
-                pass
-
-            # Security Patch, Screen, OS Version
-            security_patch = props.get("ro.build.version.security_patch", "Unknown")
-            
-            wm_size_out = self.safe_shell("wm size")
-            wm_size = "Unknown"
-            if "Physical size:" in wm_size_out:
-                wm_size = wm_size_out.split("Physical size:")[1].strip()
-
-            wm_density_out = self.safe_shell("wm density")
-            wm_density = "Unknown"
-            if "Physical density:" in wm_density_out:
-                wm_density = wm_density_out.split("Physical density:")[1].strip()
-            
-            hyperos = props.get("ro.mi.os.version.name")
-            if not hyperos:
-                 # Check for HyperOS 3 properties
-                 os_code = props.get('ro.mi.os.version.code')
-                 if os_code and os_code.startswith('3'):
-                      hyperos = f"OS3.{props.get('ro.mi.os.version.incremental', '')}"
-
-            miui = props.get("ro.miui.ui.version.name")
-            build_disp = props.get("ro.build.display.id", "Unknown")
-            
-            if hyperos:
-                os_ver = f"HyperOS {hyperos}"
-            elif miui:
-                os_ver = f"MIUI {miui}"
-            else:
-                os_ver = build_disp
-                
-            # CODENAME / PRODUCT
-            # ro.product.name or ro.build.product often holds the codename
-            device_codename = props.get("ro.product.name", props.get("ro.build.product", "Unknown"))
-            
-            # Resolve friendly device name from database
-            device_friendly = self._resolve_device_name(device_codename)
-
-            return {
-                "model": props.get("ro.product.model", "Unknown"),
-                "device_name": device_codename, # Codename
-                "device_friendly_name": device_friendly if device_friendly else device_codename, # Friendly name from database
-                "manufacturer": props.get("ro.product.manufacturer", "Unknown"),
-                "brand": props.get("ro.product.brand", "Unknown"),
-                "board": board,
-                "soc_manufacturer": soc_man,
-                "soc_model": soc_model,
-                "soc_name": resolved_soc,
-                "os_version": os_ver,
-                "android_version": props.get("ro.build.version.release", "Unknown"),
-                "sdk_version": props.get("ro.build.version.sdk", props.get("ro.build.version.sdk_int", "Unknown")),
-                "security_patch": security_patch,
-                "kernel": kernel,
-                "baseband": baseband,
-                "cpu_cores": cpu_cores,
-                "cpu_freq": f"{max(cpu_info.get('frequencies', [0]))} MHz" if cpu_info.get('frequencies') else "Unknown",
-                "ram_total": f"{mem_info.get('total', 0) / 1024:.1f} GB",
-                "ram_percent": int(mem_info.get('used', 0) / mem_info.get('total', 1) * 100) if mem_info.get('total') else 0,
-                "battery_level": battery_level,
-                "storage_used": storage_used,
-                "storage_total": storage_total,
-                "storage_percent": storage_percent,
-                "build_id": props.get("ro.build.id", "Unknown"),
-                "wm_size": wm_size,
-                "wm_density": wm_density,
-            }
-        except Exception as e:
-            # Logic failed, maybe fastboot fallback?
-            fb = self.get_fastboot_system_info()
-            if fb: return fb
-            
-            print(f"Error getting system info: {e}")
-            return {}
-
-    def _get_device_properties(self) -> Dict[str, str]:
-        """Get device properties via getprop"""
-        if not self.current_device:
-            return {}
-            
-        # Check cache
-        if self._cached_serial == self.current_device and self._prop_cache:
-            return self._prop_cache
-            
-        try:
-            output = self.shell("getprop")
-            props = {}
-            for line in output.split('\n'):
-                # Handle bracketed output [key]: [value]
-                if ']: [' in line:
-                    parts = line.split(']: [')
-                    key = parts[0].replace('[', '').strip()
-                    val = parts[1].replace(']', '').strip()
-                    props[key] = val
-                else:
-                    # Fallback for other formats
-                    match = re.search(r'\[(.*?)\]: \[(.*?)\]', line)
-                    if match:
-                        key, val = match.groups()
-                        props[key] = val
-                    
-            # Update cache
-            self._prop_cache = props
-            self._cached_serial = self.current_device
-            return props
-        except Exception:
-            return {}
-    
-    def _get_device_ip(self) -> Optional[str]:
-        """Get device IP address"""
-        try:
-            output = self.shell("ip addr show wlan0")
-            match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', output)
-            return match.group(1) if match else None
-        except:
-            return None
-    
-    # ==================== Connection Management ====================
-    
-    def connect_wireless(self, ip: str, port: int = 5555) -> bool:
-        """
-        Connect to device via TCP/IP
-        """
-        try:
-            result = self.execute(f"connect {ip}:{port}", timeout=10)
-            return "connected" in result.lower()
-        except Exception:
-            return False
-    
-    
-    def get_language_region_status(self) -> Dict[str, str]:
-        """Get current language and region settings"""
-        props = self._get_device_properties()
-        return {
-            "Active Locale (persist.sys.locale)": props.get("persist.sys.locale", "Not Set"),
-            "Factory Locale (ro.product.locale)": props.get("ro.product.locale", "Unknown"),
-            "Region (persist.sys.country)": props.get("persist.sys.country", "Unknown"),
-            "MIUI Region (ro.miui.region)": props.get("ro.miui.region", "Unknown"),
-            "Time Format (system)": self.shell("settings get system time_12_24").strip(),
-            "Timezone (persist.sys.timezone)": props.get("persist.sys.timezone", "Unknown"),
-        }
-    
-    def disconnect_wireless(self, ip: str, port: int = 5555) -> bool:
-        """Disconnect wireless connection"""
-        try:
-            result = self.execute(f"disconnect {ip}:{port}", timeout=5)
-            return "disconnected" in result.lower()
-        except Exception:
-            return False
-    
-    def enable_wireless_adb(self, port: int = 5555) -> bool:
-        """
-        Enable wireless ADB on USB-connected device
-        """
-        try:
-            self.shell(f"setprop service.adb.tcp.port {port}")
-            self.shell("stop adbd")
-            self.shell("start adbd")
-            time.sleep(2)
-            return True
-        except Exception:
-            return False
-    
-    def set_system_setting(self, namespace: str, key: str, value: str) -> bool:
-        """
-        Set system setting via settings put
-        Args:
-            namespace: system, secure, or global
-            key: setting key
-            value: setting value
-        """
-        try:
-            # Quote value if it contains spaces
-            if " " in value:
-                value = f'"{value}"'
-            self.shell(f"settings put {namespace} {key} {value}")
-            return True
-        except Exception as e:
-            LogManager.log("ADB Error", f"Failed to set setting: {e}", "error")
-            return False
-
-    def set_prop(self, key: str, value: str) -> bool:
-        """Set system property"""
-        try:
-            self.shell(f"setprop {key} {value}")
-            return True
-        except Exception:
-            return False
-
-    def grant_permission(self, package: str, permission: str) -> bool:
-        """Grant permission to package"""
-        try:
-            result = self.shell(f"pm grant {package} {permission}")
-            return "error" not in result.lower()
-        except:
-            return False
-
-    def get_battery_info(self) -> Dict:
-        """
-        Get battery information
-        """
-        output = self.shell("dumpsys battery")
-        info = {
-            'level': None,
-            'status': None,
-            'health': None,
-            'temperature': None,
-            'voltage': None,
-            'technology': None,
-        }
-        
-        for line in output.split('\n'):
-            line = line.strip()
-            if ':' in line:
-                key, value = [x.strip() for x in line.split(':', 1)]
-                key_lower = key.lower()
-                
-                # Precise matching for key to avoid duration strings like mBatteryLevelUpdateTime
-                if key_lower == 'level':
-                    info['level'] = self.safe_int(value)
-                elif key_lower == 'status':
-                    info['status'] = value
-                elif key_lower == 'health':
-                    info['health'] = value
-                elif key_lower == 'temperature':
-                    info['temperature'] = self.safe_int(value) / 10  # Convert to Celsius
-                elif key_lower == 'voltage':
-                    info['voltage'] = self.safe_int(value) / 1000  # Convert to V
-                elif key_lower == 'technology':
-                    info['technology'] = value
-        
-        return info
-    
-    def get_storage_info(self) -> Dict:
-        """
-        Get storage information
-        """
-        info = {'total': 0, 'used': 0, 'free': 0}
-        try:
-            output = self.shell("df /data")
-            lines = output.split('\n')
-            if len(lines) > 1:
-                parts = lines[1].split()
-                if len(parts) >= 4:
-                    # df output is usually in 1K blocks
-                    info['total'] = self.safe_int(parts[1]) * 1024
-                    info['used'] = self.safe_int(parts[2]) * 1024
-                    info['free'] = self.safe_int(parts[3]) * 1024
-        except:
-            pass
-        return info
-
-    def get_memory_info(self) -> Dict:
-        """
-        Get memory (RAM) information
-        
-        Returns:
-            Dict with keys: total, available, cached (in MB)
-        """
-        output = self.shell("cat /proc/meminfo")
-        info = {'total': 0, 'available': 0, 'cached': 0}
-        
-        for line in output.split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                key = key.strip()
-                value = value.strip().split()[0]  # Get number only
-                
-                try:
-                    value_kb = int(value)
-                    if 'MemTotal' in key:
-                        info['total'] = value_kb // 1024
-                    elif 'MemAvailable' in key:
-                        info['available'] = value_kb // 1024
-                    elif 'Cached' in key:
-                        info['cached'] = value_kb // 1024
-                except:
-                    pass
-        
-        # Round total to nearest standard size (4GB, 6GB, 8GB, 12GB etc)
-        # to look nicer on UI
-        standard_sizes = [
-            1024, 2048, 3072, 4096, 6144, 8192, 10240, 
-            12288, 16384, 18432, 24576, 32768
-        ]
-        
-        current_mb = info['total']
-        for size in standard_sizes:
-            if size >= current_mb:
-                # Only upgrade if it's within reasonable range (e.g. > 80% of target)
-                # To avoid mapping a weird 5GB virtual setup to 6GB?
-                # But for physical devices, simply finding the next bucket is usually correct.
-                info['total'] = size
-                break
-                
-        return info
-    
-    def get_cpu_info(self) -> Dict:
-        """
-        Get CPU information
-        """
-        info = {'cores': 0, 'frequencies': []}
-        try:
-            # Count cores
-            output = self.shell("cat /proc/cpuinfo")
-            info['cores'] = output.count("processor")
-            
-            # Get max frequencies
-            # Requires root usually to read scaling_max_freq for all, but try anyway
-            freqs = []
-            for i in range(info['cores']):
-                try:
-                    # check=False and log_error=False to prevent permission denied error dialogs
-                    freq = self.shell(f"cat /sys/devices/system/cpu/cpu{i}/cpufreq/scaling_max_freq", check=False, log_error=False).strip()
-                    if freq.isdigit():
-                        freqs.append(int(freq) // 1000) # Convert to MHz
-                except:
-                    pass
-            info['frequencies'] = freqs
-        except:
-            pass
-        return info
-        
-    def _resolve_soc_name(self, board, soc_model, hardware):
-        """Map internal board codenames/models to commercial SoC names"""
-        board = board.lower().strip()
-        soc_model = soc_model.upper().strip()
-        hardware = hardware.lower().strip()
-        
-        # Priority 1: Direct SoC Model mapping (SMxxxx)
-        if soc_model:
-             if soc_model.lower() in self.soc_mappings:
-                 return self.soc_mappings[soc_model.lower()]
-             # Try without suffix maybe? No, json has exact keys.
-             
-        # Priority 2: Board Codename mapping (lisa, alioth)
-        if board in self.soc_mappings:
-            return self.soc_mappings[board]
-            
-        # Priority 3: Hardware string (qcom, mt67xx)
-        if hardware in self.soc_mappings:
-            return self.soc_mappings[hardware]
-            
-        # Partial matches for Hardware
-        if hardware:
-            if "mt" in hardware or "dimensity" in hardware:
-                return f"MediaTek {hardware.title()}"
-            if "sm" in hardware or "sd" in hardware:
-                return f"Snapdragon {hardware.upper()}"
-        
-        # Fallback
-        if soc_model:
-            return f"Snapdragon {soc_model}" if "SM" in soc_model else soc_model
-            
-        return None
-
-    def _resolve_device_name(self, codename):
-        """Map codename to commercial device name"""
-        if not codename:
-            return None
-            
-        codename = codename.lower().strip()
-        
-        # Direct lookup from device_mappings
-        if hasattr(self, 'device_mappings') and codename in self.device_mappings:
-            return self.device_mappings[codename]
-        
-        return None
-
-    # ==================== Fastboot & Power ====================
-
-    def reboot(self, mode: str = "normal"):
-        """
-        Reboot device
-        Args:
-            mode: 'normal', 'bootloader', 'recovery', 'fastbootd', 'edl'
-        """
-        cmd = "reboot"
-        if mode == "bootloader":
-            cmd += " bootloader"
-        elif mode == "recovery":
-            cmd += " recovery"
-        elif mode == "fastbootd":
-            cmd += " fastboot"
-        elif mode == "edl":
-            self.shell("reboot edl") # Some devices support this via shell
-            return
-            
-        LogManager.log("Reboot", f"Đang khởi động lại ({mode})...", "info")
-        self.execute(cmd, check=False)
-
-    def shutdown(self):
-        """Shutdown device"""
-        LogManager.log("Shutdown", "Đang tắt nguồn thiết bị...", "info")
-        self.shell("reboot -p", check=False)
-
-    def fastboot_command(self, command: str) -> str:
-        """Execute fastboot command"""
-        # Assume fastboot is in the same dir as adb or in PATH
-        fastboot_path = self.adb_path.replace("adb.exe", "fastboot.exe").replace("adb", "fastboot")
-        if not os.path.exists(fastboot_path):
-            fastboot_path = "fastboot"
-            
-        try:
-            result = subprocess.run(
-                f'"{fastboot_path}" {command}',
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            return result.stdout.strip() + result.stderr.strip()
-        except Exception as e:
-            return str(e)
-    
-    def get_fastboot_devices(self) -> List[str]:
-        """Get devices in fastboot mode"""
-        output = self.fastboot_command("devices")
-        devices = []
-        devices = []
-        for line in output.split('\n'):
-            if 'fastboot' in line:
-                serial = line.split()[0].strip().strip('"').strip("'")
-                devices.append(serial)
         return devices
 
-    def fastboot_reboot(self):
-        """Reboot from Fastboot to System"""
-        return self.fastboot_command("reboot")
-        
-    def fastboot_bootloader(self):
-        """Reboot from Fastboot to Bootloader"""
-        return self.fastboot_command("reboot-bootloader")
-        
-    def fastboot_reboot_recovery(self):
-        """Reboot from Fastboot to Recovery"""
-        # Try standard command first, then some oem fallbacks if needed
-        return self.fastboot_command("reboot recovery")
-        
-    def fastboot_reboot_fastbootd(self):
-        """Reboot from Fastboot to FastbootD"""
-        return self.fastboot_command("reboot fastboot")
-        
-    def fastboot_reboot_edl(self):
-        """Reboot from Fastboot to EDL"""
-        return self.fastboot_command("oem edl")
+    def check_connection(self):
+        """Auto-select first device if none selected"""
+        if self.current_device: return True
+        devices = self.get_devices()
+        if devices:
+            self.current_device = devices[0][0]
+            return True
+        return False
 
-
-    def fastboot_unlock_frp(self) -> str:
-        """
-        Unlock FRP (Factory Reset Protection)
-        Uses 'fastboot erase frp' and 'fastboot erase config'
-        """
-        log = []
-        
-        # 0. Check connection
-        devices = self.get_fastboot_devices()
-        if not devices:
-            return "❌ Lỗi: Không tìm thấy thiết bị Fastboot!"
+    def execute(self, command):
+        """Execute ADB command (host side)"""
+        if isinstance(command, list):
+            cmd_list = [f'"{self.adb_path}"'] + command
+        else:
+            cmd_list = f'"{self.adb_path}" {command}'
             
-        log.append(f"📱 Tìm thấy thiết bị: {devices[0]}")
-        
-        # 1. Erase FRP
-        log.append("▶️ Thực thi: fastboot erase frp")
-        res_frp = self.fastboot_command("erase frp")
-        log.append(res_frp if res_frp else "OK")
-        
-        # 2. Erase Config (Xiaomi workaround)
-        log.append("▶️ Thực thi: fastboot erase config")
-        res_config = self.fastboot_command("erase config")
-        log.append(res_config if res_config else "OK")
-        
-        log.append("\n✅ Đã gửi lệnh mở khóa FRP.")
-        return "\n".join(log)
+        try:
+            # Use shell=True for string command
+            use_shell = isinstance(command, str)
+            return subprocess.check_output(
+                cmd_list, 
+                shell=use_shell,
+                stderr=subprocess.STDOUT, 
+                creationflags=0x08000000 if os.name == 'nt' else 0,
+                encoding='utf-8',
+                errors='replace'
+            ).strip()
+        except subprocess.CalledProcessError as e:
+            return e.output.strip()
+        except Exception as e:
+            return f"Error: {e}"
 
-    def clean_capacity(self, val: int) -> int:
-        """Logic to normalize uAh/tens-uAh to mAh"""
-        if val > 20000: 
-            if val > 1000000: # e.g. 4000000 -> 4000
-                val //= 1000
-            elif val > 100000: # e.g. 400000 -> 4000
-                val //= 100
-            else: # e.g. 40000 -> 4000
-                val //= 10
-        return val
+    def shell(self, command, *args, **kwargs):
+        """Execute ADB Shell command"""
+        if not self.current_device:
+            return "Error: No device connected"
+        return self.execute(f"-s {self.current_device} shell {command}")
+        
+    def run_adb(self, args):
+        """Run raw adb command with args list"""
+        return self.execute(args)
 
-    def get_battery_health(self) -> Dict:
-        """
-        Refactored implementation of get_battery_health
-        Using known device database for Design Capacity to avoid parsing errors.
-        """
-        
-        # Database of Design Capacities (mAh)
-        KNOWN_CAPACITIES = {
-            "lisa": 4250,      # Mi 11 Lite 5G NE
-            "renoir": 4250,    # Mi 11 Lite 5G
-            "courbet": 4250,   # Mi 11 Lite 4G
-            "alioth": 4520,    # Poco F3 / K40
-            "munch": 4500,     # Poco F4 / K40S
-            "marble": 5000,    # Poco F5
-            "mondrian": 5160,  # Poco F5 Pro
-            "haydn": 4520,     # Mi 11i / K40 Pro
-            "star": 4600,      # Mi 11 Ultra
-            "venus": 4600,     # Mi 11
-            "thyme": 4600,     # Mi 10S
-            "umi": 4780,       # Mi 10
-            "cmi": 4780,       # Mi 10 Pro
-            "cas": 4500,       # Mi 10 Ultra
-            "apollo": 5000,    # Mi 10T / Pro
-            "vayu": 5160,      # Poco X3 Pro
-            "surya": 5160,     # Poco X3 NFC
-            "sweet": 5020,     # Redmi Note 10 Pro
-            "mojito": 5000,    # Redmi Note 10
-            "sunny": 5000,     # Redmi Note 10S
-            "pissarro": 4500,  # Redmi Note 11 Pro+
-            "veux": 5000,      # Redmi Note 11 Pro 5G
-            "fleur": 5000,     # Redmi Note 11S
-            "spes": 5000,      # Redmi Note 11
-            "ruby": 5000,      # Redmi Note 12 Pro / + / Discovery
-            "tapas": 5000,     # Redmi Note 12
-            "garnet": 5100,    # Redmi Note 13 Pro 5G
-            "zircon": 5000,    # Redmi Note 13 Pro+
-            "gold": 5000,      # Redmi Note 13
-            # Tablets
-            "nabu": 8720,      # Pad 5
-            "pipa": 8840,      # Pad 6
-            "yudi": 10000,     # Pad 6 Pro/Max
-        }
+    def connect_wireless(self, ip, port=5555):
+        res = self.execute(f"connect {ip}:{port}")
+        if "connected to" in res:
+            self.current_device = f"{ip}:{port}"
+            return True
+        return False
 
-        info = {
-            "charge_full": 0,         # Real Full Capacity
-            "charge_full_design": 0,  # Design Capacity
-            "charge_current": 0,      # Current Charge stored
-            "cycle_count": 0,
-            "health_percent": 0,
-            "technology": "Unknown",
-            "wear_level_percent": 0,
-            "status": "Unknown",
-            "level": 0,
-            "scale": 100,
-            "voltage": 0,
-            "temperature": 0,
-            "debug_log": "",
-            "is_estimated": False
-        }
+    def enable_wireless_adb(self):
+        if not self.current_device: return False
+        res = self.execute(f"-s {self.current_device} tcpip 5555")
+        return "restarting in TCP mode port: 5555" in res or not res.strip()
         
-        log = []
+    def reboot(self, mode=""):
+        """Reboot device. Mode: 'bootloader', 'recovery', or empty for normal."""
+        return self.execute(f"-s {self.current_device} reboot {mode}".strip())
         
-        log = []
+    def toggle_screen(self):
+        """Toggle screen power (Power Button)"""
+        return self.shell("input keyevent 26")
+        
+    def is_online(self):
+        return self.current_device is not None
+        
+    def get_detailed_system_info(self):
+        """Fetch detailed device info (aggregated)"""
+        info = {}
+        if not self.is_online(): return info
         
         try:
-            # 0. Identify Device
-            codename = "unknown"
-            try:
-                codename = self.shell("getprop ro.product.name").strip()
-                if not codename: codename = self.shell("getprop ro.build.product").strip()
-            except: pass
-            
-            # --- Method 1: Dumpsys Battery (Basics) ---
-            dumpsys = self.shell("dumpsys battery")
-            log.append(f"--- Dumpsys Battery ---\n{dumpsys}")
-            
-            for line in dumpsys.split('\n'):
-                if ':' not in line: continue
-                k, v = [x.strip() for x in line.split(':', 1)]
-                
-                if k == "status":
-                    status_map = {"1": "Unknown", "2": "Charging", "3": "Discharging", "4": "Not charging", "5": "Full"}
-                    info["status"] = status_map.get(v, v)
-                elif k == "level": info["level"] = self.safe_int(v)
-                elif k == "scale": info["scale"] = self.safe_int(v, 100)
-                elif k == "voltage": info["voltage"] = self.safe_int(v) / 1000.0 # to Volts
-                elif k == "temperature": info["temperature"] = self.safe_int(v) / 10.0
-                elif k == "technology": info["technology"] = v
-            
-            # Extract Charge Counter
-            match_cc = re.search(r"Charge counter: (\d+)", dumpsys)
-            if match_cc:
-                # Charge counter is usually in uAh
-                cc = self.safe_int(match_cc.group(1))
-                info["charge_current"] = self.clean_capacity(cc)
-
-            # --- Method 2: Dumpsys Batterystats (Design Capacity) ---
-            try:
-                stats = self.shell("dumpsys batterystats")
-                match_cap = re.search(r"Capacity: (\d+)", stats)
-                if match_cap:
-                    info["charge_full_design"] = self.safe_int(match_cap.group(1))
-                    log.append(f"Found Design Capacity in stats: {info['charge_full_design']}")
-            except Exception as e:
-                log.append(f"Batterystats Error: {e}")
-
-            # --- Method 3: SysFS Scan (Real Capacity) ---
-            log.append("\n--- SysFS Scan ---")
-            paths = [
-                "/sys/class/power_supply/battery/",
-                "/sys/class/power_supply/bms/", 
-                "/sys/class/power_supply/main/"
-            ]
-            
-            node_map = {
-                "charge_full": ["charge_full", "energy_full", "batt_capacity_mah"], 
-                "charge_full_design": ["charge_full_design", "energy_full_design", "batt_capacity_design_mah"],
-                "cycle_count": ["cycle_count", "batt_cycle_count"]
-            }
-            
-            for path in paths:
-                for key, filenames in node_map.items():
-                    if info[key] > 0 and key != 'cycle_count': continue # Keep scanning cycles if needed
+            # 1. Props
+            props = self.shell("getprop")
+            for line in props.split('\n'):
+                if ': [' in line:
+                    parts = line.split(': [')
+                    if len(parts) >= 2:
+                        key = parts[0].strip('[] ')
+                        val = parts[1].strip('[] ')
                     
-                    for fname in filenames:
-                        # Use check=False and log_error=False to prevent permission denied errors
-                        val_str = self.shell(f"cat {path}{fname}", check=False, log_error=False).strip()
-                        if val_str and val_str[0].isdigit():
-                            log.append(f"Read {path}{fname} => {val_str}")
-                            raw_val = safe_int(val_str)
-                            
-                            if key in ["charge_full", "charge_full_design"]:
-                                val_cleaned = clean_capacity(raw_val)
-                                if info[key] == 0: info[key] = val_cleaned
-                            else:
-                                info[key] = raw_val
+                        if key == 'ro.product.model': info['model'] = val
+                        elif key == 'ro.product.name': info['device_name'] = val
+                        elif key == 'ro.product.board': info['board'] = val
+                        elif key == 'ro.build.id': info['build_id'] = val
+                        elif key == 'ro.build.version.release': info['android_version'] = val
+                        elif key == 'ro.build.version.security_patch': info['security_patch'] = val
+                        elif key == 'ro.product.manufacturer': info['manufacturer'] = val
+                        elif key == 'ro.miui.ui.version.name': info['os_version'] = f"HyperOS {val}" if "816" in val or "1.0" in val else f"MIUI {val}"
+                        elif key == 'ro.kernel.version': info['kernel'] = val
             
-            # --- Method 4: Logic Estimation & Calculation ---
+            # Friendly Name & SoC
+            brand = info.get('manufacturer', 'Xiaomi')
+            model = info.get('model', 'Device')
+            info['device_friendly_name'] = f"{brand} {model}"
             
-            # Fallback 1: Use KNOWN database for Design Capacity
-            # This is authoritative if available
-            short_code = codename.split('_')[0] # handle 'lisa_global' etc
-            if short_code in KNOWN_CAPACITIES:
-                info["charge_full_design"] = KNOWN_CAPACITIES[short_code]
-                log.append(f"Using Database Design Capacity for {short_code}: {info['charge_full_design']}")
+            # SoC Logic (Simple mapping)
+            board = info.get('board', '').lower()
+            if board == 'lisa': info['soc_name'] = 'Snapdragon 778G'
+            elif board == 'taro': info['soc_name'] = 'Snapdragon 8 Gen 1'
+            elif board == 'kalama': info['soc_name'] = 'Snapdragon 8 Gen 2'
+            elif board == 'pineapple': info['soc_name'] = 'Snapdragon 8 Gen 3'
+            elif board == 'alioth': info['soc_name'] = 'Snapdragon 870'
+            elif board == 'vayu': info['soc_name'] = 'Snapdragon 860'
+            elif board == 'courbet': info['soc_name'] = 'Snapdragon 732G'
+            elif board == 'sweet': info['soc_name'] = 'Snapdragon 732G'
+            else: info['soc_name'] = board
             
-            # Fallback 2: getprop
-            if info["charge_full_design"] == 0:
-                prop = self.shell("getprop ro.boot.battery.capacity").strip()
-                if prop.isdigit(): info["charge_full_design"] = clean_capacity(safe_int(prop))
+            # 2. Battery
+            batt = self.get_battery_info()
+            info.update(batt)
+            info['battery_level'] = batt.get('level', 0)
 
-            # Fallback 3: Real Capacity Estimation
-            # If we know Current Charge (mAh) and Level (%)
-            if info["charge_full"] == 0 and info["charge_current"] > 0 and info["level"] > 0:
-                # e.g. 2000 mAh at 50% -> 4000 mAh total
-                est = int(info["charge_current"] / (info["level"] / 100.0))
-                info["charge_full"] = est
-                info["is_estimated"] = True
-                log.append(f"Estimated Full Capacity: {est}")
-
-            # --- SANITY CHECK: Real vs Design ---
-            # If Real is much larger than Design, it's likely a scaling issue (uAh vs mAh)
-            # e.g. Design 4250, Real 391100 -> needs /100 -> 3911
-            cf = info["charge_full"]
-            cfd = info["charge_full_design"]
+            # 3. Storage
+            store = self.get_storage_info()
+            info.update(store)
+            # Format storage
+            total_gb = store.get('total', 0) / (1024**3)
+            info['storage_total'] = f"{total_gb:.0f}GB"
             
-            if cfd > 0 and cf > cfd * 1.5:
-                log.append(f"Detected huge mismatch: Real {cf} vs Design {cfd}. Attempting rescale.")
-                # Try simple divisors
-                if cf > 1000000 and (cf / 1000) < (cfd * 1.2):
-                    info["charge_full"] = int(cf / 1000)
-                    log.append(f"Rescaled by 1000 -> {info['charge_full']}")
-                elif (cf / 100) < (cfd * 1.2):
-                    info["charge_full"] = int(cf / 100)
-                    log.append(f"Rescaled by 100 -> {info['charge_full']}")
-                elif (cf / 10) < (cfd * 1.2):
-                    info["charge_full"] = int(cf / 10)
-                    log.append(f"Rescaled by 10 -> {info['charge_full']}")
-                else:
-                    log.append("Could not auto-rescale safely.")
-
-            # Calculate Health
-            if info["charge_full"] > 0 and info["charge_full_design"] > 0:
-                health = (info["charge_full"] / info["charge_full_design"]) * 100
-                info["health_percent"] = round(health, 1) # Decimal for precision
-                info["wear_level_percent"] = max(0, 100 - health) # Don't round yet for cleaner display? 
-                # UI expects ints mostly but float is fine
-                info["health_percent"] = int(health)
-                info["wear_level_percent"] = max(0, 100 - int(health))
+            # 4. Memory/RAM
+            mem = self.get_memory_info()
+            info.update(mem)
             
-            info["debug_log"] = "\n".join(log)
-            
-        except Exception as e:
-            print(f"Battery Health Error: {e}")
-            info["debug_log"] += f"\nCritical Error: {e}"
-            
+        except Exception as e: 
+            print(f"Error getting system info: {e}")
+            pass
         return info
 
-
-
-    # ==================== Xiaomi Optimization ====================
-
-    def disable_package(self, package_name: str) -> bool:
-        """Disable a package"""
+    def get_memory_info(self):
+        """Get RAM info from /proc/meminfo (Python parsing)"""
+        info = {'ram_total': '0GB', 'ram_free': '0GB'}
         try:
-            result = self.shell(f"pm disable-user --user 0 {package_name}")
-            success = "disabled" in result.lower() or "new state" in result.lower()
-            if success:
-                LogManager.log("Disable App", f"Đã tắt ứng dụng: {package_name}", "success")
-            return success
-        except:
-            return False
-
-    def enable_package(self, package_name: str) -> bool:
-        """Enable a package"""
-        try:
-            result = self.shell(f"pm enable {package_name}")
-            success = "enabled" in result.lower() or "new state" in result.lower()
-            if success:
-                LogManager.log("Enable App", f"Đã bật ứng dụng: {package_name}", "success")
-            return success
-        except:
-            return False
-
-    def uninstall_package(self, package_name: str) -> bool:
-        """Uninstall a package for user 0"""
-        try:
-            result = self.shell(f"pm uninstall --user 0 {package_name}")
-            success = "success" in result.lower()
-            if success:
-                LogManager.log("Uninstall App", f"Đã gỡ bỏ: {package_name}", "success")
-            return success
-        except:
-            return False
-
-    def set_system_property(self, key: str, value: str):
-        """Set a system property (might require root or specific permissions)"""
-        self.shell(f"setprop {key} {value}")
-
-    def optimize_animations(self, scale: float = 0.5):
-        """Set animation scales"""
-        self.shell(f"settings put global window_animation_scale {scale}")
-        self.shell(f"settings put global transition_animation_scale {scale}")
-        self.shell(f"settings put global animator_duration_scale {scale}")
-
-    def apply_smart_blur(self) -> str:
-        """
-        Auto-configure Control Center Blur based on device specs.
-        """
-        try:
-            # Check RAM
-            mem = self.get_memory_info()
-            total_ram_mb = mem.get('total', 0)
+            # Read file directly without grep to avoid pipe issues on Windows
+            out = self.shell("cat /proc/meminfo")
+            total = 0
+            free = 0
+            available = 0
             
-            # Threshold: 6GB = 6144MB
-            # If > 6GB, use Max settings. Else use Balanced.
-            if total_ram_mb >= 6000:
-                mode = "Max Performance (v:1,c:3,g:3)"
-                val = "v:1,c:3,g:3"
-                desc = "Đã kích hoạt Blur mức cao nhất cho máy cấu hình mạnh."
-            else:
-                mode = "Balanced (v:1,c:2,g:2)"
-                val = "v:1,c:2,g:2"
-                desc = "Đã kích hoạt Blur mức tối ưu cho máy cấu hình trung bình."
+            for line in out.split('\n'):
+                parts = line.split(':')
+                if len(parts) < 2: continue
                 
-            self.shell(f"settings put global deviceLevelList {val}")
-            # Extra properties for HyperOS 3/Android 16 blur
-            self.shell("settings put global blur_enable 1", check=False)
-            self.shell("settings put global miui_recents_container_type 1", check=False) # Enable blur in recents
+                key = parts[0].strip()
+                val_str = parts[1].strip().split(' ')[0] # 'MemTotal: 12345 kB'
+                if not val_str.isdigit(): continue
+                val = int(val_str) # kB
+                
+                if key == 'MemTotal': total = val
+                elif key == 'MemFree': free = val
+                elif key == 'MemAvailable': available = val
             
-            LogManager.log("Smart Blur", f"Applied {mode}", "success")
-            return f"{desc}\n(Mode: {mode})"
+            # Convert to GB
+            if total > 0:
+                # Round to nearest standard RAM size (4, 6, 8, 12, 16)
+                total_gb_real = total / (1024 * 1024)
+                standard_sizes = [4, 6, 8, 12, 16, 24, 32]
+                closest = min(standard_sizes, key=lambda x: abs(x - total_gb_real))
+                info['ram_total'] = f"{closest}GB"
+                
+            info['ram_raw_total'] = total
+            info['ram_raw_free'] = available if available > 0 else free
             
-        except Exception as e:
-            return f"Lỗi: {e}"
+        except: pass
+        return info
 
-    def disable_msa(self) -> bool:
-        """Disable MIUI System Ads (Using uninstall for Android 16 compatibility)"""
-        return self.uninstall_package("com.miui.msa.global")
-
-    def disable_analytics(self) -> bool:
-        """Disable MIUI Analytics (Using uninstall for Android 16 compatibility)"""
-        return self.uninstall_package("com.miui.analytics")
-
-    # ==================== System Cleaner ====================
-
-    def clean_app_cache(self) -> str:
-        """
-        Clean app caches using trim-caches.
-        Frees up space by deleting non-essential cache files.
-        """
+    def get_storage_info(self):
+        """Get storage usage: {'total': bytes, 'used': bytes, 'free': bytes}"""
+        info = {'total': 0, 'used': 0, 'free': 0}
+        if not self.is_online(): return info
         try:
-            # 256G is a target free space, forcing Android to trim caches to reach it.
-            # It won't delete data, just caches.
-            result = self.shell("pm trim-caches 256g")
-            msg = "✅ Đã gửi lệnh dọn dẹp Cache"
-            LogManager.log("Cleaner", msg, "success")
-            return msg
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
+            # df returns 1K blocks
+            out = self.shell("df /data")
+            lines = out.strip().split('\n')
+            # Look for the line mounted on /data (or contains /data)
+            # Some devices output multiple lines or wrapping
+            target_line = None
+            for line in lines:
+                parts = line.split()
+                if len(parts) >= 4:
+                     if "/data" in line:
+                         target_line = line
+                         break
+                     elif "/storage" in line and not target_line:
+                         target_line = line
+            
+            # Fallback: if no specific match, take the first non-header line
+            if not target_line and len(lines) > 1 and "Filesystem" not in lines[-1]:
+                 # Check last line (often the result) or second line
+                 # Debug output showed data on line 1 (index 1)
+                 if "Filesystem" in lines[0] and len(lines) >= 2:
+                     target_line = lines[1]
 
-    def clean_obsolete_dex(self) -> str:
-        """
-        Prune obsolete dex files (prune-dex-opt).
-        Removes odex files for apps that no longer exist or are updated.
-        """
-        try:
-            # check=False prevents raising exception on failure
-            result = self.shell("cmd package prune-dex-opt", check=False)
-            msg = "✅ Đã dọn dẹp Dex lỗi thời"
-            LogManager.log("Cleaner", msg, "success")
-            return msg
-        except Exception as e:
-            # Just ignore if failed, likely not supported or permission denied
-            return f"⚠️ Bỏ qua Dex Opt"
+            if target_line:
+                 parts = target_line.split()
+                 nums = [x for x in parts if x.isdigit()]
+                 if len(nums) >= 3:
+                     try:
+                         # parts logic varies if filesystem name is long. 
+                         # Reliable way: last part is mount, 2nd last is %, 3rd last is Avail, 4th last is Used, 5th last is Total (1K-blocks)
+                         # Filesystem 1K-blocks Used Available Use% Mounted on
+                         
+                         # Reverse indexing is safer against long filesystem paths with spaces (though rare for block devices)
+                         # But parts are split by space.
+                         
+                         # Let's try standard index first
+                         t = int(parts[1]) * 1024
+                         u = int(parts[2]) * 1024
+                         a = int(parts[3]) * 1024
+                         
+                         info['total'] = t
+                         info['used'] = u
+                         info['free'] = a
+                     except:
+                         pass
+        except: pass
+        return info
+        
+    def screenshot(self, filename="screenshot.png"):
+        self.shell(f"screencap -p /sdcard/{filename}")
+        self.execute(f"-s {self.current_device} pull /sdcard/{filename} .")
+        self.shell(f"rm /sdcard/{filename}")
+        
+    def shutdown(self):
+        return self.shell("reboot -p")
+        
+    def fastboot_reboot(self):
+        return self.execute("reboot") # fastboot command
+        
+    def fastboot_reboot_recovery(self):
+        # fastboot oem reboot-recovery or generic
+        return self.execute("oem reboot-recovery")
+        
+    def fastboot_reboot_fastbootd(self):
+        return self.execute("reboot fastboot")
+        
+    def fastboot_reboot_edl(self):
+        return self.execute("oem edl")
 
-    def clean_messenger_data(self) -> str:
-        """
-        Clean Telegram/Nekogram cache.
-        Warning: This deletes cache folders.
-        """
+    def get_battery_info(self):
+        """Get dumpsys battery info as dict"""
+        info = {}
+        if not self.is_online(): return info
+        
         try:
-            targets = [
-                "/sdcard/Telegram/Telegram Images",
-                "/sdcard/Telegram/Telegram Video",
-                "/sdcard/Telegram/Telegram Audio",
-                "/sdcard/Telegram/Telegram Documents",
-                "/sdcard/Android/data/org.telegram.messenger/cache",
-                "/sdcard/Android/data/tw.nekomimi.nekogram/cache"
+            cmd = "dumpsys battery"
+            output = self.shell(cmd)
+            
+            if "Error" in output or not output: return info
+            
+            # Parse basic fields
+            for line in output.split('\n'):
+                line = line.strip()
+                if ': ' in line:
+                    key, val = line.split(': ', 1)
+                    if key == 'level': info['level'] = int(val)
+                    elif key == 'status': 
+                        info['status_code'] = int(val)
+                        status_map = {1: "Unknown", 2: "Charging", 3: "Discharging", 4: "Not charging", 5: "Full"}
+                        info['status'] = status_map.get(int(val), "Unknown")
+                    elif key == 'health': info['health'] = int(val)
+                    elif key == 'voltage': info['voltage'] = int(val)
+                    elif key == 'temperature': info['temperature'] = int(val)
+                    elif key == 'technology': info['technology'] = val
+                    elif key == 'Charge counter': 
+                        # Xiaomi specific: 394600000 -> 3946 mAh
+                        try:
+                            c = int(val)
+                            # Heuristic: If > 10M, assume it needs scaling
+                            # User case: 394,600,000 uAh / 100,000 = 3946 mAh
+                            if c > 10000000:
+                                info['charge_full'] = int(c / 100000)
+                            else:
+                                info['charge_full'] = int(c / 1000) # Normal uAh
+                        except: pass
+
+            # Design Capacity Lookup (Xiaomi)
+            design_map = {
+                "lisa": 4250, "renoir": 4250, "courbet": 4250, "2107119DC": 4250, # Mi 11 Lite Series
+                "sweet": 5020, "vayu": 5160, "alioth": 4520, "munch": 4500,
+                "marble": 5000, "mondrian": 5160, "fuxi": 4500, "nuwa": 4820,
+                "socrates": 6000, "ishtar": 5000
+            }
+            
+            # Try to find match
+            # We need model or board. We can assume get_detailed_system_info called props, 
+            # OR we check adb shell getprop quickly.
+            # But making another shell call here might slow things down.
+            # Let's do a quick lazy check if 'charge_full' is present but design is missing
+            if 'charge_full' in info:
+                # We have real capacity, need design to calc health
+                try:
+                   board = self.shell("getprop ro.product.board").strip()
+                   cap = design_map.get(board)
+                   if not cap:
+                       model = self.shell("getprop ro.product.model").strip()
+                       cap = design_map.get(model)
+                   
+                   if cap:
+                       info['charge_full_design'] = cap
+                except: pass
+                
+        except Exception as e:
+            print(f"Error getting battery info: {e}")
+        return info
+
+    def get_battery_health(self):
+        """Get advanced health info from kernel files"""
+        info = self.get_battery_info()
+        
+        # Try to read kernel nodes for more accurate capacity
+        # Charge Full (uc)
+        try:
+            # Common paths
+            paths = [
+                "/sys/class/power_supply/battery/charge_full",
+                "/sys/class/power_supply/bms/charge_full",
+                "/sys/class/power_supply/battery/charge_full_design", # For design
             ]
             
-            count = 0
-            for path in targets:
-                # Check if exists first to avoid scary errors? rm -rf is silent usually.
-                self.shell(f"rm -rf \"{path}\"")
-                count += 1
+            # Read real capacity
+            real_cap = self.shell("cat /sys/class/power_supply/battery/charge_full")
+            if real_cap.isdigit():
+                info['charge_full'] = int(real_cap) / 1000 # Usually in uAh
                 
-            msg = f"✅ Đã dọn dẹp {count} thư mục rác Telegram"
-            LogManager.log("Cleaner", msg, "success")
-            return msg
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-
-    # ==================== Advanced Optimization ====================
-
-    def optimize_notifications(self, packages: str) -> str:
-        """
-        Add packages to Doze whitelist for instant notifications.
-        Args:
-            packages: Comma separated package names
-        """
-        try:
-            pkg_list = [p.strip() for p in packages.split(',')]
-            count = 0
-            for pkg in pkg_list:
-                if not pkg: continue
-                # dumpsys deviceidle whitelist +com.package
-                self.shell(f"dumpsys deviceidle whitelist +{pkg}")
-                count += 1
-            msg = f"✅ Đã thêm {count} ứng dụng vào Whitelist (Tối ưu thông báo)"
-            LogManager.log("Optimization", msg, "success")
-            return msg
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-
-    def compile_apps(self, mode: str, timeout: int = 900, callback=None) -> str:
-        """
-        Compile apps using 'cmd package compile' with streaming output.
-        """
-        try:
-            cmd = f"cmd package compile -m {mode} -a"
-            
-            if callback:
-                callback(f"🚀 Bắt đầu tối ưu hóa (Mode: {mode})...")
+            # Read design capacity
+            design_cap = self.shell("cat /sys/class/power_supply/battery/charge_full_design")
+            if design_cap.isdigit():
+                info['charge_full_design'] = int(design_cap) / 1000
+            else:
+                # Fallback
+                info['charge_full_design'] = 4500 # Default fallback
                 
-            success_count = 0
-            for line in self.shell_stream(cmd, timeout=timeout):
-                if callback:
-                     # Filter interesting lines to avoid spam
-                     if "Success" in line:
-                         success_count += 1
-                         # Try to find package name using regex (com.foo.bar)
-                         match = re.search(r'([a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+)', line)
-                         pkg = match.group(0) if match else "Application"
-                         callback(f"✅ OK: {pkg}")
-                     elif "Failure" in line:
-                         callback(f"⚠️ Skip: {line}")
-                     elif hasattr(line, 'strip') and len(line.strip()) > 0:
-                         # Still show other important info but filter empty lines
-                         callback(f"ℹ️ {line}")
+        except:
+             pass
+             
+        # Normalize voltage and temp
+        if 'voltage' in info and info['voltage'] > 100:
+            info['voltage'] = info['voltage'] / 1000.0 # mV to V
             
-            msg = f"✅ Tối ưu hóa ART hoàn tất! ({success_count} ứng dụng)"
-            LogManager.log("Compilation", msg, "success")
-            return msg
-            
-        except Exception as e:
-            return f"❌ Lỗi biên dịch: {e}"
+        if 'temperature' in info and info['temperature'] > 100:
+             info['temperature'] = info['temperature'] / 10.0 # 300 -> 30.0
+             
+        return info
 
-    # ==================== File Transfer ====================
-    
-    def push_file(self, local_path: str, remote_path: str) -> bool:
+    def push_file(self, local, remote):
         """Push file to device"""
-        try:
-            # Use list arguments for safe execution (handles spaces and special chars automatically)
-            self.execute(["push", local_path, remote_path])
-            LogManager.log("Push File", f"Đã gửi file: {os.path.basename(local_path)}", "success")
-            return True
-        except Exception:
-            return False
+        result = self.execute(["push", local, remote])
+        return result
 
-    def pull_file(self, remote_path: str, local_path: str) -> bool:
+    def pull_file(self, remote, local):
         """Pull file from device"""
-        try:
-            self.execute(["pull", remote_path, local_path])
-            LogManager.log("Pull File", f"Đã lấy file: {os.path.basename(remote_path)}", "success")
-            return True
-        except Exception:
-            return False
+        result = self.execute(["pull", remote, local])
+        return result
 
-    def set_prop(self, key: str, value: str):
-        """Set system property best-effort (no error UI)"""
-        self.shell(f"setprop {key} {value}", check=False, log_error=False)
+    # Cleaner Methods
+    def clean_app_cache(self):
+        return self.shell("pm trim-caches 32G")
+        
+    def clean_obsolete_dex(self):
+        return self.shell("cmd package prune-dex-opt")
+        
+    def clean_messenger_data(self):
+         # Example for Telegram
+         return self.shell("rm -rf /sdcard/Telegram/Telegram\ Video/* /sdcard/Telegram/Telegram\ Images/*")
 
-    def apply_performance_props(self) -> str:
-        """
-        Expert System Property Tweaks for HyperOS 3 / Android 16.
-        Focus: animations, cache, and kernel tuning.
-        """
+    def fix_connection(self):
+        """Kill-server and Start-server to fix connection issues"""
         try:
-            # 1. Settings-based Tweaks (Usually safe)
-            self.shell("settings put global window_animation_scale 0.5", check=False)
-            self.shell("settings put global transition_animation_scale 0.5", check=False)
-            self.shell("settings put global animator_duration_scale 0.5", check=False)
-            
-            # 2. System Prop Tweaks (Best effort)
-            # These might fail on non-root or restricted ROMs, so we use check=False
-            self.set_prop("persist.sys.composition.type", "cgo")
-            self.set_prop("persist.sys.use_16k_pages", "1")
-            self.set_prop("ro.config.low_ram", "false")
-            
-            # Dalvik tuning
-            self.set_prop("dalvik.vm.dex2oat-threads", "8")
-            self.set_prop("dalvik.vm.image-dex2oat-threads", "8")
-            
-            return "✅ Đã tối ưu hóa Animation và tham số Kernel (Best-effort)."
+            self.execute("kill-server")
+            import time
+            time.sleep(1)
+            out = self.execute("start-server")
+            return f"Đã khởi động lại ADB:\n{out}\n\nVui lòng thử kết nối lại."
         except Exception as e:
-            return f"❌ Lỗi: {e}"
+            return f"Lỗi khi sửa kết nối: {e}"
 
-    # ==================== Quick Controls ====================
-
-    def set_brightness(self, level: int):
-        """Set screen brightness (0-255)"""
-        # Ensure range
-        level = max(0, min(255, level))
-        self.shell(f"settings put system screen_brightness {level}", check=False)
-
-    def set_volume(self, level: int):
-        """Set media volume (0-15 typically)"""
-        # Using cmd media_session if available
-        self.shell(f"cmd media_session volume --stream 3 --set {level}", check=False)
-
+    # ================== Control Utils ==================
+    def set_brightness(self, val):
+        return self.shell(f"settings put system screen_brightness {val}")
+        
+    def set_volume(self, val):
+        # STREAM_MUSIC
+        return self.shell(f"media volume --stream 3 --set {val}")
+        
     def toggle_show_taps(self, enable: bool):
-        """Toggle 'Show Taps' visual feedback"""
-        val = "1" if enable else "0"
-        self.shell(f"settings put system show_touches {val}", check=False)
-
+        val = 1 if enable else 0
+        return self.shell(f"settings put system show_touches {val}")
+        
     def toggle_layout_bounds(self, enable: bool):
-        """Toggle 'Show Layout Bounds'"""
         val = "true" if enable else "false"
-        self.shell(f"setprop debug.layout {val}", check=False)
-        # Force refresh (poke service)
-    def set_language_vietnamese(self) -> str:
-        """
-        Force set system language to Vietnamese via ADB properties.
-        Requires reboot to take effect.
-        """
-        try:
-            # Set properties
-            self.shell("setprop persist.sys.language vi")
-            self.shell("setprop persist.sys.country VN")
-            self.shell("setprop persist.sys.locale vi-VN")
-            
-            # Additional for some Xiaomi ROMs
-            # self.shell("setprop ro.product.locale vi-VN") # Usually RO
-            self.shell("setprop persist.sys.timezone Asia/Ho_Chi_Minh")
-            
-            return "Đã gửi lệnh. Vui lòng KHỞI ĐỘNG LẠI máy để áp dụng."
-        except Exception as e:
-            return f"Lỗi: {e}"
-
-    def skip_setup_wizard(self) -> str:
-        """
-        Skip Android Setup Wizard (Bypass FRP/Account Login after reset).
-        """
-        log = []
-        try:
-            # 1. Mark setup as complete
-            self.shell("settings put secure user_setup_complete 1")
-            self.shell("settings put global device_provisioned 1")
-            log.append("Marked user_setup_complete & device_provisioned")
-            
-            # 2. Try to disable setup wizard packages (Google & Xiaomi)
-            # This prevents it from popping up again. Use check=False to avoid crashing if Permission Denied.
-            packages = [
-                "com.google.android.setupwizard",
-                "com.android.provision",
-                "com.miui.provision"
-            ]
-            
-            for pkg in packages:
-                try:
-                    res = self.shell(f"pm disable-user --user 0 {pkg}", check=False, log_error=False)
-                    if "SecurityException" in res:
-                        log.append(f"⚠️ Failed to disable {pkg} (Security Restricted)")
-                    else:
-                        log.append(f"Disabled {pkg}")
-                except:
-                    log.append(f"Failed to disable {pkg}")
-
-            # 3. Force go to Home Screen
-            self.shell("am start -c android.intent.category.HOME -a android.intent.action.MAIN")
-            log.append("Sent HOME intent")
-            
-            return "✅ Đã gửi lệnh bỏ qua Setup Wizard! (Kiểm tra lại màn hình chính)"
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-
-    def disable_miui_ota(self) -> str:
-        """Disable MIUI System Updater"""
-        try:
-            pkgs = ["com.android.updater", "com.miui.updater", "com.miui.android.qt"]
-            count = 0
-            for p in pkgs:
-                 if self.disable_package(p): count += 1
-            return f"✅ Đã chặn cập nhật hệ thống ({count} packages disabled)"
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-
-    def set_refresh_rate(self, hz_value: int) -> str:
-        """Force specific Refresh Rate (Hz) or Reset"""
-        try:
-            if hz_value > 0:
-                self.shell(f"settings put system user_refresh_rate {hz_value}")
-                self.shell(f"settings put system peak_refresh_rate {hz_value}")
-                self.shell(f"settings put system min_refresh_rate {hz_value}")
-                return f"✅ Đã ép xung màn hình {hz_value}Hz"
-            else:
-                # Reset to auto/default
-                self.shell("settings put system user_refresh_rate 0") 
-                self.shell("settings delete system peak_refresh_rate")
-                self.shell("settings delete system min_refresh_rate")
-                return "✅ Đã đặt lại tần số quét (Auto)"
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-
-    def force_dark_mode(self, enable: bool) -> str:
-        """Force System-wide Dark Mode"""
-        try:
-            # 1. Standard Settings
-            val = "2" if enable else "1" # 2: Yes, 1: No
-            self.shell(f"settings put secure ui_night_mode {val}")
-            
-            # 2. Command Line Interface (More effective on A10+)
-            mode = "yes" if enable else "no"
-            self.shell(f"cmd uimode night {mode}")
-            
-            # 3. Developer Option Force Dark
-            self.shell("setprop debug.hwui.force_dark true" if enable else "setprop debug.hwui.force_dark false")
-            
-            return "✅ Đã gửi lệnh Dark Mode. (Có thể cần khởi động lại ứng dụng hoặc máy để áp dụng)"
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-
-    def hide_navigation_bar(self, hide: bool) -> str:
-        """Hide/Show Navigation Bar (Switch to Gestures)"""
-        try:
-            if hide:
-                # 1. Enable Full Screen Gestures (Xiaomi Legacy)
-                self.shell("settings put global force_fsg_nav_bar 1")
-                
-                # 2. Standard Android Gestures
-                self.shell("settings put secure navigation_mode 2")
-                
-                # 3. Hide Gesture Line/Indicator (HyperOS/MIUI)
-                self.shell("settings put global hide_gesture_line 1")
-                self.shell("settings put system hide_gesture_line 1") # Try system table too
-                
-                return "✅ Đã ẩn thanh điều hướng & Vạch kẻ (Full Screen)"
-            else:
-                # Show 3-Buttons
-                self.shell("settings put global force_fsg_nav_bar 0")
-                self.shell("settings put secure navigation_mode 0")
-                self.shell("settings put global hide_gesture_line 0")
-                return "✅ Đã hiện lại 3 phím điều hướng"
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-
-    def show_refresh_rate_overlay(self, show: bool) -> str:
-        """Show/Hide Refresh Rate FPS overlay"""
-        try:
-            val = "1" if show else "0"
-            
-            # 1. Developer Options Setting
-            # Ensure Dev Options is "seen" as enabled for this to take effect
-            self.shell("settings put global development_settings_enabled 1")
-            
-            self.shell(f"settings put system show_refresh_rate_overlay {val}")
-            self.shell(f"settings put global show_refresh_rate_overlay {val}")
-            self.shell(f"settings put secure show_refresh_rate_overlay {val}")
-            
-            # 2. SurfaceFlinger Service Call (Root/ADB magic)
-            # Codes change every Android version:
-            # A11: 1008
-            # A12/A13: 1034
-            # A14 (HyperOS): 1042 or 1035
-            codes = [1008, 1034, 1035, 1042] 
-            
-            for code in codes:
-                try:
-                    self.shell(f"service call SurfaceFlinger {code} i32 {val}")
-                except:
-                    pass
-
-            return "✅ Đã kích hoạt Show FPS (Hỗ trợ cả Android 14/HyperOS)" if show else "✅ Đã tắt FPS Monitor"
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-
-    def open_developer_options(self) -> str:
-        """Open Developer Options Screen"""
-        try:
-            self.shell("am start -a com.android.settings.APPLICATION_DEVELOPMENT_SETTINGS")
-            return "✅ Đã mở Cài đặt cho nhà phát triển"
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-
-    def set_display_density(self, dpi: int) -> str:
-        """Set Display Density (DPI)"""
-        try:
-            if dpi <= 0:
-                self.shell("wm density reset")
-                return "✅ Đã đặt lại DPI gốc"
-            else:
-                self.shell(f"wm density {dpi}")
-                return f"✅ Đã đổi DPI sang {dpi}"
-        except Exception as e:
-            return f"❌ Lỗi: {e}"
-            
-    def toggle_layout_bounds(self, enable: bool):
-        """Toggle 'Show Layout Bounds'"""
-        val = "true" if enable else "false"
-        self.shell(f"setprop debug.layout {val}", check=False)
-        # Force refresh (poke service)
-        self.shell("service call activity 1599295570", check=False)
-
-    def set_recents_style(self, style: int) -> str:
-        """
-        Set MIUI/HyperOS Recents Style with verification.
-        0: Grid (Vertical)
-        1: Stack (iOS style)
-        """
-        try:
-            # 1. Native flag for HyperOS 2 / 3
-            self.shell(f"settings put global miui_recents_style {style}")
-            
-            # 2. Deep intervention / Legacy support
-            self.shell(f"settings put system miui_recents_style {style}")
-            self.shell(f"settings put global task_stack_view_layout_style {2 if style == 1 else 1}")
-            
-            # Verification
-            check_val = self.shell("settings get global miui_recents_style").strip()
-            
-            label = "Xếp chồng (Stack)" if style == 1 else "Dọc (Grid)"
-            if check_val == str(style):
-                return f"✅ Đã kích hoạt kiểu {label} thành công!"
-            else:
-                return f"⚠️ Đã gửi lệnh nhưng thiết bị chưa phản hồi (Hãy kiểm tra quyền 'Cài đặt bảo mật')."
-        except Exception as e:
-            if "SecurityException" in str(e):
-                return "❌ Lỗi: Cần bật 'Gỡ lỗi USB (Cài đặt bảo mật)' trong Tùy chọn nhà phát triển."
-            return f"❌ Lỗi can thiệp hệ thống: {e}"
-
-    def toggle_screen(self):
-        """Toggle screen on/off using power button keyevent"""
-        self.shell("input keyevent 26", check=False)
-
+        return self.shell(f"setprop debug.layout {val}; service call activity 1599295570") 

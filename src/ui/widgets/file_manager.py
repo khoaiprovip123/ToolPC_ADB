@@ -410,7 +410,7 @@ class FileManagerWidget(QWidget):
             QLineEdit {
                 background-color: #F3F4F6;
                 border: 1px solid #E5E7EB;
-                border-radius: 8px;
+                border-radius: 0px;
                 padding: 0 12px;
                 color: #374151;
             }

@@ -238,7 +238,7 @@ class ThemeManager:
     # ==================== IOS DIMENSIONS ====================
     RADIUS_CARD = "22px"      # Larger radius for cards
     RADIUS_BUTTON = "12px"    # Standard button radius
-    RADIUS_INPUT = "10px"
+    RADIUS_INPUT = "0px"
     BLUR_RADIUS = "20px"      # Standard Blur
     
     # ==================== HELPER METHODS ====================
@@ -392,15 +392,68 @@ class ThemeManager:
                 border-radius: 6px;
                 font-size: 12px;
             }}
+            /* Dialog Styling - Critical Fix for Dark Mode */
             QMessageBox, QDialog {{
-                background-color: {theme['COLOR_BG_MAIN']};
+                background-color: {theme['COLOR_BG_MAIN']}; 
+                color: {theme['COLOR_TEXT_PRIMARY']};
             }}
-            QMessageBox QLabel, QDialog QLabel {{
+            QMessageBox QLabel {{
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                background: transparent;
+                min-width: 250px; /* Ensure wide enough for text */
+                font-size: 13px;
+            }}
+            QMessageBox QPushButton {{
+                background-color: {theme['COLOR_BG_SECONDARY']};
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                border: 1px solid {theme['COLOR_BORDER']};
+                border-radius: 4px;
+                padding: 6px 15px;
+                min-width: 80px;
+            }}
+            QMessageBox QPushButton:hover {{
+                background-color: {ThemeManager.COLOR_ACCENT};
+                color: white;
+                border: 1px solid {ThemeManager.COLOR_ACCENT};
+            }}
+            
+            /* Enforce background for all widgets inside dialog to match main bg */
+            QDialog QWidget {{
+                background-color: transparent;
+                color: {theme['COLOR_TEXT_PRIMARY']};
+            }}
+
+            /* Specific Fix for Message Box Labels */
+            QMessageBox QLabel {{
                 color: {theme['COLOR_TEXT_PRIMARY']};
                 font-size: 14px;
+                background-color: transparent;
+                min-width: 240px;
             }}
+            
+            QMessageBox QLabel#qt_msgbox_informativelabel {{
+                color: {theme['COLOR_TEXT_SECONDARY']};
+                font-weight: normal;
+            }}
+            
+            /* Buttons in Dialogs */
             QMessageBox QPushButton, QDialog QPushButton {{
                 min-width: 80px;
+                padding: 6px 16px;
+                border-radius: 6px;
+                background-color: {theme['COLOR_GLASS_CARD']};
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                border: 1px solid {theme['COLOR_BORDER']};
+                font-weight: bold;
+            }}
+            
+            QMessageBox QPushButton:hover, QDialog QPushButton:hover {{
+                background-color: {theme['COLOR_GLASS_HOVER']};
+                border: 1px solid {cls.COLOR_ACCENT};
+            }}
+            
+            QMessageBox QPushButton:pressed {{
+                background-color: {cls.COLOR_ACCENT_TRANSPARENT};
             }}
         """
 
@@ -660,6 +713,130 @@ class ThemeManager:
             }}
             QTextEdit:focus {{
                 border: 1px solid {cls.COLOR_ACCENT};
+            }}
+        """
+
+    @classmethod
+    def get_sidebar_logo_style(cls):
+        return f"""
+            QFrame {{
+                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #3DDC84, stop:1 #32B36C);
+                border-radius: 14px;
+                border: 1px solid rgba(255,255,255,0.2);
+            }}
+        """
+
+    @classmethod
+    def get_sidebar_title_style(cls):
+        theme = cls.get_theme()
+        return f"""
+            font-size: 19px;
+            font-weight: 700;
+            color: {theme['COLOR_TEXT_PRIMARY']};
+            background: transparent;
+            font-family: {cls.FONT_FAMILY};
+            letter-spacing: -0.5px;
+        """
+
+    @classmethod
+    def get_sidebar_group_label_style(cls):
+        theme = cls.get_theme()
+        return f"""
+            color: {theme['COLOR_TEXT_SECONDARY']};
+            font-size: 11px;
+            font-weight: 600;
+            padding-left: 14px;
+            margin-bottom: 6px;
+            background: transparent;
+            font-family: {cls.FONT_FAMILY};
+            text-transform: uppercase;
+            opacity: 0.8;
+        """
+
+    @classmethod
+    def get_nav_button_style(cls, padding_left="16px"):
+        theme = cls.get_theme()
+        hover_bg = theme['COLOR_GLASS_HOVER']
+        
+        return f"""
+            QPushButton {{
+                text-align: left;
+                padding-left: {padding_left};
+                border: none;
+                border-radius: 12px;
+                font-size: 15px;
+                font-weight: 500;
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                background: transparent;
+                font-family: {cls.FONT_FAMILY};
+                margin-left: 8px;
+                margin-right: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {hover_bg};
+            }}
+            QPushButton:checked {{
+                background-color: rgba(126, 217, 87, 0.5); /* Lime Green 50% Opacity */
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                font-weight: 700;
+                border: 1px solid rgba(126, 217, 87, 0.8);
+                border-left: 4px solid #7ed957; /* Solid accent on left */
+                padding-left: 12px;
+            }}
+        """
+
+    @classmethod
+    def get_statusbar_style(cls):
+        theme = cls.get_theme()
+        return f"""
+            QStatusBar {{
+                background: {theme['COLOR_GLASS_WHITE']};
+                color: {theme['COLOR_TEXT_SECONDARY']};
+                border-top: 1px solid {theme['COLOR_BORDER']};
+                font-family: {cls.FONT_FAMILY};
+                padding: 8px 16px;
+                font-size: 12px;
+            }}
+        """
+
+    @classmethod
+    def get_header_frame_style(cls):
+        theme = cls.get_theme()
+        return f"""
+            #MainHeader {{
+                background-color: {theme['COLOR_GLASS_WHITE']};
+                border-radius: 16px;
+                border: 1px solid {theme['COLOR_BORDER_LIGHT']};
+            }}
+        """
+
+    @classmethod
+    def get_header_title_style(cls):
+        theme = cls.get_theme()
+        return f"""
+            font-size: 22px;
+            font-weight: 700;
+            color: {theme['COLOR_TEXT_PRIMARY']};
+            background: transparent;
+            font-family: {cls.FONT_FAMILY};
+        """
+
+    @classmethod
+    def get_icon_button_style(cls):
+        theme = cls.get_theme()
+        return f"""
+            QPushButton {{
+                background-color: {theme['COLOR_GLASS_CARD']};
+                border-radius: 12px;
+                border: 2px solid {theme['COLOR_BORDER']};
+                font-size: 20px;
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {cls.COLOR_ACCENT}15;
+                border: 2px solid {cls.COLOR_ACCENT};
+                color: {cls.COLOR_ACCENT};
             }}
         """
 

@@ -1,5 +1,47 @@
 # Changelog
 
+## [2.5.5.1] - 2026-01-27
+### Fixed
+- **Hotfix ADB & UI**: Sửa lỗi không nhận ADB sau khi cập nhật và fix lỗi crash startup (mutex error).
+- **Cải thiện hiển thị**: Badge trạng thái ADB trên Dashboard hiển thị chính xác hơn.
+
+## [2.5.5.0] - 2026-01-27
+### Added
+- **System Tweaks UI Refactor**: Tái cấu trúc hoàn toàn Tab Tweaks đồng bộ phong cách "Xiaomi Hub" với hệ thống Card Gradient hiện đại.
+- **Relocated Brevent Activation**: Chuyển công cụ "Kích hoạt Brevent" sang mục "Công Cụ Khác -> Cấp Quyền" để tối ưu trải nghiệm.
+- **Bổ sung Tweaks quan trọng**: Khôi phục các tính năng Việt hóa 1-Click, Tắt OTA MIUI, Bỏ qua Setup Wizard.
+- **Fixed Hub Icons**: Sửa lỗi hiển thị icon (dấu hỏi chấm) cho các mục Store và Fastboot trong Hub.
+
+### Fixed
+- **Indentation Error**: Sửa lỗi cú pháp nghiêm trọng trong `optimization_manager.py` gây treo ứng dụng.
+- **Optimization Worker**: Cải thiện logic xử lý tác vụ ngầm cho tính năng Tweaks mới.
+
+
+## [2.5.4.1] - 2026-01-24
+### Added
+- **App Manager - Aggressive Cascade Strategy**: 
+  - System apps now automatically try multiple removal methods in sequence (disable-user → uninstall-user → disable → hide → clear data → force-stop) until one succeeds.
+  - Significantly improves success rate for stubborn HyperOS/MIUI system apps that previously failed to disable.
+
+### Changed
+- **Simplified Action Buttons**: 
+  - System apps now show only one "Xóa" (Remove) button instead of separate "Tắt" and "Gỡ" buttons.
+  - User apps now show only one "Gỡ" (Uninstall) button with cascade fallback.
+- **Clear Success Notifications**: 
+  - Notifications now explicitly state the method used (e.g., "đã được gỡ khỏi thiết bị" vs "đã được tắt" vs "đã được ẩn").
+  - Action results are crystal clear to users.
+- **Removed App Display Limit**: 
+  - App list now displays ALL filtered apps instead of only the first 100.
+  - Status bar shows accurate count (e.g., "Hiển thị 485/485" instead of "100/485").
+
+### Fixed
+- **Duplicate Error Notifications**: 
+  - Eliminated redundant error notifications for cascade attempts.
+  - Only final failures are reported, preventing notification spam.
+- **Refresh Crash Bug**: 
+  - Fixed application crash when clicking "Làm mới" (Refresh) multiple times rapidly.
+  - Properly stops and cleans up old scanner threads before starting new ones.
+
 ## [2.5.4.0] - 2026-01-23
 ### Added
 - **Xiaomi Brevent Tools**: Integrates 4 new optimization codes:

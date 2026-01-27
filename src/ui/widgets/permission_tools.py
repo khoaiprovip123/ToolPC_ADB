@@ -121,7 +121,18 @@ class PermissionToolsWidget(QWidget):
         )
         layout.addWidget(setedit_card)
         
-        # 3. System UI Tuner (Bonus)
+        # 3. Brevent Card (Relocated)
+        brevent_card = PermissionCard(
+            "Kích hoạt Brevent",
+            "Kích hoạt Brevent Server và cấp quyền Secure Settings để quản lý ứng dụng chạy ngầm.",
+            "🛡️",
+            "Kích hoạt Brevent",
+            "#2980b9",
+            self.run_brevent_activation
+        )
+        layout.addWidget(brevent_card)
+        
+        # 4. System UI Tuner (Bonus)
         ui_tuner_card = PermissionCard(
             "System UI Tuner",
             "Cấp quyền đặc biệt cho các app tùy biến giao diện hệ thống (SystemUI Tuner, v.v.)",
@@ -150,6 +161,25 @@ class PermissionToolsWidget(QWidget):
         pkg = "com.zacharee1.systemuituner"
         cmd = f"pm grant {pkg} android.permission.WRITE_SECURE_SETTINGS && pm grant {pkg} android.permission.DUMP && pm grant {pkg} android.permission.PACKAGE_USAGE_STATS"
         self._run_perm_cmd("Cấp quyền SystemUI Tuner", cmd)
+
+    def run_brevent_activation(self):
+        """Kích hoạt Brevent qua OptimizationWorker"""
+        from src.workers.optimization_worker import OptimizationWorker
+        from src.core.log_manager import LogManager
+        
+        confirm = QMessageBox.question(
+            self, "Kích hoạt Brevent", 
+            "Giữ thiết bị kết nối. Lệnh này sẽ kích hoạt Brevent Server (Rootless) và cấp quyền Write Secure Settings.\n\nTiếp tục?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if confirm == QMessageBox.Yes:
+            # We use PermissionWorker for simple commands, but activate_brevent is complex logic
+            # However, for consistency with other perm tools, let's see if we can use the existing manager method
+            # Actually OptimizationManager has activate_brevent()
+            self.opt_worker = OptimizationWorker(self.adb, "activate_brevent")
+            self.opt_worker.progress.connect(lambda msg: LogManager.log("Brevent", msg, "info"))
+            self.opt_worker.start()
+            QMessageBox.information(self, "Đã gửi lệnh", "Lệnh kích hoạt Brevent đã được gửi. Vui lòng kiểm tra Log để xem tiến trình.")
 
     def _run_perm_cmd(self, title, cmd, show_output=False):
         if not self.adb.current_device:

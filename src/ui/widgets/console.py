@@ -104,10 +104,10 @@ class ConsoleWidget(QWidget):
         self.output_area.setReadOnly(True)
         self.output_area.setStyleSheet(f"""
             QTextEdit {{
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                border-radius: 12px;
-                border: 1px solid {ThemeManager.COLOR_BORDER};
+                background-color: {ThemeManager.COLOR_GLASS_CARD};
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+                border-radius: {ThemeManager.RADIUS_CARD};
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
                 padding: 10px;
                 font-family: Consolas, monospace;
             }}
@@ -272,6 +272,10 @@ class ConsoleWidget(QWidget):
         self.input_field.clear()
 
     def append_log(self, text, color=None):
+        # Safety limit
+        if self.output_area.document().blockCount() > 2000:
+            self.output_area.document().setMaximumBlockCount(2000)
+            
         if color:
              self.output_area.append(f'<span style="color:{color};">{text}</span>')
         else:
