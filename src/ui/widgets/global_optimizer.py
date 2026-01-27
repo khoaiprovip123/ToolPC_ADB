@@ -18,10 +18,12 @@ from src.core.optimization_manager import OptimizationManager
 try:
     from src.ui.widgets.xiaomi_optimizer import XiaomiOptimizerWidget
     from src.ui.widgets.fastboot_toolbox import FastbootToolboxWidget
+    # from src.ui.widgets.system_tweaks import SystemTweaksWidget
 except ImportError:
     # Fallback or placeholder if circular import issues (though unlikely here)
     XiaomiOptimizerWidget = None
     FastbootToolboxWidget = None
+    SystemTweaksWidget = None
 
 class OptimizerThread(QThread):
     progress = Signal(str, int)  # msg, percent
@@ -599,6 +601,10 @@ class GlobalOptimizerWidget(QWidget):
         if XiaomiOptimizerWidget:
             self.xiaomi_tweaks = XiaomiOptimizerWidget(self.adb)
             adb_subtabs.addTab(self.xiaomi_tweaks, "Tiện Ích Xiaomi")
+            
+            # 3. System Tweaks (Moved to XiaomiOptimizerWidget)
+            # self.system_tweaks = SystemTweaksWidget(self.adb)
+            # adb_subtabs.addTab(self.system_tweaks, "🔧 Tùy Chỉnh Nâng Cao")
         else:
             adb_subtabs.addTab(QLabel("Không thể tải Xiaomi Module"), "Lỗi")
             

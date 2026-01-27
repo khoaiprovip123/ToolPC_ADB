@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.5.5.0] - 2026-01-27
+### Added
+- **System Tweaks UI Refactor**: Tái cấu trúc hoàn toàn Tab Tweaks đồng bộ phong cách "Xiaomi Hub" với hệ thống Card Gradient hiện đại.
+- **Relocated Brevent Activation**: Chuyển công cụ "Kích hoạt Brevent" sang mục "Công Cụ Khác -> Cấp Quyền" để tối ưu trải nghiệm.
+- **Bổ sung Tweaks quan trọng**: Khôi phục các tính năng Việt hóa 1-Click, Tắt OTA MIUI, Bỏ qua Setup Wizard.
+- **Fixed Hub Icons**: Sửa lỗi hiển thị icon (dấu hỏi chấm) cho các mục Store và Fastboot trong Hub.
+
+### Fixed
+- **Indentation Error**: Sửa lỗi cú pháp nghiêm trọng trong `optimization_manager.py` gây treo ứng dụng.
+- **Optimization Worker**: Cải thiện logic xử lý tác vụ ngầm cho tính năng Tweaks mới.
+
+
 ## [2.5.4.1] - 2026-01-24
 ### Added
 - **App Manager - Aggressive Cascade Strategy**: 

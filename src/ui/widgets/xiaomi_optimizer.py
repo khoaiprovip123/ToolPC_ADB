@@ -8,7 +8,8 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QLabel, QPushButton, QCheckBox, QHeaderView, QMessageBox,
     QTabWidget, QTextEdit, QGroupBox, QProgressBar, QScrollArea, QFrame,
-    QGraphicsDropShadowEffect, QGridLayout, QLineEdit, QProgressDialog
+    QGraphicsDropShadowEffect, QGridLayout, QLineEdit, QProgressDialog,
+    QListWidget, QListWidgetItem, QStackedWidget
 )
 from PySide6.QtCore import Qt, QThread, Signal, QSize
 from PySide6.QtGui import QColor, QIcon, QLinearGradient, QGradient
@@ -21,6 +22,11 @@ from src.workers.debloat_worker import DebloatWorker
 from src.workers.optimization_worker import OptimizationWorker
 from src.workers.generic_worker import GenericShellWorker
 from src.data.bloatware_data import BLOATWARE_DICT
+from src.ui.widgets.system_tweaks import SystemTweaksWidget
+from src.ui.widgets.ota_downloader import OTADownloaderWidget, HyperOSAppsWidget
+from src.ui.widgets.app_manager import AppManagerWidget
+from src.ui.widgets.fastboot_toolbox import FastbootToolboxWidget
+# Internal classes used directly: XiaomiDebloaterWidget, XiaomiAdvancedWidget, XiaomiQuickToolsWidget
 
 # Reuse GradientCard logic or import if shared (Defining here for simplicity/independence)
 # Updated for stability check
@@ -233,14 +239,13 @@ class XiaomiHubWidget(QWidget):
         self.grid.setContentsMargins(0, 0, 0, 0)
 
         # Service Tiles
-        # Service Tiles
-        self.add_tile("Gỡ Rác (Debloat)", "Giải phóng dung lượng, gỡ app thừa an toàn.", "🗑️", 1, ["#FF6B6B", "#FF8E53"])
-        self.add_tile("Tiện Ích Xiaomi", "Chỉnh FPS, Hz, Dark Mode, DPI...", "✨", 2, ["#4834D4", "#686DE0"])
-        self.add_tile("Tính Năng Nâng Cao", "Chặn OTA, Bỏ qua Setup, Fix Region.", "⚙️", 3, ["#22A6B3", "#7ED6DF"])
-        self.add_tile("Tải ROM & Apps", "Cập nhật HyperOS và tải App hệ thống.", "☁️", 4, ["#F093FB", "#F5576C"])
-        self.add_tile("Tối Ưu Hóa (Tweaks)", "Tăng tốc hiệu năng, tinh chỉnh Animation.", "🚀", 5, ["#11998e", "#38ef7d"])
-        self.add_tile("Fastboot Toolkit", "Flash ROM, Unlock Bootloader, Format.", "🔌", 6, ["#363795", "#005C97"])
-        self.add_tile("Kho Ứng Dụng", "Cài đặt file APK, XAPK nhanh chóng.", "📱", 7, ["#FF416C", "#FF4B2B"])
+        self.add_tile("Gỡ Rác & Tối Ưu (Debloater)", "Quét và gỡ bỏ ứng dụng rác, app thừa.", "🗑️", 1, ["#FF9A9E", "#FECFEF"])
+        self.add_tile("Tiện Ích Nhanh (Quick Tools)", "FPS, 90Hz, Dark Mode, Brevent.", "✨", 2, ["#a18cd1", "#fbc2eb"])
+        self.add_tile("Tính Năng Nâng Cao (Advanced)", "Chặn Update, Skip Setup, Region.", "⚙️", 3, ["#84fab0", "#8fd3f4"])
+        self.add_tile("Hiệu Năng (Tweaks)", "Animation, SetEdit, 120Hz.", "🚀", 5, ["#fccb90", "#d57eeb"])
+        self.add_tile("Quản Lý ROM & Apps", "Tải ROM HyperOS, App Gốc.", "☁️", 4, ["#e0c3fc", "#8ec5fc"])
+        self.add_tile("Kho Ứng Dụng (Store)", "Tải APK/XAPK từ kho online.", "🛍️", 7, ["#ff9a9e", "#fecfef"]) 
+        self.add_tile("Công Cụ Fastboot", "Flash ROM, Unlock, Format.", "🛠️", 6, ["#43e97b", "#38f9d7"])
 
         layout.addWidget(grid_container)
         layout.addStretch()
@@ -296,11 +301,21 @@ class XiaomiBaseWidget(QWidget):
             return
 
         try:
-            info = self.adb.get_device_info()
-            brand_raw = self.adb.shell("getprop ro.product.brand")
-            brand = brand_raw.strip().lower() if brand_raw else ""
-            manufacturer = (info.manufacturer or "").lower()
-            xiaomi_ids = ["xiaomi", "redmi", "poco", "blackshark", "mi", "mix", "meitu"]
+            # Use get_detailed_system_info (returns dict) instead of get_device_info
+            info = self.adb.get_detailed_system_info()
+            
+            # Use dictionary .get() access
+            brand = info.get('device_friendly_name') or self.adb.shell("getprop ro.product.brand").strip()
+            model = info.get('model') or self.adb.shell("getprop ro.product.model").strip()
+            
+            status_label.setText(f"✅ Đã kết nối: {brand} | {model}")
+            self.setEnabled(True)
+            
+            # Optional: Check Xiaomi ID compatibility logic if needed
+            # manufacturer = info.get('manufacturer', '').lower()
+            # ...
+            
+        except Exception as e:
             
             is_xiaomi_brand = any(x in brand or x in manufacturer for x in xiaomi_ids)
             is_xiaomi_os = bool(info.miui_version or info.hyperos_version)
@@ -420,6 +435,10 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
         super().__init__(adb_manager)
         self.app_cards = {}
         self.setup_ui()
+        # self.check_device(self.status_label) # Deferred to refresh_state
+
+    def refresh_state(self):
+        """Called when widget becomes visible"""
         self.check_device(self.status_label)
         
     def setup_ui(self):
@@ -656,7 +675,8 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
         )
         grid.addWidget(card_record, 4, 1)
 
-        grid.setRowStretch(5, 1) # Push to top
+        
+        grid.setRowStretch(6, 1) # Push to top
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
@@ -729,19 +749,21 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
 
     def run_hyperos_stacked_recent(self):
         try:
-            info = self.adb.get_device_info()
+            info = self.adb.get_detailed_system_info()
             android_ver = 0
-            if info.android_version and info.android_version != "Unknown":
+            
+            # Use info.get() logic
+            av_str = info.get('android_version', '0')
+            if av_str and av_str != "Unknown":
                 try:
-                    android_ver = int(str(info.android_version).split('.')[0])  
-                except:
-                    pass
+                    android_ver = int(str(av_str).split('.')[0])  
+                except: pass
             
             if android_ver < 14:
-                LogManager.log("Compat", f"Yêu cầu Android 14+ (Hiện tại: {info.android_version})", "warning")
+                LogManager.log("Compat", f"Yêu cầu Android 14+ (Hiện tại: {av_str})", "warning")
                 return
 
-            if not info.hyperos_version:
+            if 'HyperOS' not in info.get('os_version', ''):
                  LogManager.log("Compat", "Chỉ hỗ trợ Xiaomi HyperOS.", "warning")
                  return
 
@@ -759,15 +781,21 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
         try:
             cmd = "dumpsys package com.miui.home | grep versionName"
             output = self.adb.shell(cmd).strip()
+            
             if "versionName=" in output:
                 version_str = output.split("versionName=")[1].strip().split()[0]
+                
+                # Simple parser for major.minor...
                 import re
                 def parse_version(v_str):
                     return [int(n) for n in re.findall(r'\d+', v_str)]
 
                 current_ver = parse_version(version_str)
+                # Requirement: RELEASE-4.39.14.8145-05301748 (Example old) vs HyperOS new
+                # HyperOS 2 target: RELEASE-6.01.03.1924
                 required_ver = parse_version("RELEASE-6.01.03.1924")
                 
+                # Compare only first 3 segments for safety? No, compare list.
                 if current_ver < required_ver:
                      from PySide6.QtGui import QDesktopServices
                      from PySide6.QtCore import QUrl
@@ -775,23 +803,48 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
                      msg = QMessageBox(self)
                      msg.setIcon(QMessageBox.Warning)
                      msg.setWindowTitle("Phiên bản Launcher cũ")
-                     msg.setText(f"Yêu cầu HyperOS Launcher >= RELEASE-6.01.03.1924\nHiện tại: {version_str}\n\n(! Một số trường hợp không kích hoạt được có thể dùng lệnh can thiệp sâu để kích hoạt tính năng này)")
-                     btn_download = msg.addButton("Tải bản cập nhật 🌐", QMessageBox.ActionRole)
-                     btn_deep = msg.addButton("Can thiệp sâu (ADB) ⚡", QMessageBox.ActionRole)
-                     msg.addButton("Đóng", QMessageBox.RejectRole)
+                     msg.setText(f"Tính năng này yêu cầu HyperOS Launcher mới nhất.\n\nHiện tại: {version_str}\nYêu cầu: RELEASE-6.01.03+\n\nBạn có muốn tải bản mới không?")
+                     
+                     btn_download = msg.addButton("Tải bản cập nhật (Web) 🌐", QMessageBox.ActionRole)
+                     btn_force = msg.addButton("Ép chạy (Can thiệp sâu) ⚡", QMessageBox.ActionRole)
+                     btn_cancel = msg.addButton("Hủy bỏ", QMessageBox.RejectRole)
+                     
                      msg.exec()
                      
                      if msg.clickedButton() == btn_download:
                          QDesktopServices.openUrl(QUrl("https://hyperosupdates.com/apps/com.miui.home"))
                          return
-                     elif msg.clickedButton() == btn_deep:
-                         # Continue to start worker
-                         LogManager.log("Deep Action", "Đang kích hoạt can thiệp sâu...", "info")
-                         pass
+                     elif msg.clickedButton() == btn_force:
+                         LogManager.log("Deep Action", "Đang kích hoạt can thiệp sâu (Force Mode)...", "warning")
+                         # Fall through to execution
                      else:
                          return
-        except:
-             pass
+            else:
+                 # Version check failed or not found
+                 from PySide6.QtGui import QDesktopServices
+                 from PySide6.QtCore import QUrl
+                 
+                 msg = QMessageBox(self)
+                 msg.setIcon(QMessageBox.Warning)
+                 msg.setWindowTitle("Không thể kiểm tra phiên bản")
+                 msg.setText(f"Không thể xác định phiên bản Launcher hiện tại.\n\nYêu cầu: RELEASE-6.01.03+\nĐể an toàn, bạn nên kiểm tra cập nhật trước.")
+                 
+                 btn_download = msg.addButton("Tải bản cập nhật 🌐", QMessageBox.ActionRole)
+                 btn_force = msg.addButton("Ép chạy (Force) ⚡", QMessageBox.ActionRole)
+                 btn_cancel = msg.addButton("Hủy bỏ", QMessageBox.RejectRole)
+                 
+                 msg.exec()
+                 
+                 if msg.clickedButton() == btn_download:
+                      QDesktopServices.openUrl(QUrl("https://hyperosupdates.com/apps/com.miui.home"))
+                      return
+                 elif msg.clickedButton() == btn_force:
+                      LogManager.log("Deep Action", "Đang kích hoạt can thiệp sâu (Unknown Version)...", "warning")
+                 else:
+                      return
+                 
+        except Exception as e:
+             LogManager.log("Debug", f"Lỗi check version: {e} (Tiếp tục xử lý...)", "warning")
 
         if self.opt_worker and self.opt_worker.isRunning():
             LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")
@@ -828,6 +881,10 @@ class XiaomiQuickToolsWidget(XiaomiBaseWidget):
             self.opt_worker.progress.connect(lambda msg: LogManager.log("ART Tuning", msg, "info"))
             self.opt_worker.error_occurred.connect(self.show_error)
             self.opt_worker.start()
+
+
+            self.opt_worker.start()
+
 
 
 class XiaomiAdvancedWidget(XiaomiBaseWidget):
@@ -1087,84 +1144,119 @@ class XiaomiOptimizerWidget(XiaomiBaseWidget):
     def __init__(self, adb_manager):
         super().__init__(adb_manager)
         self.setup_ui()
-        self.check_device(self.status_label)
         
     def setup_ui(self):
+        # Main Layout (Stack + Nav Overlay)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
-        # Header (Unified Banner)
-        self.setup_header(layout)
-
-        # Status Label
-        self.status_label = QLabel("Đang kiểm tra thiết bị...")
-        self.status_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-weight: 600; margin-left: 20px;")
-        layout.addWidget(self.status_label)
-
-        # Tabs
-        self.tabs = QTabWidget()
-        self.tabs.setStyleSheet(f"""
-            QTabWidget::pane {{ border: none; background: transparent; }}
-            QTabBar::tab {{
-                background: transparent;
-                color: {ThemeManager.COLOR_TEXT_SECONDARY};
-                padding: 12px 20px;
-                font-weight: 600;
-                font-size: 14px;
-                margin-right: 5px;
-                border-bottom: 3px solid transparent;
-            }}
-            QTabBar::tab:selected {{
-                color: {ThemeManager.COLOR_ACCENT};
-                border-bottom: 3px solid {ThemeManager.COLOR_ACCENT};
-            }}
-            QTabBar::tab:hover {{ background: rgba(0,0,0,0.05); border-radius: 5px; }}
-        """)
-        
-        # Add modular widgets
-        self.tabs.addTab(XiaomiDebloaterWidget(self.adb), "Tối Ưu Chung")
-        self.tabs.addTab(XiaomiQuickToolsWidget(self.adb), "Tiện Ích Xiaomi")
-        self.tabs.addTab(XiaomiAdvancedWidget(self.adb), "Tính năng Nâng cao")
-        
-        layout.addWidget(self.tabs)
-
-    def setup_header(self, layout):
-        container = QFrame()
-        container.setStyleSheet(f"""
+        # 1. Navigation Bar (Back Button + Title) - Hidden on Hub
+        self.nav_bar = QFrame()
+        self.nav_bar.setFixedHeight(50)
+        self.nav_bar.setStyleSheet(f"""
             QFrame {{
-                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #FF9A9E, stop:1 #FECFEF);
-                border-radius: 20px;
-                border: none;
+                background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border-bottom: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
             }}
         """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0,0,0,20))
-        shadow.setOffset(0,5)
-        container.setGraphicsEffect(shadow)
         
-        h_layout = QHBoxLayout(container)
-        h_layout.setContentsMargins(30, 30, 30, 30)
+        nav_layout = QHBoxLayout(self.nav_bar)
+        nav_layout.setContentsMargins(15, 5, 15, 5)
+        nav_layout.setSpacing(15)
         
-        text_layout = QVBoxLayout()
-        title = QLabel("Xiaomi Turbo Suite")
-        title.setStyleSheet("font-size: 28px; font-weight: 800; color: white; background: transparent;")
-        desc = QLabel("Tối ưu hóa toàn diện cho thiết bị MIUI/HyperOS.")
-        desc.setStyleSheet("font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 5px; background: transparent;")
-        text_layout.addWidget(title)
-        text_layout.addWidget(desc)
-        h_layout.addLayout(text_layout)
-        h_layout.addSpacing(20)
+        # Back Button
+        btn_back = QPushButton("⬅ Quay lại Hub")
+        btn_back.setCursor(Qt.PointingHandCursor)
+        btn_back.clicked.connect(lambda: self.switch_page(0))
+        btn_back.setStyleSheet("""
+            QPushButton {
+                background: transparent; border: 1px solid #ccc; 
+                border-radius: 12px; padding: 6px 16px; font-weight: bold; color: #333;
+            }
+            QPushButton:hover { background: rgba(0,0,0,0.05); }
+        """)
+        nav_layout.addWidget(btn_back)
         
-        btn = QPushButton("⚡ Quét & Tối Ưu")
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.setFixedSize(180, 50)
-        btn.setStyleSheet("QPushButton { background-color: white; color: #FF9A9E; font-weight: bold; border-radius: 25px; border: none; } QPushButton:hover { background-color: #fafafa; }")
-        btn.clicked.connect(self.run_full_optimization)
-        h_layout.addWidget(btn)
+        # Title
+        self.page_title = QLabel("Xiaomi Turbo Suite")
+        self.page_title.setStyleSheet(f"font-size: 16px; font-weight: 800; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
+        nav_layout.addWidget(self.page_title)
         
-        layout.addWidget(container)
+        nav_layout.addStretch()
+        layout.addWidget(self.nav_bar)
         
+        # 2. Content Stack
+        self.stack = QStackedWidget()
+        layout.addWidget(self.stack)
+        
+        # Initialize Pages
+        self.init_pages()
+        
+        # Initial State
+        self.switch_page(0)
+
+    def init_pages(self):
+        # 0. Hub
+        self.hub = XiaomiHubWidget(self.adb)
+        self.hub.switch_page.connect(self.switch_page)
+        self.stack.addWidget(self.hub)
+        
+        # 1. Debloater
+        self.stack.addWidget(XiaomiDebloaterWidget(self.adb))
+        
+        # 2. Quick Tools
+        self.stack.addWidget(XiaomiQuickToolsWidget(self.adb))
+        
+        # 3. Advanced
+        self.stack.addWidget(XiaomiAdvancedWidget(self.adb))
+        
+        # 4. ROM & Apps
+        self.stack.addWidget(OTADownloaderWidget(self.adb))
+        
+        # 5. Tweaks
+        self.stack.addWidget(SystemTweaksWidget(self.adb))
+        
+        # 6. Fastboot
+        self.stack.addWidget(FastbootToolboxWidget(self.adb))
+        
+        # 7. Apps
+        self.stack.addWidget(HyperOSAppsWidget(self.adb))
+
+    def switch_page(self, index):
+        self.stack.setCurrentIndex(index)
+        
+        # Determine Title
+        titles = [
+            "Xiaomi Turbo Hub", 
+            "Gỡ Rác & Debloat", 
+            "Tiện Ích Xiaomi", 
+            "Tính Năng Nâng Cao", 
+            "Tải ROM & Check OTA", 
+            "Tối Ưu Hóa (Tweaks)",
+            "Fastboot Toolkit", 
+            "Kho Ứng Dụng (HyperOS)"
+        ]
+        
+        current_title = titles[index] if 0 <= index < len(titles) else "Chi tiết"
+        self.page_title.setText(f"|  {current_title}")
+            
+        # Toggle Nav Bar
+        if index == 0:
+            self.nav_bar.setVisible(False)
+        if index == 0:
+            self.nav_bar.setVisible(False)
+        else:
+            self.nav_bar.setVisible(True)
+            
+        # [AUTO-REFRESH] Trigger connection check on the target widget
+        current_widget = self.stack.widget(index)
+        if hasattr(current_widget, 'refresh_state'):
+            current_widget.refresh_state()
+        elif hasattr(current_widget, 'check_device') and hasattr(current_widget, 'status_label'):
+             # Fallback if refresh_state not defined but check_device is
+             current_widget.check_device(current_widget.status_label)
+
     def run_full_optimization(self):
         if self.opt_worker and self.opt_worker.isRunning():
             LogManager.log("System", "Một tiến trình tối ưu hóa khác đang chạy. Vui lòng đợi.", "warning")

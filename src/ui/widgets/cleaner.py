@@ -41,11 +41,13 @@ class CleanerItem(QFrame):
         self.setStyleSheet(f"""
             #CleanerItem {{
                 background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
-                border-radius: 12px;
-                border: 1px solid rgba(0,0,0,0.05);
+                border-radius: 16px;
+                border: 1px solid rgba(255,255,255,0.1);
             }}
             #CleanerItem:hover {{
-                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}80; /* Slight tint on hover */
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']};
+                border: 1px solid {ThemeManager.COLOR_ACCENT}40;
+                /* transform not supported in Qt CSS */
             }}
         """)
         

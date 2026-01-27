@@ -11,12 +11,19 @@ from pathlib import Path
 # Add src to python path
 current_dir = Path(__file__).parent
 root_dir = current_dir.parent
-sys.path.append(str(root_dir))
+sys.path.insert(0, str(root_dir)) # Force local priority
+print(f"DEBUG: Root Dir: {root_dir}")
+print(f"DEBUG: sys.path[0]: {sys.path[0]}")
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 from src.core.adb.adb_manager import ADBManager
 from src.ui.main_window import MainWindow
+from src.ui.theme_manager import ThemeManager
+import src.ui.widgets.xiaomi_optimizer
+print(f"DEBUG: Loaded xiaomi_optimizer from: {src.ui.widgets.xiaomi_optimizer.__file__}")
+
+
 
 
 def main():
@@ -47,6 +54,13 @@ def main():
     
     # Create and show main window
     adb = ADBManager()
+    
+    # Apply Global Theme
+    current_theme = ThemeManager.get_theme()
+    # ThemeManager.set_theme("light") # Default is light in class
+    # Apply stylesheet to QApplication to ensure all top-level windows (Dialogs) inherit it
+    app.setStyleSheet(ThemeManager.get_main_window_style())
+    
     window = MainWindow(adb)
     window.show()
     

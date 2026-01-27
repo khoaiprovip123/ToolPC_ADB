@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QTimer, Signal, QSize, QPoint
 from PySide6.QtGui import QIcon, QColor, QFont, QPainter, QPainterPath
 
 from src.ui.theme_manager import ThemeManager
+from src.ui.performance_utils import widget_cache, BatchProcessor, debounce
 from src.core.adb.adb_manager import DeviceStatus
 from src.data.app_data import AppInfo
 from src.workers.app_worker import (
@@ -250,7 +251,7 @@ class ModernAppRow(QFrame):
         layout.addLayout(info_layout, 1)
         
         # 3. Badges
-        type_text = "SYSTEM" if self.app.is_system else "USER"
+        type_text = "HỆ THỐNG" if self.app.is_system else "NGƯỜI DÙNG"
         type_bg = "#f39c12" if self.app.is_system else "#3498db"
         
         badge_type = QLabel(type_text)
@@ -263,10 +264,10 @@ class ModernAppRow(QFrame):
         
         # Status
         if self.app.is_enabled:
-            status_text = "RUNNING"
+            status_text = "ĐANG CHẠY"
             status_color = "#2ecc71"
         else:
-            status_text = "DISABLED"
+            status_text = "ĐÃ TẮT"
             status_color = "#e74c3c"
             name_lbl.setStyleSheet(f"font-weight: bold; font-size: 15px; color: {ThemeManager.COLOR_TEXT_SECONDARY}; text-decoration: line-through; background: transparent; border: none;")
             
@@ -324,9 +325,15 @@ class AppManagerWidget(QWidget):
         super().__init__()
         self.adb = adb_manager
         self.apps_all: List[AppInfo] = []
+        
+        # Optimized: Tăng debounce delay từ 300ms lên 500ms
         self.search_timer = QTimer()
         self.search_timer.setSingleShot(True)
         self.search_timer.timeout.connect(self.filter_apps)
+        
+        # Optimized: Batch processor cho rendering
+        self.batch_processor = BatchProcessor(batch_size=30)
+        
         self.setup_ui()
         QTimer.singleShot(500, self.refresh_data)
 
@@ -350,7 +357,7 @@ class AppManagerWidget(QWidget):
             }}
             QLineEdit:focus {{ border: 2px solid {ThemeManager.COLOR_ACCENT}; }}
         """)
-        self.search_input.textChanged.connect(lambda: self.search_timer.start(300))
+        self.search_input.textChanged.connect(lambda: self.search_timer.start(500))  # Increased from 300ms to 500ms
         
         btn_refresh = QPushButton("🔄")
         btn_refresh.setFixedSize(50, 50)
@@ -446,28 +453,66 @@ class AppManagerWidget(QWidget):
         self.filter_apps()
 
     def clear_list(self):
+        # IMPORTANT: Clear cache because we are destroying the widgets
+        # If we don't, render_app_row will try to reuse deleted widgets
+        widget_cache.clear()
+        
         while self.list_layout.count():
             item = self.list_layout.takeAt(0)
-            if item.widget(): item.widget().deleteLater()
+            if item.widget(): 
+                item.widget().deleteLater()
 
     def filter_apps(self):
+        """Filter and display apps (optimized with batch rendering)"""
+        # Note: clear_list() is called at the start of filter_apps in the original code? 
+        # Yes, line 462 calls self.clear_list().
+        # So we just improved clear_list to wipe the cache.
+        
         self.clear_list()
         query = self.search_input.text().strip().lower()
         mode = self.tab_group.checkedId()
         
         filtered = []
         for app in self.apps_all:
-            if query and not ((app.name and query in app.name.lower()) or (query in app.package.lower())): continue
+            # Safe logic for filtering
+            if query:
+                name_match = app.name and query in app.name.lower()
+                pkg_match = query in app.package.lower()
+                if not (name_match or pkg_match): continue
+                
             if mode == 2 and not app.is_system: continue
             if mode == 3 and app.is_system: continue
             if mode == 4 and app.is_enabled: continue
             filtered.append(app)
+        
+        # Optimized: Batch render apps để tránh UI freeze với danh sách lớn
+        def render_app_row(app):
+            # Check cache first
+            cache_key = f"app_row_{app.package}"
+            row = widget_cache.get(cache_key)
             
-        # Display ALL filtered apps (removed [:100] limit)
-        for app in filtered:
-            row = ModernAppRow(app)
-            row.action_triggered.connect(self.handle_row_action)
+            if row is None:
+                row = ModernAppRow(app)
+                row.action_triggered.connect(self.handle_row_action)
+                widget_cache.put(cache_key, row)
+            
             self.list_layout.addWidget(row)
+        
+        # Render first 30 immediately, rest in batches
+        if len(filtered) <= 30:
+            for app in filtered:
+                render_app_row(app)
+        else:
+            # Render first batch immediately
+            for app in filtered[:30]:
+                render_app_row(app)
+            
+            # Rest in background batches
+            self.batch_processor.process(
+                filtered[30:],
+                render_app_row,
+                lambda: self.lbl_stats.setText(f"Hiển thị {len(filtered)}/{len(self.apps_all)}")
+            )
             
         self.lbl_stats.setText(f"Hiển thị {len(filtered)}/{len(self.apps_all)}")
 
