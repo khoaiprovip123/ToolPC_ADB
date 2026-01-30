@@ -279,11 +279,13 @@ class SystemTweaksWidget(QWidget):
     def add_hero_banner(self, layout, title, desc, c1, c2):
         hero = QFrame()
         hero.setFixedHeight(140)
+        hero.setObjectName("TweaksHero")
         hero.setStyleSheet(f"""
-            QFrame {{
+            #TweaksHero {{
                 background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 {c1}, stop:1 {c2});
                 border-radius: 24px;
             }}
+            QLabel {{ border: none; background: transparent; }}
         """)
         hl = QHBoxLayout(hero)
         hl.setContentsMargins(30, 0, 30, 0)

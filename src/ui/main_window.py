@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QComboBox, QStatusBar, QMessageBox, QGraphicsDropShadowEffect,
     QApplication
 )
-from PySide6.QtCore import Qt, QSize, QTimer, QEvent, Signal, QThread
+from PySide6.QtCore import Qt, QSize, QTimer, QEvent, Signal, QThread, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QIcon, QColor, QFont, QPixmap
 
 # Import Core
@@ -42,18 +42,26 @@ class Sidebar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedWidth(280) # iOS sidebar is wide
+        self.full_width = 280
+        self.collapsed_width = 80
+        self.is_collapsed = False
+        
+        self.group_labels = []
+        self.nav_buttons = []
+        self.title_label = None
+        
         self.apply_theme()
         
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 30, 16, 30)
-        layout.setSpacing(8)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(16, 30, 16, 30)
+        self.main_layout.setSpacing(8)
         
         # App Logo/Title
-        title_container = QFrame()
-        title_container.setStyleSheet("background: transparent; border: none;")
-        title_layout = QHBoxLayout(title_container)
-        title_layout.setContentsMargins(12, 0, 0, 0)
-        title_layout.setSpacing(14)
+        self.title_container = QFrame()
+        self.title_container.setStyleSheet("background: transparent; border: none;")
+        self.title_layout = QHBoxLayout(self.title_container)
+        self.title_layout.setContentsMargins(12, 0, 0, 0)
+        self.title_layout.setSpacing(14)
         
         # Logo with Android Green Gradient
         logo_frame = QFrame()
@@ -78,41 +86,41 @@ class Sidebar(QFrame):
             logo_lbl.setText("🤖")
             logo_lbl.setStyleSheet("color: white; font-size: 26px; background: transparent;")
         
-        title_layout.addWidget(logo_frame)
+        self.title_layout.addWidget(logo_frame)
         
         theme = ThemeManager.get_theme()
-        title_text = QLabel("ADB Commander")
-        title_text.setStyleSheet(ThemeManager.get_sidebar_title_style())
-        title_layout.addWidget(title_text)
-        title_layout.addStretch()
-        layout.addWidget(title_container)
+        self.title_label = QLabel("ADB Commander")
+        self.title_label.setStyleSheet(ThemeManager.get_sidebar_title_style())
+        self.title_layout.addWidget(self.title_label)
+        self.title_spacer = self.title_layout.addStretch()
+        self.main_layout.addWidget(self.title_container)
         
-        layout.addSpacing(30)
+        self.main_layout.addSpacing(30)
         
         # Navigation Buttons
         self.buttons = []
         
         # Main
-        self.add_nav_button("Tổng Quan", "dashboard", 0, layout, active=True)
-        layout.addSpacing(20)
+        self.add_nav_button("Tổng Quan", "dashboard", 0, active=True)
+        self.main_layout.addSpacing(20)
         
         # Quản lý
-        self.add_group_label("QUẢN LÝ", layout)
-        self.add_nav_button("Ứng Dụng", "apps", 1, layout)
-        self.add_nav_button("Tệp Tin", "files", 2, layout)
-        layout.addSpacing(20)
+        self.add_group_label("QUẢN LÝ")
+        self.add_nav_button("Ứng Dụng", "apps", 1)
+        self.add_nav_button("Tệp Tin", "files", 2)
+        self.main_layout.addSpacing(20)
         
         # Công cụ
-        self.add_group_label("CÔNG CỤ", layout)
-        self.add_nav_button("Bộ Xiaomi", "xiaomi", 3, layout)
-        self.add_nav_button("Công Cụ Khác", "tools", 4, layout)
-        layout.addSpacing(20)
+        self.add_group_label("CÔNG CỤ")
+        self.add_nav_button("Bộ Xiaomi", "xiaomi", 3)
+        self.add_nav_button("Công Cụ Khác", "tools", 4)
+        self.main_layout.addSpacing(20)
         
         # Hệ thống
-        self.add_group_label("HỆ THỐNG", layout)
-        self.add_nav_button("Cài Đặt", "settings", 5, layout)
+        self.add_group_label("HỆ THỐNG")
+        self.add_nav_button("Cài Đặt", "settings", 5)
         
-        layout.addStretch()
+        self.main_layout.addStretch()
         
         # Version
         from src.version import __version__
@@ -126,7 +134,17 @@ class Sidebar(QFrame):
             font-weight: 500;
         """)
         self.version_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.version_label)
+        self.main_layout.addWidget(self.version_label)
+        
+        self.main_layout.addSpacing(10)
+        
+        # Bottom Toggle Button - Back to Bottom
+        self.collapse_btn = QPushButton("  ☰   Thu gọn")
+        self.collapse_btn.setFixedHeight(50)
+        self.collapse_btn.setCursor(Qt.PointingHandCursor)
+        self.collapse_btn.setStyleSheet(ThemeManager.get_nav_button_style("16px", alignment="left"))
+        self.collapse_btn.clicked.connect(self.toggle_collapse)
+        self.main_layout.addWidget(self.collapse_btn)
     
     def apply_theme(self):
         theme = ThemeManager.get_theme()
@@ -137,13 +155,14 @@ class Sidebar(QFrame):
             }}
         """)
     
-    def add_group_label(self, text, layout):
+    def add_group_label(self, text):
         theme = ThemeManager.get_theme()
         label = QLabel(text)
         label.setStyleSheet(ThemeManager.get_sidebar_group_label_style())
-        layout.addWidget(label)
+        self.main_layout.addWidget(label)
+        self.group_labels.append(label)
     
-    def add_nav_button(self, text, icon_key, index, layout, active=False):
+    def add_nav_button(self, text, icon_key, index, active=False):
         theme = ThemeManager.get_theme()
         icon_val = ThemeManager.get_icon(icon_key, "●")
         
@@ -174,10 +193,96 @@ class Sidebar(QFrame):
             btn.setChecked(True)
         
         btn.setProperty("page_index", index)
+        btn.setProperty("full_text", text)
+        btn.setProperty("has_icon", has_icon)
+        btn.setProperty("icon_key", icon_key)
+        
         self.buttons.append(btn)
-        layout.addWidget(btn)
+        self.nav_buttons.append(btn)
+        self.main_layout.addWidget(btn)
         
         return btn
+
+    def toggle_collapse(self):
+        """Toggle between expanded and collapsed states with animation"""
+        self.is_collapsed = not self.is_collapsed
+        
+        # Target width
+        target_width = self.collapsed_width if self.is_collapsed else self.full_width
+        
+        # Start animation
+        self.anim = QPropertyAnimation(self, b"minimumWidth")
+        self.anim.setDuration(300)
+        self.anim.setStartValue(self.width())
+        self.anim.setEndValue(target_width)
+        self.anim.setEasingCurve(QEasingCurve.InOutQuart)
+        
+        self.anim_max = QPropertyAnimation(self, b"maximumWidth")
+        self.anim_max.setDuration(300)
+        self.anim_max.setStartValue(self.width())
+        self.anim_max.setEndValue(target_width)
+        self.anim_max.setEasingCurve(QEasingCurve.InOutQuart)
+        
+        self.anim.start()
+        self.anim_max.start()
+        
+        # Update visibility of text elements
+        self.title_label.setVisible(not self.is_collapsed)
+        for label in self.group_labels:
+            label.setVisible(not self.is_collapsed)
+        
+        if self.is_collapsed:
+            self.main_layout.setContentsMargins(0, 30, 0, 30)
+            self.title_layout.setContentsMargins(0, 0, 0, 0)
+            self.title_layout.setSpacing(0)
+            self.title_layout.setAlignment(Qt.AlignCenter)
+            self.main_layout.setAlignment(self.title_container, Qt.AlignCenter)
+            if hasattr(self, 'title_spacer'):
+                self.title_layout.setStretchFactor(self.title_spacer, 0)
+            
+            self.collapse_btn.setText("☰")
+            self.collapse_btn.setStyleSheet(ThemeManager.get_nav_button_style("0px", alignment="center"))
+            self.collapse_btn.setFixedWidth(80)
+        else:
+            self.main_layout.setContentsMargins(16, 30, 16, 30)
+            self.title_layout.setContentsMargins(12, 0, 0, 0)
+            self.title_layout.setSpacing(14)
+            self.title_layout.setAlignment(Qt.AlignLeft)
+            self.main_layout.setAlignment(self.title_container, Qt.AlignLeft)
+            if hasattr(self, 'title_spacer'):
+                self.title_layout.setStretchFactor(self.title_spacer, 1)
+            
+            self.collapse_btn.setText("  ☰   Thu gọn")
+            self.collapse_btn.setStyleSheet(ThemeManager.get_nav_button_style("16px", alignment="left"))
+            self.collapse_btn.setFixedWidth(248) # Matching full width minus margins
+            
+        self.version_label.setVisible(not self.is_collapsed)
+        
+        # Update button text/padding
+        for btn in self.nav_buttons:
+            has_icon = btn.property("has_icon")
+            icon_key = btn.property("icon_key")
+            icon_val = ThemeManager.get_icon(icon_key, "●")
+            
+            if self.is_collapsed:
+                if has_icon:
+                    btn.setText("") # Show image icon only
+                else:
+                    btn.setText(icon_val) # Show emoji only
+                
+                btn.setToolTip(btn.property("full_text"))
+                # Perfect Centering: alignment='center', padding=0
+                btn.setStyleSheet(ThemeManager.get_nav_button_style("0px", alignment="center"))
+            else:
+                full_text = btn.property("full_text")
+                if has_icon:
+                    btn.setText(full_text)
+                else:
+                    btn.setText(f"  {icon_val}   {full_text}")
+                
+                btn.setToolTip("")
+                # Use default padding for expanded mode
+                btn.setStyleSheet(ThemeManager.get_nav_button_style("16px", "12px", alignment="left"))
 
 
 class DeviceSelector(QComboBox):
@@ -234,6 +339,31 @@ class MainWindow(QMainWindow):
         if auto_check:
             # Delay 3 seconds to let UI load first
             QTimer.singleShot(3000, self.check_for_updates_startup)
+
+        # Apply Window Acrylic Effect (Glass)
+        try:
+            from src.core.utils.window_effect import WindowEffect
+            self.window_effect = WindowEffect()
+            # Set translucent background for Qt
+            self.setAttribute(Qt.WA_TranslucentBackground)
+            # Apply Acrylic: use 0x01FFFFFF (very slight white tint) or adapt to theme
+            # Wait for show event to ensure hwnd is valid, but usually safe here if widget created
+            # Better to do it in showEvent or after a simplified timer
+            QTimer.singleShot(100, self.apply_window_effect)
+        except Exception as e:
+            print(f"Effect Error: {e}")
+
+    def apply_window_effect(self):
+        """Apply Acrylic Blur based on theme"""
+        if hasattr(self, 'window_effect'):
+            # Detect Dark Mode for tint
+            is_dark = ThemeManager.is_dark()
+            # ABGR format: 0xAABBGGRR
+            # Low alpha (0x20 = ~12%) for crystal clear glass effect
+            # Light Mode: 0x40FFFFFF (White tint)
+            # Dark Mode: 0x40000000 (Black tint)
+            tint = 0x40000000 if is_dark else 0x40FFFFFF
+            self.window_effect.apply_acrylic(self.winId(), tint)
 
     def apply_theme(self):
         """Apply main theme"""

@@ -322,9 +322,21 @@ class AdvancedCommandsWidget(QWidget):
         layout.addWidget(helper)
         
         # Predefined Broadcasts
-        predef_group = QGroupBox("📢 Broadcast Có Sẵn")
-        predef_group.setStyleSheet(ThemeManager.get_group_box_style())
+        predef_group = QFrame()
+        predef_group.setObjectName("BroadcastScanPanel")
+        predef_group.setStyleSheet(f"""
+            #BroadcastScanPanel {{
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border-radius: 12px;
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+            }}
+        """)
         predef_layout = QVBoxLayout(predef_group)
+        predef_layout.setContentsMargins(15, 15, 15, 15)
+        
+        predef_header = QLabel("📢 Broadcast Có Sẵn")
+        predef_header.setStyleSheet(f"font-weight: bold; color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 14px; border: none; background: transparent;")
+        predef_layout.addWidget(predef_header)
         
         self.broadcast_combo = QComboBox()
         self.broadcast_combo.setStyleSheet(ThemeManager.get_input_style())
@@ -351,9 +363,21 @@ class AdvancedCommandsWidget(QWidget):
         layout.addWidget(predef_group)
         
         # Custom Broadcast
-        custom_group = QGroupBox("✏️ Custom Broadcast")
-        custom_group.setStyleSheet(ThemeManager.get_group_box_style())
+        custom_group = QFrame()
+        custom_group.setObjectName("CustomBroadcastPanel")
+        custom_group.setStyleSheet(f"""
+            #CustomBroadcastPanel {{
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border-radius: 12px;
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+            }}
+        """)
         custom_layout = QVBoxLayout(custom_group)
+        custom_layout.setContentsMargins(15, 15, 15, 15)
+        
+        custom_header = QLabel("✏️ Custom Broadcast")
+        custom_header.setStyleSheet(f"font-weight: bold; color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 14px; border: none; background: transparent;")
+        custom_layout.addWidget(custom_header)
         
         self.custom_action = QLineEdit()
         self.custom_action.setPlaceholderText("android.intent.action.CUSTOM")

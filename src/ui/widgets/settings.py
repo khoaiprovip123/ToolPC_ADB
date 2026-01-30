@@ -36,23 +36,17 @@ class SettingsWidget(QWidget):
 
         # 1. Header & Tabs
         header_frame = QFrame()
-        header_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {ThemeManager.COLOR_GLASS_WHITE};
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.6);
-            }}
-        """)
+        header_frame.setStyleSheet("background: transparent; border: none;")
         header_layout = QVBoxLayout(header_frame)
         
         # Title
         title = QLabel("Cài Đặt & Cấu Hình")
-        title.setStyleSheet(f"font-size: 20px; font-weight: 800; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
+        title.setStyleSheet(f"font-size: 24px; font-weight: 800; color: {ThemeManager.COLOR_ACCENT}; margin-bottom: 5px;")
         header_layout.addWidget(title)
         
         # Tab Buttons Container
         tabs_container = QFrame()
-        tabs_container.setStyleSheet("background-color: rgba(0,0,0,0.05); border-radius: 10px; padding: 4px;")
+        tabs_container.setStyleSheet("background: transparent;")
         tabs_layout = QHBoxLayout(tabs_container)
         tabs_layout.setContentsMargins(4, 4, 4, 4)
         tabs_layout.setSpacing(8)
@@ -79,17 +73,17 @@ class SettingsWidget(QWidget):
                     border: none;
                     border-radius: 8px;
                     font-weight: 600;
-                    color: {ThemeManager.COLOR_TEXT_SECONDARY};
+                    color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']};
                     padding: 8px 20px;
                     font-size: 14px;
                 }}
                 QPushButton:checked {{
-                    background-color: {ThemeManager.COLOR_ACCENT_TRANSPARENT};
-                    color: {ThemeManager.COLOR_ACCENT};
-                    font-weight: 800;
+                    background-color: {ThemeManager.COLOR_ACCENT};
+                    color: white;
+                    font-weight: 700;
                 }}
                 QPushButton:hover {{
-                    background-color: rgba(0,0,0,0.05);
+                    background-color: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']};
                 }}
             """)
             
@@ -136,55 +130,191 @@ class SettingsWidget(QWidget):
         page = QWidget()
         content_layout = QVBoxLayout(page)
         
-        # General Settings
-        general_group = QGroupBox("Chung")
-        general_group.setStyleSheet(self.get_group_style())
-        general_layout = QFormLayout(general_group)
+        # General Settings Card
+        general_card = self.create_card("Chung")
+        general_layout = QFormLayout(general_card)
+        general_layout.setContentsMargins(20, 25, 20, 20)
+        general_layout.setVerticalSpacing(15)
         
         self.theme_combo = QComboBox()
-        # Load themes dynamically
         themes = ThemeManager.get_available_themes()
         for name, key in themes:
             self.theme_combo.addItem(name, key)
             
-        # Set current selection
         current = ThemeManager._current_theme
         index = self.theme_combo.findData(current)
-        if index >= 0:
-            self.theme_combo.setCurrentIndex(index)
+        if index >= 0: self.theme_combo.setCurrentIndex(index)
             
         self.theme_combo.setStyleSheet(ThemeManager.get_input_style())
-        self.theme_combo.currentIndexChanged.connect(self.on_theme_changed) # Auto-save
-        general_layout.addRow("Giao diện:", self.theme_combo)
+        self.theme_combo.currentIndexChanged.connect(self.on_theme_changed) 
+        
+        lbl_theme = QLabel("Giao diện:")
+        lbl_theme.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 600;")
+        general_layout.addRow(lbl_theme, self.theme_combo)
         
         self.lang_combo = QComboBox()
         self.lang_combo.addItems(["Tiếng Việt", "Tiếng Anh"])
         self.lang_combo.setStyleSheet(ThemeManager.get_input_style())
-        # self.lang_combo.currentIndexChanged.connect(...) # Future
-        general_layout.addRow("Ngôn ngữ:", self.lang_combo)
         
-        content_layout.addWidget(general_group)
+        lbl_lang = QLabel("Ngôn ngữ:")
+        lbl_lang.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 600;")
+        general_layout.addRow(lbl_lang, self.lang_combo)
         
-        # Menu Visibility Settings
-        menu_group = QGroupBox("Hiển thị Menu / Menu Visibility")
-        menu_group.setStyleSheet(self.get_group_style())
-        menu_layout = QVBoxLayout(menu_group)
+        content_layout.addWidget(general_card)
+        
+        # Menu Visibility Card
+        menu_card = self.create_card("Hiển thị Menu / Menu Visibility")
+        menu_layout = QVBoxLayout(menu_card)
+        menu_layout.setContentsMargins(20, 25, 20, 20)
         
         menu_desc = QLabel("Bật/tắt các menu trong thanh điều hướng bên trái:")
-        menu_desc.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 12px;")
+        menu_desc.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-size: 13px; margin-bottom: 10px;")
         menu_layout.addWidget(menu_desc)
         
-        # Advanced Commands Toggle
         self.advanced_menu_checkbox = QCheckBox("⚡ Hiện menu 'Nâng Cao' / Show 'Advanced' menu")
         show_advanced = self.settings.value("show_advanced_menu", True, type=bool)
         self.advanced_menu_checkbox.setChecked(show_advanced)
-        self.advanced_menu_checkbox.stateChanged.connect(self.on_advanced_menu_changed) # Auto-save
-        self.advanced_menu_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px; padding: 5px;")
+        self.advanced_menu_checkbox.stateChanged.connect(self.on_advanced_menu_changed)
+        self.advanced_menu_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 14px; padding: 5px;")
         menu_layout.addWidget(self.advanced_menu_checkbox)
         
-        content_layout.addWidget(menu_group)
+        content_layout.addWidget(menu_card)
         content_layout.addStretch()
         
+        return page
+
+    def create_card(self, title_text):
+        """Create a Glass Card with a Title"""
+        card = QFrame()
+        card.setObjectName("SettingsCard")
+        card.setStyleSheet(f"""
+            #SettingsCard {{
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_CARD']};
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                border-radius: {ThemeManager.RADIUS_CARD};
+            }}
+        """)
+        
+        # Overlay Title (Label on top of the frame)
+        # Note: In a simple VBoxLayout, we just add the title inside.
+        # But to have it look like a "Section Header", we style it.
+        
+        # We return the card widget. The caller should create a layout for it.
+        # WAIT: The caller needs to add the title to the layout first.
+        # Let's change this: create_card returns (card_widget, content_layout)?
+        # No, let's keep it simple. We can't easily add the title 'outside' the layout inside this method if we return just the widget.
+        # Actually, let's follow the pattern: The card is the container.
+        
+        # Let's manually add the title label *inside* the card as the first item.
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(0, 0, 0, 0) # Clear margins for internal logic, but caller might set layout
+        # Re-creating layout? No, caller usually does 'layout = QFormLayout(card)'. 
+        
+        # To support different layouts (Form vs VBox), let's just return the styled frame.
+        # AND let's handle the title by returning a container that HAS the title?
+        # Or, we just use a helper to CREATE the title label.
+        
+        # Changing approach: create_group_box replacement.
+        
+        return card
+
+    # ... wait, we need to inject the Title if we replace QGroupBox.
+    # Let's modify usage above:
+    # general_card = self.create_card("Chung") -> The helper adds the title?
+    
+    # Correction: The code above `general_layout = QFormLayout(general_card)` will OVERWRITE the layout if I set one in `create_card`.
+    # So `create_card` should just return the Frame.
+    # AND I should add the title manually?
+    # BETTER: `create_card` returns a Frame, and I add a QLabel "Header" to it?
+    
+    # Revised implementation for `create_card`:
+    # It acts as a factory. But QFormLayout can't easily have a "Header" unless it's a spanning row.
+    
+    # Let's look at `create_general_page` again.
+    # I can use a VBoxLayout for expectation, and nest the FormLayout?
+    
+    # Let's stick to the Plan:
+    # 1. create_general_page creates a QFrame (card).
+    # 2. Inside, a QVBoxLayout.
+    # 3. Add Title Label.
+    # 4. Add FormLayout (or widget with form layout).
+    
+    # Let's Rewrite `create_general_page` completely in the Replacement Content to be safer.
+    
+    # REVISED REPLACEMENT CONTENT below imports the new logic.
+    pass
+
+    def create_card_frame(self, title):
+        card = QFrame()
+        card.setObjectName("SettingsCard")
+        card.setStyleSheet(f"""
+            #SettingsCard {{
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_CARD']};
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                border-radius: {ThemeManager.RADIUS_CARD};
+            }}
+            QLabel {{ border: none; background: transparent; }}
+        """)
+        
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+        
+        if title:
+            lbl_title = QLabel(title)
+            lbl_title.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {ThemeManager.COLOR_ACCENT}; margin-bottom: 5px;")
+            layout.addWidget(lbl_title)
+            
+        return card, layout
+
+    def create_general_page(self):
+        page = QWidget()
+        content_layout = QVBoxLayout(page)
+        
+        # General Settings
+        card, card_layout = self.create_card_frame("Chung")
+        
+        form_layout = QFormLayout()
+        form_layout.setVerticalSpacing(15)
+        
+        self.theme_combo = QComboBox()
+        for name, key in ThemeManager.get_available_themes():
+            self.theme_combo.addItem(name, key)
+        index = self.theme_combo.findData(ThemeManager._current_theme)
+        if index >= 0: self.theme_combo.setCurrentIndex(index)
+        self.theme_combo.setStyleSheet(ThemeManager.get_input_style())
+        self.theme_combo.currentIndexChanged.connect(self.on_theme_changed)
+        
+        lbl_theme = QLabel("Giao diện:")
+        lbl_theme.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 600;")
+        form_layout.addRow(lbl_theme, self.theme_combo)
+        
+        self.lang_combo = QComboBox()
+        self.lang_combo.addItems(["Tiếng Việt", "Tiếng Anh"])
+        self.lang_combo.setStyleSheet(ThemeManager.get_input_style())
+        
+        lbl_lang = QLabel("Ngôn ngữ:")
+        lbl_lang.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 600;")
+        form_layout.addRow(lbl_lang, self.lang_combo)
+        
+        card_layout.addLayout(form_layout)
+        content_layout.addWidget(card)
+        
+        # Menu Visibility
+        menu_card, menu_layout = self.create_card_frame("Hiển thị Menu / Menu Visibility")
+        
+        menu_desc = QLabel("Bật/tắt các menu trong thanh điều hướng bên trái:")
+        menu_desc.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-size: 13px;")
+        menu_layout.addWidget(menu_desc)
+        
+        self.advanced_menu_checkbox = QCheckBox("⚡ Hiện menu 'Nâng Cao' / Show 'Advanced' menu")
+        self.advanced_menu_checkbox.setChecked(self.settings.value("show_advanced_menu", True, type=bool))
+        self.advanced_menu_checkbox.stateChanged.connect(self.on_advanced_menu_changed)
+        self.advanced_menu_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 14px; padding: 5px;")
+        menu_layout.addWidget(self.advanced_menu_checkbox)
+        
+        content_layout.addWidget(menu_card)
+        content_layout.addStretch()
         return page
 
     def _save_setting(self, key, value, feedback_msg=None):
@@ -194,9 +324,7 @@ class SettingsWidget(QWidget):
             self.show_toast(feedback_msg)
             
     def show_toast(self, message):
-        """Show a small feedback message (Toast)"""
-        # For now, use QToolTip as a simple non-blocking toast
-        # Position it near the cursor or center of widget
+        """Show a simple toast"""
         from PySide6.QtWidgets import QToolTip
         from PySide6.QtGui import QCursor
         QToolTip.showText(QCursor.pos(), f"✅ {message}", self)
@@ -511,14 +639,14 @@ class SettingsWidget(QWidget):
         changelog_group.setStyleSheet(self.get_group_style())
         changelog_layout = QVBoxLayout(changelog_group)
         
-        # Release Notes v2.5.3.0 mapped content
+        # Release Notes v2.5.5.2 mapped content
         changelog_html = """
-        <h3 style="margin-bottom: 5px;">✨ App Manager Refactor (v2.5.3.0)</h3>
+        <h3 style="margin-bottom: 5px;">✨ UI Polish & Dialog Fixes (v2.5.5.2)</h3>
         <ul style="margin-top: 0px; margin-bottom: 10px; margin-left: -20px; color: #333;">
-            <li>🎨 <b>Premium Glass UI:</b> Giao diện quản lý ứng dụng mới cực đẹp với hiệu ứng kính.</li>
-            <li>🔘 <b>Floating Action Bar:</b> Thanh công cụ nổi thông minh tự động xuất hiện khi chọn app.</li>
-            <li>🇻🇳 <b>Tiếng Việt:</b> Dịch toàn bộ trạng thái app (Đã bật, Đã tắt, Hệ thống, Người dùng).</li>
-            <li>🚀 <b>Performance:</b> Tối ưu hóa tốc độ tải danh sách và xử lý lệnh ADB.</li>
+            <li>🎨 <b>Glass Dialogs:</b> Hộp thoại thông báo mới với hiệu ứng kính mờ (Glassmorphism), không còn bị lỗi đen nền.</li>
+            <li>🧹 <b>Clean UI:</b> Loại bỏ hoàn toàn các viền dư thừa (boxy borders) trên tiêu đề các nhóm chức năng.</li>
+            <li>🛡️ <b>Stability:</b> Thêm kiểm tra kết nối thiết bị chặt chẽ trước khi chạy lệnh tối ưu hóa.</li>
+            <li>🐛 <b>Bug Fixes:</b> Sửa lỗi Crash khởi động và các lỗi hiển thị nhỏ khác.</li>
         </ul>
         """
         if ThemeManager.get_theme() == "dark":

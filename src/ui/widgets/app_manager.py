@@ -5,7 +5,8 @@ from typing import List
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, 
     QMessageBox, QFrame, QButtonGroup, QScrollArea, QCheckBox, QDialog,
-    QApplication, QGraphicsDropShadowEffect, QProgressBar, QProgressDialog
+    QApplication, QGraphicsDropShadowEffect, QProgressBar, QProgressDialog,
+    QFileDialog
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QSize, QPoint
 from PySide6.QtGui import QIcon, QColor, QFont, QPainter, QPainterPath
@@ -38,11 +39,16 @@ class SoftDialog(QDialog):
         
         # Main Container with Shadow
         self.container = QFrame(self)
+        self.container.setObjectName("SoftDialogContainer")
         self.container.setStyleSheet(f"""
-            QFrame {{
+            #SoftDialogContainer {{
                 background-color: {ThemeManager.get_theme()['COLOR_BG_MAIN']};
                 border-radius: 20px;
                 border: 1px solid {ThemeManager.COLOR_BORDER_LIGHT};
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         
@@ -200,15 +206,20 @@ class ModernAppRow(QFrame):
         super().__init__(parent)
         self.app = app
         self.setFixedHeight(85)
+        self.setObjectName("ModernAppRow")
         self.setStyleSheet(f"""
-            QFrame {{
+            #ModernAppRow {{
                 background-color: {ThemeManager.COLOR_GLASS_WHITE};
                 border-radius: 18px; /* Softer */
                 border: 1px solid {ThemeManager.COLOR_BORDER_LIGHT};
             }}
-            QFrame:hover {{
+            #ModernAppRow:hover {{
                 background-color: {ThemeManager.COLOR_GLASS_HOVER};
                 border: 1px solid {ThemeManager.COLOR_BORDER};
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         self.setup_ui()
@@ -373,7 +384,25 @@ class AppManagerWidget(QWidget):
         """)
         btn_refresh.clicked.connect(self.refresh_data)
         
+        self.btn_install_apk = QPushButton("📦 Cài đặt APK")
+        self.btn_install_apk.setFixedHeight(50)
+        self.btn_install_apk.setCursor(Qt.PointingHandCursor)
+        self.btn_install_apk.setStyleSheet(f"""
+            QPushButton {{
+                background: {ThemeManager.COLOR_GLASS_WHITE};
+                border: 1px solid {ThemeManager.COLOR_BORDER};
+                border-radius: 25px;
+                padding: 0 20px;
+                font-size: 14px;
+                font-weight: 600;
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+            }}
+            QPushButton:hover {{ background: {ThemeManager.COLOR_GLASS_HOVER}; }}
+        """)
+        self.btn_install_apk.clicked.connect(self.on_install_apk_clicked)
+        
         search_layout.addWidget(self.search_input)
+        search_layout.addWidget(self.btn_install_apk)
         search_layout.addWidget(btn_refresh)
         main.addLayout(search_layout)
         
@@ -390,17 +419,24 @@ class AppManagerWidget(QWidget):
             btn.setFixedHeight(40)
             btn.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: transparent;
-                    border: 1px solid {ThemeManager.COLOR_BORDER};
-                    border-radius: 20px; /* Softer Pills */
+                    background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                    border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                    border-radius: 20px;
                     padding: 0 24px;
-                    color: {ThemeManager.COLOR_TEXT_SECONDARY};
+                    color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']};
                     font-weight: 600;
+                    font-size: 13px;
+                }}
+                QPushButton:hover {{
+                    background-color: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']};
+                    border: 1px solid {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']};
+                    color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
                 }}
                 QPushButton:checked {{
-                    background-color: {ThemeManager.COLOR_ACCENT};
+                    background: {ThemeManager.COLOR_ACCENT_GRADIENT};
                     color: white;
                     border: none;
+                    font-weight: 700;
                 }}
             """)
             self.tab_group.addButton(btn, id)
@@ -411,6 +447,7 @@ class AppManagerWidget(QWidget):
         
         pill_layout.addStretch()
         self.lbl_stats = QLabel("0 apps")
+        self.lbl_stats.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 600;")
         pill_layout.addWidget(self.lbl_stats)
         main.addLayout(pill_layout)
         
@@ -594,4 +631,38 @@ class AppManagerWidget(QWidget):
 
 
         
+    def on_install_apk_clicked(self):
+        if not self.adb.is_online():
+            QMessageBox.warning(self, "Lỗi", "Thiết bị mất kết nối!")
+            return
+            
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Chọn file APK", "", "Android Package (*.apk)"
+        )
+        
+        if not file_path:
+            return
+            
+        # Progress Dialog
+        self.install_pd = QProgressDialog("Đang cài đặt APK...", "Hủy", 0, 0, self)
+        self.install_pd.setWindowTitle("Cài đặt")
+        self.install_pd.setWindowModality(Qt.WindowModal)
+        self.install_pd.show()
+        
+        # Start Installer Thread
+        self.installer = InstallerThread(self.adb, [file_path])
+        self.installer.progress.connect(self.install_pd.setLabelText)
+        self.installer.finished.connect(self.on_install_finished)
+        self.installer.start()
+
+    def on_install_finished(self, success, msg):
+        self.install_pd.close()
+        if success:
+            LogManager.log("App Manager", f"✓ Cài đặt APK thành công!", "success")
+            QMessageBox.information(self, "Thành công", "Ứng dụng đã được cài đặt thành công!")
+            self.refresh_data()
+        else:
+            LogManager.log("App Manager", f"✗ Cài đặt APK thất bại: {msg}", "error")
+            QMessageBox.warning(self, "Thất bại", f"Lỗi cài đặt: {msg}")
+
     def reset(self): self.refresh_data()

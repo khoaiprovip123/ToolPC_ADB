@@ -188,10 +188,15 @@ class XiaomiHubWidget(QWidget):
         # 1. Hero Banner
         self.hero = QFrame()
         self.hero.setFixedHeight(220)
+        self.hero.setObjectName("HubHero")
         self.hero.setStyleSheet(f"""
-            QFrame {{
+            #HubHero {{
                 background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 {ThemeManager.COLOR_ACCENT}, stop:1 #6A11CB);
                 border-radius: 24px;
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         
@@ -356,15 +361,20 @@ class AppItemCard(QFrame):
         self.app_name = app_name
         self.package_name = package_name or app_name
         
+        self.setObjectName("AppItemCard")
         self.setStyleSheet(f"""
-            QFrame {{
+            #AppItemCard {{
                 background: {ThemeManager.COLOR_GLASS_WHITE};
                 border-radius: 12px;
                 border: 1px solid rgba(0,0,0,0.05);
             }}
-            QFrame:hover {{
+            #AppItemCard:hover {{
                 border: 1px solid {ThemeManager.COLOR_ACCENT}50;
                 background: rgba(255,255,255,0.8);
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         
@@ -504,10 +514,15 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
         # Bottom Actions Bar
         actions_bar = QFrame()
         actions_bar.setFixedHeight(80)
+        actions_bar.setObjectName("ActionsBar")
         actions_bar.setStyleSheet(f"""
-            QFrame {{
+            #ActionsBar {{
                 background: {ThemeManager.COLOR_GLASS_WHITE};
                 border-top: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         actions_layout = QHBoxLayout(actions_bar)
@@ -1152,12 +1167,18 @@ class XiaomiOptimizerWidget(XiaomiBaseWidget):
         layout.setSpacing(0)
         
         # 1. Navigation Bar (Back Button + Title) - Hidden on Hub
+        # 1. Navigation Bar (Back Button + Title) - Hidden on Hub
         self.nav_bar = QFrame()
         self.nav_bar.setFixedHeight(50)
+        self.nav_bar.setObjectName("OptimizerNavBar")
         self.nav_bar.setStyleSheet(f"""
-            QFrame {{
+            #OptimizerNavBar {{
                 background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
                 border-bottom: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         
