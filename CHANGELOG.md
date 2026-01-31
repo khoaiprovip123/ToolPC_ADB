@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.5.5.2] - 2026-01-30
+### Added
+- **UI Polish**: Sửa lỗi "boxy borders" (viền dư thừa) trên tiêu đề các nhóm chức năng trong Xiaomi Optimizer.
+- **Glass Dialogs**: Cập nhật ThemeManager để hỗ trợ hộp thoại (Dialog) với hiệu ứng kính (Glass Effect), khắc phục hoàn toàn lỗi đen nền (black background) trên Windows.
+- **Icon Update**: Logo ứng dụng được cập nhật đồng bộ trong cả giao diện và file cài đặt (setup).
+
+### Fixed
+- **Stability**: Thêm cơ chế kiểm tra kết nối thiết bị chặt chẽ (Strict Device Check) trong OptimizationWorker. Ngăn chặn báo "Thành công" ảo khi không có thiết bị.
+- **Crash Fix**: Sửa lỗi `NameError: QFrame` khi khởi động App Manager/Logcat.
+
 ## [2.5.5.1] - 2026-01-27
 ### Fixed
 - **Hotfix ADB & UI**: Sửa lỗi không nhận ADB sau khi cập nhật và fix lỗi crash startup (mutex error).
