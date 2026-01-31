@@ -30,12 +30,14 @@ class PermissionWorker(QThread):
 class PermissionCard(QFrame):
     def __init__(self, title, desc, icon_text, button_text, button_color, callback):
         super().__init__()
+        self.setObjectName("PermissionCard")
         self.setStyleSheet(f"""
-            QFrame {{
+            #PermissionCard {{
                 background-color: {ThemeManager.COLOR_GLASS_WHITE};
                 border-radius: {ThemeManager.RADIUS_CARD};
                 border: 1px solid rgba(0,0,0,0.05);
             }}
+            QLabel {{ border: none; background: transparent; }}
         """)
         
         # Shadow

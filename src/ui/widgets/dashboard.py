@@ -24,12 +24,17 @@ class StatCard(QFrame):
         self.setFixedHeight(130) # Increased height
         
         # Style
+        self.setObjectName("StatCard")
         grad_str = f"qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 {gradient_stops[0]}, stop:1 {gradient_stops[1]})"
         self.setStyleSheet(f"""
-            QFrame {{
+            #StatCard {{
                 background: {grad_str};
                 border-radius: 24px;
                 border: 1px solid rgba(255, 255, 255, 0.15);
+            }}
+            QLabel {{
+                background: transparent;
+                border: none;
             }}
         """)
         
@@ -94,16 +99,21 @@ class SpecItem(QFrame):
     """Modern Spec Item with Icon and Value"""
     def __init__(self, title, value, icon, parent=None):
         super().__init__(parent)
+        self.setObjectName("SpecItem")
         self.setMinimumHeight(70) # Allow expansion
         self.setStyleSheet(f"""
-            QFrame {{
+            #SpecItem {{
                 background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}40; /* Very light bg */
                 border-radius: 12px;
                 border: 1px solid transparent;
             }}
-            QFrame:hover {{
+            #SpecItem:hover {{
                 background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}80;
                 border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         
@@ -261,12 +271,17 @@ class DashboardWidget(QWidget):
         """Xiaomi Style Hero Section - Modern Revamp (Fixed)"""
         self.hero = QFrame()
         self.hero.setFixedHeight(220)
+        self.hero.setObjectName("HeroFrame")
         # Force Dark Premium Look regardless of app theme to match S23 Ultra reference
         self.hero.setStyleSheet(f"""
-            QFrame {{
+            #HeroFrame {{
                 background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #141e30, stop:1 #243b55);
                 border-radius: 20px;
                 border: 1px solid rgba(255, 255, 255, 0.1);
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         # Shadow
@@ -537,8 +552,9 @@ class DashboardWidget(QWidget):
         self.details_added = True
         
         self.details_card = QFrame()
+        self.details_card.setObjectName("details_card")
         self.details_card.setStyleSheet(f"""
-            QFrame {{
+            QFrame#details_card {{
                 background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
                 border-radius: 20px;
                 border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};

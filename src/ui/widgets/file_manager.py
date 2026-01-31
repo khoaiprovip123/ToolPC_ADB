@@ -132,23 +132,23 @@ class DriveUsageWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(70)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #F1F5F9; /* Slate-100 */
-                border-top: 1px solid #E2E8F0;
-            }
-            QLabel { color: #475569; font-size: 11px; font-weight: 600; }
-            QProgressBar {
-                background-color: #CBD5E1; /* Slate-300 */
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']};
+                border-top: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+            }}
+            QLabel {{ color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-size: 11px; font-weight: 600; }}
+            QProgressBar {{
+                background-color: {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']}; 
                 border: none;
                 border-radius: 4px;
                 height: 8px;
                 text-align: center;
-            }
-            QProgressBar::chunk {
-                background-color: #3B82F6; /* Blue-500 */
+            }}
+            QProgressBar::chunk {{
+                background-color: {ThemeManager.COLOR_ACCENT}; 
                 border-radius: 4px;
-            }
+            }}
         """)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 10, 15, 10)
@@ -165,7 +165,7 @@ class DriveUsageWidget(QWidget):
         
         self.lbl_desc = QLabel("Đang tải...")
         self.lbl_desc.setAlignment(Qt.AlignRight)
-        self.lbl_desc.setStyleSheet("font-size: 10px; color: #64748B;")
+        self.lbl_desc.setStyleSheet(f"font-size: 10px; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']};")
         layout.addWidget(self.lbl_desc)
 
     def update_data(self, total_gb, used_gb):
@@ -179,11 +179,11 @@ class DriveUsageWidget(QWidget):
         
         # Color coding
         if percent > 90:
-            self.progress.setStyleSheet("QProgressBar::chunk { background-color: #EF4444; border-radius: 4px; }") # Red
+            self.progress.setStyleSheet(f"QProgressBar::chunk {{ background-color: {ThemeManager.COLOR_DANGER}; border-radius: 4px; }}") 
         elif percent > 75:
-            self.progress.setStyleSheet("QProgressBar::chunk { background-color: #F59E0B; border-radius: 4px; }") # Orange
+            self.progress.setStyleSheet(f"QProgressBar::chunk {{ background-color: {ThemeManager.COLOR_WARNING}; border-radius: 4px; }}")
         else:
-            self.progress.setStyleSheet("QProgressBar::chunk { background-color: #3B82F6; border-radius: 4px; }") # Blue
+            self.progress.setStyleSheet(f"QProgressBar::chunk {{ background-color: {ThemeManager.COLOR_ACCENT}; border-radius: 4px; }}")
 
 class SidebarItem(QListWidgetItem):
     def __init__(self, text, icon_char, path=None, is_header=False, parent=None):
@@ -194,13 +194,14 @@ class SidebarItem(QListWidgetItem):
         
         if is_header:
             self.setFlags(Qt.NoItemFlags)
-            self.setForeground(QColor("#94A3B8")) # Slate-400
+            self.setForeground(QColor(ThemeManager.get_theme()['COLOR_TEXT_SECONDARY'])) 
             self.setFont(QFont("Segoe UI", 8, QFont.Bold))
             self.setText(text.upper())
         else:
             self.setText(f"  {icon_char}  {text}")
             self.setFont(QFont("Segoe UI", 10))
 
+# ... (Existing ExplorerTree and ExplorerGrid classes remain unchanged as they use separate update logic if needed, but for now we skip them to keep contiguous edit logic simple or check if we need to jump)
 class ExplorerTree(QTreeWidget):
     """Details View"""
     files_dropped = Signal(list) 
@@ -309,11 +310,11 @@ class FileManagerWidget(QWidget):
         # --- LEFT: Full Height Sidebar ---
         self.sidebar_container = QWidget()
         self.sidebar_container.setFixedWidth(260)
-        self.sidebar_container.setStyleSheet("""
-            QWidget {
-                background-color: #F9FAFB; /* Very light gray sidebar bg */
-                border-right: 1px solid #E5E7EB;
-            }
+        self.sidebar_container.setStyleSheet(f"""
+            QWidget {{
+                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']};
+                border-right: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+            }}
         """)
         sidebar_layout = QVBoxLayout(self.sidebar_container)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
@@ -325,7 +326,7 @@ class FileManagerWidget(QWidget):
         brand_layout = QHBoxLayout(brand_frame)
         brand_layout.setContentsMargins(20, 0, 0, 0)
         brand_lbl = QLabel("CloudFile")
-        brand_lbl.setStyleSheet("font-size: 20px; font-weight: 800; color: #3B82F6;")
+        brand_lbl.setStyleSheet(f"font-size: 20px; font-weight: 800; color: {ThemeManager.COLOR_ACCENT};")
         brand_layout.addWidget(brand_lbl)
         sidebar_layout.addWidget(brand_frame)
         
@@ -333,29 +334,29 @@ class FileManagerWidget(QWidget):
         self.sidebar = QListWidget()
         self.sidebar.setFrameShape(QFrame.NoFrame)
         self.sidebar.setFocusPolicy(Qt.NoFocus)
-        self.sidebar.setStyleSheet("""
-            QListWidget {
+        self.sidebar.setStyleSheet(f"""
+            QListWidget {{
                 background: transparent;
                 border: none;
                 outline: none;
-            }
-            QListWidget::item {
+            }}
+            QListWidget::item {{
                 height: 38px;
                 padding-left: 10px;
                 border-radius: 6px;
                 margin-left: 10px; 
                 margin-right: 10px;
                 margin-bottom: 2px;
-                color: #334155; /* Slate-700 */
-            }
-            QListWidget::item:hover {
-                background-color: #E2E8F0; /* Slate-200 */
-            }
-            QListWidget::item:selected {
-                background-color: #DBEAFE; /* Blue-100 */
-                color: #1D4ED8; /* Blue-700 */
+                color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
+            }}
+            QListWidget::item:hover {{
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']};
+            }}
+            QListWidget::item:selected {{
+                background-color: {ThemeManager.COLOR_ACCENT}20; /* 20% opacity */
+                color: {ThemeManager.COLOR_ACCENT};
                 font-weight: 600;
-            }
+            }}
         """)
         self.sidebar.itemClicked.connect(self.on_sidebar_click)
         
@@ -369,7 +370,7 @@ class FileManagerWidget(QWidget):
 
         # --- RIGHT: Right Panel (Top Bar + Content) ---
         right_panel = QWidget()
-        right_panel.setStyleSheet("background-color: white;")
+        right_panel.setStyleSheet("background-color: transparent;") # Transparent for Acrylic
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
@@ -377,11 +378,13 @@ class FileManagerWidget(QWidget):
         # 1. Top Bar (Header)
         top_bar = QFrame()
         top_bar.setFixedHeight(56) # h-14
-        top_bar.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border-bottom: 1px solid #E2E8F0; /* Slate-200 */
-            }
+        top_bar.setObjectName("FileTopBar")
+        top_bar.setStyleSheet(f"""
+            #FileTopBar {{
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border-bottom: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+            }}
+            QLabel {{ border: none; background: transparent; }}
         """)
         top_layout = QHBoxLayout(top_bar)
         top_layout.setContentsMargins(20, 10, 20, 10)
@@ -406,14 +409,14 @@ class FileManagerWidget(QWidget):
         self.search_bar.setPlaceholderText("Tìm kiếm...")
         self.search_bar.setFixedHeight(36)
         self.search_bar.setFixedWidth(250)
-        self.search_bar.setStyleSheet("""
-            QLineEdit {
-                background-color: #F3F4F6;
-                border: 1px solid #E5E7EB;
-                border-radius: 0px;
+        self.search_bar.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']};
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                border-radius: 6px;
                 padding: 0 12px;
-                color: #374151;
-            }
+                color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
+            }}
         """)
         top_layout.addWidget(self.search_bar)
         
@@ -423,7 +426,7 @@ class FileManagerWidget(QWidget):
         # View Toggles
         toggle_frame = QFrame()
         toggle_frame.setFixedSize(70, 32)
-        toggle_frame.setStyleSheet("background-color: #F1F5F9; border-radius: 6px; border: 1px solid #E2E8F0;")
+        toggle_frame.setStyleSheet(f"background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}; border-radius: 6px; border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};")
         toggle_layout = QHBoxLayout(toggle_frame)
         toggle_layout.setContentsMargins(2, 2, 2, 2)
         toggle_layout.setSpacing(0)
@@ -438,10 +441,10 @@ class FileManagerWidget(QWidget):
         
         for btn in [self.btn_view_list, self.btn_view_grid]:
             btn.setFixedSize(30, 26)
-            btn.setStyleSheet("""
-                QPushButton { border: none; border-radius: 4px; color: #64748B; }
-                QPushButton:checked { background-color: white; color: #2563EB; }
-                QPushButton:hover { color: #334155; }
+            btn.setStyleSheet(f"""
+                QPushButton {{ border: none; border-radius: 4px; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; }}
+                QPushButton:checked {{ background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']}; color: {ThemeManager.COLOR_ACCENT}; }}
+                QPushButton:hover {{ color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']}; }}
             """)
             toggle_layout.addWidget(btn)
             
@@ -452,7 +455,7 @@ class FileManagerWidget(QWidget):
         # 2. Action Bar (New)
         action_bar = QFrame()
         action_bar.setFixedHeight(40)
-        action_bar.setStyleSheet("background-color: #F8FAFC; border-bottom: 1px solid #E2E8F0;")
+        action_bar.setStyleSheet(f"background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']}; border-bottom: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};")
         ab_layout = QHBoxLayout(action_bar)
         ab_layout.setContentsMargins(15, 0, 15, 0)
         ab_layout.setSpacing(10)
@@ -544,7 +547,7 @@ class FileManagerWidget(QWidget):
         self.stack.addWidget(self.tree)
         
         # Grid View
-
+        
         # Grid View
         self.grid = ExplorerGrid()
         self.grid.files_dropped.connect(self.handle_dropped_files)
@@ -638,33 +641,33 @@ class FileManagerWidget(QWidget):
         btn.setCursor(Qt.PointingHandCursor)
         if primary:
             # Accent Button (New)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2563EB; 
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {ThemeManager.COLOR_ACCENT}; 
                     color: white; 
                     border: none; 
                     border-radius: 4px;
                     padding: 6px 12px;
                     font-weight: 600;
                     font-family: "Segoe UI", sans-serif;
-                }
-                QPushButton:hover { background-color: #1D4ED8; }
-                QPushButton:pressed { background-color: #1E40AF; }
+                }}
+                QPushButton:hover {{ background-color: {ThemeManager.COLOR_ACCENT}DD; }}
+                QPushButton:pressed {{ background-color: {ThemeManager.COLOR_ACCENT}AA; }}
             """)
         else:
             # Standard Command Bar Button (Windows 11 style)
-            btn.setStyleSheet("""
-                QPushButton {
+            btn.setStyleSheet(f"""
+                QPushButton {{
                     background-color: transparent; 
-                    color: #334155; 
+                    color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']}; 
                     border: none; 
                     border-radius: 4px;
                     padding: 6px 12px;
                     font-family: "Segoe UI", sans-serif;
-                }
-                QPushButton:hover { background-color: #E2E8F0; } /* Slate-200 */
-                QPushButton:pressed { background-color: #CBD5E1; } /* Slate-300 */
-                QPushButton:disabled { color: #94A3B8; }
+                }}
+                QPushButton:hover {{ background-color: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']}; }}
+                QPushButton:pressed {{ background-color: {ThemeManager.get_theme()['COLOR_BORDER']}; }}
+                QPushButton:disabled {{ color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; }}
             """)
         layout.addWidget(btn)
         return btn
@@ -673,28 +676,28 @@ class FileManagerWidget(QWidget):
         line = QFrame()
         line.setFrameShape(QFrame.VLine)
         line.setFixedSize(1, 16)
-        line.setStyleSheet("background-color: #CBD5E1;")
+        line.setStyleSheet(f"background-color: {ThemeManager.get_theme()['COLOR_BORDER']};")
         layout.addWidget(line)
 
     def create_nav_btn(self, text, slot):
         btn = QPushButton(text)
         btn.setFixedSize(36, 36)
         btn.clicked.connect(slot)
-        btn.setStyleSheet("""
-            QPushButton {
+        btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                border: 1px solid #E5E7EB;
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
                 border-radius: 6px;
-                color: #374151; /* Gray-700 */
+                color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
                 font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #F3F4F6;
-                border: 1px solid #D1D5DB;
-            }
-            QPushButton:pressed {
-                background-color: #E5E7EB;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']};
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+            }}
+            QPushButton:pressed {{
+                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']};
+            }}
         """)
         return btn
 

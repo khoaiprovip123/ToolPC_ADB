@@ -141,12 +141,13 @@ class GeneralToolsWidget(QWidget):
         
         # 1. Sidebar Container
         sidebar_container = QFrame()
+        sidebar_container.setObjectName("sidebar_panel")
         sidebar_container.setFixedWidth(260)
         sidebar_container.setStyleSheet(f"""
-            QFrame {{
-                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+            #sidebar_panel {{
+                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']};
                 border-radius: 16px;
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
             }}
         """)
         
@@ -158,11 +159,13 @@ class GeneralToolsWidget(QWidget):
         lbl_title = QLabel("Công Cụ Khác")
         lbl_title.setStyleSheet(f"""
             QLabel {{
-                color: {ThemeManager.COLOR_TEXT_PRIMARY};
-                font-size: 18px;
-                font-weight: bold;
+                color: {ThemeManager.COLOR_ACCENT};
+                font-size: 20px;
+                font-weight: 800;
                 padding-left: 10px;
                 margin-bottom: 10px;
+                background: transparent;
+                border: none;
             }}
         """)
         sidebar_layout.addWidget(lbl_title)
@@ -184,18 +187,19 @@ class GeneralToolsWidget(QWidget):
                 border-radius: 10px;
                 padding: 12px 15px;
                 margin-bottom: 5px;
-                color: {ThemeManager.COLOR_TEXT_SECONDARY};
+                color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']};
                 font-size: 14px;
-                font-weight: 500;
+                font-weight: 600;
+                border: none;
             }}
             QListWidget::item:hover {{
                 background: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']};
+                color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
             }}
             QListWidget::item:selected {{
-                background: {ThemeManager.COLOR_ACCENT}20; /* 20 alpha */
-                color: {ThemeManager.COLOR_ACCENT};
-                font-weight: bold;
-                border: 1px solid {ThemeManager.COLOR_ACCENT}40;
+                background-color: {ThemeManager.COLOR_ACCENT};
+                color: white;
+                font-weight: 700;
             }}
         """)
         
@@ -207,8 +211,9 @@ class GeneralToolsWidget(QWidget):
         
         # 2. Content Area
         content_container = QFrame()
+        content_container.setObjectName("content_panel")
         content_container.setStyleSheet(f"""
-            QFrame {{
+            #content_panel {{
                 background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
                 border-radius: 16px;
                 border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};

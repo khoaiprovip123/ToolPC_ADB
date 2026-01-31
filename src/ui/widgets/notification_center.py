@@ -250,9 +250,10 @@ class NotificationCenter(QFrame):
     def create_status_card(self, title, icon, value, color):
         card = QFrame()
         card.setFixedHeight(94) # Fixed height
+        card.setObjectName("StatusCard")
         # Fix: QLabel inherits QFrame, so we must explicitly remove border from children
         card.setStyleSheet("""
-            .QFrame {
+            #StatusCard {
                 background: white; 
                 border-radius: 16px; 
                 border: 1px solid #f0f0f0;

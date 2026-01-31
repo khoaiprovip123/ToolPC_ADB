@@ -15,6 +15,12 @@ class OptimizationWorker(QThread):
         self.task_type = task_type
         
     def run(self):
+        # 1. Strict Device Check
+        if not self.adb.is_online():
+            self.error_occurred.emit("Lỗi Kết Nối", "Không tìm thấy thiết bị! Vui lòng kiểm tra kết nối USB/Wifi.")
+            self.finished.emit()
+            return
+            
         try:
             if self.task_type == "full_scan":
                 self.progress.emit("🔍 Đang quét hệ thống...")

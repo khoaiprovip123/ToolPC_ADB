@@ -2,7 +2,7 @@
 ; This script creates a Windows installer with installation path selection
 
 #define MyAppName "Xiaomi ADB Commander"
-#define MyAppVersion "2.5.5.1"
+#define MyAppVersion "2.5.5.2"
 #define MyAppPublisher "VanKhoai Dev"
 #define MyAppExeName "XiaomiADBCommander.exe"
 
@@ -24,7 +24,7 @@ InfoAfterFile=
 ; Output Configuration
 OutputDir=installer_output
 OutputBaseFilename=XiaomiADBCommander_Setup_v{#MyAppVersion}
-; SetupIconFile=resources\icon.ico
+SetupIconFile=resources\icon.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

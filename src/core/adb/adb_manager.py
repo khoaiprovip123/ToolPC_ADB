@@ -97,7 +97,7 @@ class ADBManager:
             if "platform-tools" not in fastboot_path and "adb" == self.adb_path:
                  fastboot_path = "fastboot"
                  
-            cmd = f'{fastboot_path} devices'
+            cmd = f'"{fastboot_path}" devices'
             
             # Execute manually since self.execute uses adb_path
             creation_flags = 0x08000000 if os.name == 'nt' else 0
@@ -127,7 +127,7 @@ class ADBManager:
     def execute(self, command):
         """Execute ADB command (host side)"""
         if isinstance(command, list):
-            cmd_list = [f'"{self.adb_path}"'] + command
+            cmd_list = [self.adb_path] + [str(arg) for arg in command]
         else:
             cmd_list = f'"{self.adb_path}" {command}'
             

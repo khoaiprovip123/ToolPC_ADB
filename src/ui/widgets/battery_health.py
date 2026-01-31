@@ -21,24 +21,33 @@ class BatteryWorker(QThread):
         self.adb = adb
         
     def run(self):
-        try:
-            # Ensure connected
-            if not self.adb.is_online():
-                self.adb.check_connection()
-            
-            info = self.adb.get_battery_info()
-            
-            if not info:
-                 # If empty, try one more time causing check_connection
-                 if self.adb.check_connection():
-                     info = self.adb.get_battery_info()
-            
-            if not info:
-                 self.finished.emit({'debug_log': 'No data returned. Device offline or ADB error.'})
-            else:
-                 self.finished.emit(info)
-        except Exception as e:
-            self.finished.emit({'debug_log': str(e)})
+        retries = 3
+        last_error = ""
+        while retries > 0:
+            try:
+                # Ensure connected
+                if not self.adb.is_online():
+                    self.adb.check_connection()
+                
+                info = self.adb.get_battery_info()
+                
+                if info and info.get('level', 0) > 0:
+                     self.finished.emit(info)
+                     return
+                
+                # If failed, wait a bit and retry
+                retries -= 1
+                if retries > 0:
+                    import time
+                    time.sleep(1) # Wait 1s between retries
+            except Exception as e:
+                last_error = str(e)
+                retries -= 1
+                if retries > 0:
+                    import time
+                    time.sleep(1)
+        
+        self.finished.emit({'debug_log': f'Failed after 3 retries. Last error: {last_error or "Unknown"}'})
 
 class BatteryIcon(QWidget):
     """Custom painted battery icon"""
@@ -145,8 +154,9 @@ class BatteryHealthWidget(QWidget):
         
         # --- 1. Header Card (Gradient) ---
         self.top_card = QFrame()
+        self.top_card.setObjectName("BatteryCard")
         self.gradient_style = f"""
-            QFrame {{
+            #BatteryCard {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {ThemeManager.COLOR_ACCENT}, stop:1 #2d3436);
                 border-radius: 20px;
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -164,16 +174,43 @@ class BatteryHealthWidget(QWidget):
         self.lbl_main_cap = QLabel("--- mAh")
         self.lbl_main_cap.setStyleSheet(f"font-size: 32px; font-weight: bold; color: {ThemeManager.COLOR_TEXT_PRIMARY}; border: none;")
         
-        self.lbl_percent = QLabel("--%")
-        self.lbl_percent.setStyleSheet(f"font-size: 24px; color: {ThemeManager.COLOR_TEXT_SECONDARY}; border: none;")
+        self.lbl_status_detailed = QLabel("Trạng thái: ---")
+        self.lbl_status_detailed.setStyleSheet(f"font-size: 16px; color: {ThemeManager.COLOR_TEXT_SECONDARY}; border: none;")
         
-        self.lbl_status = QLabel("Bộ sạc: ---")
-        self.lbl_status.setStyleSheet(f"font-size: 14px; color: {ThemeManager.COLOR_TEXT_SECONDARY}; margin-top: 5px; border: none;")
+        self.lbl_tech = QLabel("Công nghệ: ---")
+        self.lbl_tech.setStyleSheet(f"font-size: 13px; color: {ThemeManager.COLOR_TEXT_SECONDARY}; margin-top: 2px; border: none;")
         
         v_info.addWidget(self.lbl_main_cap)
-        v_info.addWidget(self.lbl_percent)
-        v_info.addWidget(self.lbl_status)
+        v_info.addWidget(self.lbl_status_detailed)
+        v_info.addWidget(self.lbl_tech)
+        
+        self.btn_retry = QPushButton("🔄 Thử lại")
+        self.btn_retry.setCursor(Qt.PointingHandCursor)
+        self.btn_retry.setFixedSize(120, 36)
+        self.btn_retry.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                border-radius: 18px;
+                font-weight: bold;
+                font-size: 13px;
+                margin-top: 5px;
+            }}
+            QPushButton:hover {{ background: rgba(255, 255, 255, 0.3); }}
+        """)
+        self.btn_retry.clicked.connect(self.refresh_data)
+        self.btn_retry.hide()
+        v_info.addWidget(self.btn_retry)
+        
         top_layout.addLayout(v_info)
+        
+        top_layout.addStretch()
+        
+        # Big Percentage Display
+        self.lbl_big_percent = QLabel("--%")
+        self.lbl_big_percent.setStyleSheet("font-size: 52px; font-weight: 800; color: white; border: none;")
+        top_layout.addWidget(self.lbl_big_percent)
         
         top_layout.addStretch()
         
@@ -190,6 +227,7 @@ class BatteryHealthWidget(QWidget):
         
         # Left: Details Card
         self.info_card = QFrame()
+        self.info_card.setObjectName("BatteryCard")
         self.info_card.setStyleSheet(self.top_card.styleSheet()) # Reuse
         info_l = QVBoxLayout(self.info_card)
         info_l.setContentsMargins(30, 30, 30, 30)
@@ -226,6 +264,7 @@ class BatteryHealthWidget(QWidget):
         
         # Right: Temp Card
         self.temp_card = QFrame()
+        self.temp_card.setObjectName("BatteryCard")
         self.temp_card.setStyleSheet(self.top_card.styleSheet())
         self.temp_card.setFixedWidth(220)
         temp_l = QVBoxLayout(self.temp_card)
@@ -305,22 +344,25 @@ class BatteryHealthWidget(QWidget):
         # Check for errors first
         if "debug_log" in info:
             self.txt_debug.setText(info["debug_log"])
-            if "no devices/emulators" in info["debug_log"] or "error" in info.get("debug_log", "").lower():
-                # Show disconnected state if critical data is missing
-                if info.get("charge_full", 0) == 0:
-                    self.lbl_main_cap.setText("Mất Kết Nối")
-                    self.lbl_main_cap.setStyleSheet("font-size: 28px; font-weight: bold; color: #e74c3c; border: none;")
-                    self.lbl_percent.setText("--%")
-                    self.lbl_status.setText("Không tìm thấy thiết bị")
-                    self.lbl_design.setText("---")
-                    self.lbl_real.setText("---")
-                    self.lbl_loss.setText("---")
-                    self.bat_icon.set_data(0, False) # Empty battery
-                    return
+            # If after retries it still fails
+            self.lbl_main_cap.setText("Mất Kết Nối")
+            self.lbl_main_cap.setStyleSheet("font-size: 28px; font-weight: bold; color: #ff5252; border: none;")
+            self.lbl_big_percent.setText("--%")
+            self.lbl_status_detailed.setText("Thiết bị không phản hồi")
+            self.lbl_tech.setText("Vui lòng kiểm tra cáp hoặc ADB")
+            self.lbl_design.setText("---")
+            self.lbl_real.setText("---")
+            self.lbl_loss.setText("---")
+            self.bat_icon.set_data(0, False) # Empty battery
+            self.btn_retry.show()
+            return
+
+        self.btn_retry.hide()
 
         # Restore normal style & Apply Gradient to ALL Cards
+        # Restore normal style & Apply Gradient to ALL Cards
         gradient_style = f"""
-            QFrame {{
+            #BatteryCard {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {ThemeManager.COLOR_ACCENT}, stop:1 #2d3436);
                 border-radius: 20px;
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -332,8 +374,9 @@ class BatteryHealthWidget(QWidget):
         self.temp_card.setStyleSheet(gradient_style)
 
         self.lbl_main_cap.setStyleSheet("font-size: 36px; font-weight: bold; color: white; border: none;")
-        self.lbl_percent.setStyleSheet("font-size: 20px; color: rgba(255, 255, 255, 0.8); border: none;")
-        self.lbl_status.setStyleSheet("font-size: 14px; color: rgba(255, 255, 255, 0.6); margin-top: 5px; border: none;")
+        self.lbl_status_detailed.setStyleSheet("font-size: 18px; color: rgba(255, 255, 255, 0.9); border: none;")
+        self.lbl_tech.setStyleSheet("font-size: 13px; color: rgba(255, 255, 255, 0.6); margin-top: 2px; border: none;")
+        self.lbl_big_percent.setStyleSheet("font-size: 56px; font-weight: 800; color: white; border: none;")
         
         # Parse Info
         full_mah = info.get("charge_full", 0)
@@ -353,10 +396,11 @@ class BatteryHealthWidget(QWidget):
         if full_mah > 0:
             self.lbl_main_cap.setText(f"{full_mah:,} mAh")
         else:
-            self.lbl_main_cap.setText(f"{level}%")
+            self.lbl_main_cap.setText("Pin Thiết Bị")
             
-        self.lbl_percent.setText(f"Trạng thái: {status_txt}")
-        self.lbl_status.setText(f"Công nghệ: {tech}\n(Sạc tới 100% để kiểm tra chính xác hơn nhé)")
+        self.lbl_big_percent.setText(f"{level}%")
+        self.lbl_status_detailed.setText(f"Trạng thái: {status_txt}")
+        self.lbl_tech.setText(f"Công nghệ: {tech}\n(Sạc tới 100% để kiểm tra chính xác hơn nhé)")
 
         # Update Icon
         is_charging = str(status_raw).lower() == "charging" or info.get("status_code", 0) == 2

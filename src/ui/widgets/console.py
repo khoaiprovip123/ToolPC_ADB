@@ -34,9 +34,10 @@ class ConsoleWidget(QWidget):
         
         # ==================== LEFT SIDEBAR (Quick Commands) ====================
         sidebar_container = QFrame()
+        sidebar_container.setObjectName("sidebar_console")
         sidebar_container.setFixedWidth(300)
         sidebar_container.setStyleSheet(f"""
-            QFrame {{
+            #sidebar_console {{
                 background-color: {ThemeManager.COLOR_GLASS_WHITE};
                 border-right: 1px solid {ThemeManager.COLOR_BORDER};
             }}
@@ -46,24 +47,27 @@ class ConsoleWidget(QWidget):
         
         # Sidebar Header
         lbl_quick = QLabel("⚡ Lệnh Nhanh (Awesome ADB)")
-        lbl_quick.setStyleSheet("font-weight: bold; font-size: 14px; color: #333;")
+        lbl_quick.setStyleSheet("font-weight: bold; font-size: 14px; color: #333; border: none; background: transparent;")
         sidebar_layout.addWidget(lbl_quick)
         
         # Command Categories
         self.cmd_tree = QTreeWidget()
         self.cmd_tree.setHeaderHidden(True)
         self.cmd_tree.setIndentation(15)
+        self.cmd_tree.setFocusPolicy(Qt.NoFocus)
         self.cmd_tree.setStyleSheet(f"""
             QTreeWidget {{
                 background: transparent;
                 border: none;
                 font-size: 13px;
                 color: {ThemeManager.COLOR_TEXT_PRIMARY};
+                outline: none;
             }}
             QTreeWidget::item {{
                 padding: 6px;
                 border-radius: 6px;
                 margin-bottom: 2px;
+                border: none;
             }}
             QTreeWidget::item:hover {{
                 background-color: {ThemeManager.COLOR_GLASS_HOVER};
@@ -86,13 +90,14 @@ class ConsoleWidget(QWidget):
             padding: 10px;
             color: {ThemeManager.COLOR_TEXT_SECONDARY};
             font-size: 12px;
+            border: none;
         """)
         sidebar_layout.addWidget(self.desc_box)
         
         # Populate Commands
         self.populate_commands()
         self.cmd_tree.currentItemChanged.connect(self.on_command_selected)
-
+ 
         main_layout.addWidget(sidebar_container)
         
         # ==================== RIGHT CONTENT (Console) ====================
@@ -116,8 +121,9 @@ class ConsoleWidget(QWidget):
         
         # Input Area
         input_container = QFrame()
+        input_container.setObjectName("input_console")
         input_container.setStyleSheet(f"""
-            QFrame {{
+            #input_console {{
                 background-color: {ThemeManager.COLOR_GLASS_WHITE};
                 border-radius: 12px;
                 border: 1px solid {ThemeManager.COLOR_BORDER};
@@ -142,7 +148,7 @@ class ConsoleWidget(QWidget):
         
         # Tips Label
         tips_lbl = QLabel("💡 Click đúp vào lệnh bên trái để chạy an toàn.")
-        tips_lbl.setStyleSheet("color: #888; font-size: 11px; margin-left: 5px;")
+        tips_lbl.setStyleSheet("color: #888; font-size: 11px; margin-left: 5px; border: none; background: transparent;")
         content_layout.addWidget(tips_lbl)
         
         main_layout.addLayout(content_layout)

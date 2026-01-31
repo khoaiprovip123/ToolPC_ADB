@@ -6,7 +6,7 @@ Style: Glassmorphism
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QComboBox, QTextEdit, QCheckBox, QGroupBox
+    QLineEdit, QComboBox, QTextEdit, QCheckBox, QGroupBox, QFrame
 )
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtGui import QColor, QTextCursor, QFont
@@ -85,9 +85,30 @@ class LogcatViewerWidget(QWidget):
         layout.addWidget(header)
         
         # Smart Tools Group
-        tools_group = QGroupBox("Bộ lọc thông minh")
-        tools_group.setStyleSheet(ThemeManager.get_group_box_style())
-        tools_layout = QHBoxLayout(tools_group)
+        tools_group = QFrame()
+        tools_group.setObjectName("LogcatToolsPanel")
+        tools_group.setStyleSheet(f"""
+            #LogcatToolsPanel {{
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                border-radius: {ThemeManager.RADIUS_BUTTON};
+                margin-top: 10px;
+            }}
+            QLabel {{ border: none; background: transparent; }}
+        """)
+        
+        # Use VBox for Header + Content
+        lg_main = QVBoxLayout(tools_group)
+        lg_main.setContentsMargins(15, 15, 15, 15)
+        lg_main.setSpacing(10)
+        
+        # Header
+        lg_header = QLabel("Bộ lọc thông minh")
+        lg_header.setStyleSheet(f"font-weight: bold; color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px;")
+        lg_main.addWidget(lg_header)
+        
+        # Content HBox
+        tools_layout = QHBoxLayout()
         
         self.cb_smart_filter = QCheckBox("Chỉ hiện App đang mở (Foreground)")
         self.cb_smart_filter.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-weight: bold;")
@@ -99,6 +120,8 @@ class LogcatViewerWidget(QWidget):
         tools_layout.addWidget(self.cb_errors_only)
         
         tools_layout.addStretch()
+        lg_main.addLayout(tools_layout) # Add content layout to main vertical layout
+        
         layout.addWidget(tools_group)
         
         # Standard Controls

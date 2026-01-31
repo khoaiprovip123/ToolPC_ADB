@@ -17,11 +17,17 @@ from src.ui.theme_manager import ThemeManager
 class Card(QFrame):
     def __init__(self, title, layout_type=QVBoxLayout):
         super().__init__()
+        self.setObjectName("CustomCard")
         self.setStyleSheet(f"""
-            QFrame {{
+            #CustomCard {{
                 background-color: {ThemeManager.COLOR_GLASS_WHITE};
                 border-radius: {ThemeManager.RADIUS_CARD};
                 border: 1px solid rgba(0,0,0,0.05);
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
             }}
         """)
         
@@ -46,15 +52,6 @@ class Card(QFrame):
             background: transparent;
         """)
         self.main_layout.addWidget(self.lbl_title)
-        
-        # Style for generic labels inside content
-        self.setStyleSheet(self.styleSheet() + f"""
-            QLabel {{
-                border: none;
-                background: transparent;
-                color: {ThemeManager.COLOR_TEXT_PRIMARY};
-            }}
-        """)
         
         # Content Layout
         self.content_layout = layout_type()
