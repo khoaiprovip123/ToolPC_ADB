@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QStandardPaths
 from src.ui.theme_manager import ThemeManager
+from src.core.log_manager import LogManager
 
 class CloudSyncWidget(QWidget):
     def __init__(self, adb_manager):
@@ -138,9 +139,9 @@ class CloudSyncWidget(QWidget):
                         zipf.write(self.config_path, "config.yaml")
                         # Add other files like 'history.json' if check existence
                         
-                QMessageBox.information(self, "Thành công", f"Đã sao lưu Cấu hình Tool tại:\n{file_path}")
+                LogManager.log("Thành công", f"Đã sao lưu Cấu hình Tool tại:\n{file_path}", "success")
             except Exception as e:
-                QMessageBox.critical(self, "Lỗi", f"Không thể tạo backup: {e}")
+                LogManager.log("Lỗi", f"Không thể tạo backup: {e}", "error")
                 
     def restore_backup(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Chọn file backup (PC Settings)", "", "Zip Files (*.zip)")
@@ -162,9 +163,9 @@ class CloudSyncWidget(QWidget):
                         # Extract
                         zipf.extract("config.yaml", ".")
                         
-                    QMessageBox.information(self, "Thành công", "Khôi phục thành công! Vui lòng khởi động lại ứng dụng để áp dụng thay đổi.")
+                    LogManager.log("Thành công", "Khôi phục thành công! Vui lòng khởi động lại ứng dụng để áp dụng thay đổi.", "success")
                 except Exception as e:
-                    QMessageBox.critical(self, "Lỗi", f"Không thể khôi phục: {e}")
+                    LogManager.log("Lỗi", f"Không thể khôi phục: {e}", "error")
                     
     def reset(self):
         pass

@@ -14,7 +14,10 @@ from PySide6.QtCore import Qt, QTimer, QSize, QThread, Signal, QPropertyAnimatio
 from PySide6.QtGui import QIcon, QAction, QCursor, QColor, QFont, QLinearGradient, QGradient, QPainter, QPen
 from src.ui.theme_manager import ThemeManager
 from src.ui.performance_utils import worker_pool, data_cache, throttle
+from src.core.resource_utils import get_resource_path
+from src.core.log_manager import LogManager
 import datetime
+import os
 
 
 class StatCard(QFrame):
@@ -25,12 +28,20 @@ class StatCard(QFrame):
         
         # Style
         self.setObjectName("StatCard")
-        grad_str = f"qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 {gradient_stops[0]}, stop:1 {gradient_stops[1]})"
+        # Gradient for Icon, NOT Card
+        self.grad_str = f"qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 {gradient_stops[0]}, stop:1 {gradient_stops[1]})"
+        
+        theme = ThemeManager.get_theme()
+        
         self.setStyleSheet(f"""
             #StatCard {{
-                background: {grad_str};
+                background-color: {theme['COLOR_GLASS_CARD']};
                 border-radius: 24px;
-                border: 1px solid rgba(255, 255, 255, 0.15);
+                border: 1px solid {theme['COLOR_BORDER_LIGHT']};
+            }}
+            #StatCard:hover {{
+                border: 1px solid {gradient_stops[0]}; /* Border color on hover */
+                background-color: {theme['COLOR_GLASS_HOVER']};
             }}
             QLabel {{
                 background: transparent;
@@ -41,8 +52,8 @@ class StatCard(QFrame):
         # Shadow
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 30)) # Slightly darker shadow
-        shadow.setOffset(0, 8)
+        shadow.setColor(QColor(0, 0, 0, 20)) # Lighter shadow
+        shadow.setOffset(0, 4)
         self.setGraphicsEffect(shadow)
         
         layout = QVBoxLayout(self)
@@ -52,23 +63,26 @@ class StatCard(QFrame):
         h_layout = QHBoxLayout()
         h_layout.setSpacing(15)
         
-        # Icon Container (Glass bubble)
+        # Icon Container (Gradient bubble)
         icon_bg = QLabel()
-        icon_bg.setFixedSize(48, 48)
-        icon_bg.setStyleSheet("background-color: rgba(255, 255, 255, 0.2); border-radius: 14px; border: none;")
+        icon_bg.setFixedSize(52, 52)
+        icon_bg.setStyleSheet(f"background: {self.grad_str}; border-radius: 16px; border: none;")
         icon_bg.setAlignment(Qt.AlignCenter)
         
         icon_lbl = QLabel(icon_bg)
-        icon_lbl.setFixedSize(48, 48)
+        icon_lbl.setFixedSize(52, 52)
         icon_lbl.setAlignment(Qt.AlignCenter)
         icon_lbl.setStyleSheet("background: transparent; border: none;")
         
         import os
-        if icon and os.path.isfile(icon):
+        # If absolute path or relative path exists, use as image
+        full_icon_path = icon if os.path.isabs(icon) else get_resource_path(icon)
+        
+        if icon and (os.path.isfile(icon) or os.path.isfile(full_icon_path)):
             from PySide6.QtGui import QPixmap
-            pixmap = QPixmap(icon)
+            pixmap = QPixmap(full_icon_path if os.path.isfile(full_icon_path) else icon)
             if not pixmap.isNull():
-                pixmap = pixmap.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                pixmap = pixmap.scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 icon_lbl.setPixmap(pixmap)
             else:
                 icon_lbl.setText("📌")
@@ -77,23 +91,71 @@ class StatCard(QFrame):
             
         # Title
         title_lbl = QLabel(title)
-        title_lbl.setStyleSheet(f"color: rgba(255,255,255,0.9); font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: transparent; border: none;")
+        title_lbl.setStyleSheet(f"color: {theme['COLOR_TEXT_SECONDARY']}; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; background: transparent; border: none;")
         
         h_layout.addWidget(icon_bg)
-        h_layout.addWidget(title_lbl)
-        h_layout.addStretch()
-        layout.addLayout(h_layout)
+        h_layout.addSpacing(5) # Space between icon and text if we want side-by-side, but let's do vertical alignment or just keep row
         
-        layout.addStretch()
+        # Vertical layout for Title + Value ? No, kept layout similar but cleaner.
+        # Let's put Title next to Icon? Or above Value?
+        # User Image shows Icon | Title .............. Value
+        # New Design: Icon (Left) ...... Right: (Title (Top), Value (Bottom))
+        
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(2)
+        info_layout.setAlignment(Qt.AlignVCenter)
+        
+        info_layout.addWidget(title_lbl)
         
         # Value (Big & Bold)
         self.value_lbl = QLabel(value)
-        self.value_lbl.setStyleSheet("color: white; font-size: 32px; font-weight: 800; background: transparent; border: none;")
+        self.value_lbl.setStyleSheet(f"color: {theme['COLOR_TEXT_PRIMARY']}; font-size: 28px; font-weight: 800; background: transparent; border: none;")
         self.value_lbl.setWordWrap(True)
-        layout.addWidget(self.value_lbl, alignment=Qt.AlignRight | Qt.AlignBottom)
+        info_layout.addWidget(self.value_lbl)
+        
+        h_layout.addLayout(info_layout)
+        h_layout.addStretch()
+        
+        layout.addLayout(h_layout)
 
     def update_value(self, value):
         self.value_lbl.setText(value)
+
+    def enterEvent(self, event):
+        """Hover Effect: Scale Up & Brighter Border"""
+        from PySide6.QtCore import QPropertyAnimation, QRect
+        
+        # Animate Geometry (Scale Up simulation via margins or transform? Transform is hard in widgets without QGraphicsView)
+        # We will animate the border color/background instead for stability
+        
+        # However, we can use QGraphicsEffect or just stylesheet. 
+        # But stylesheet parsing is slow for animation.
+        # Let's simple animate the shadow blur radius or offset?
+        
+        effect = self.graphicsEffect()
+        if effect:
+            # Animate Shadow
+            self._anim = QPropertyAnimation(effect, b"blurRadius")
+            self._anim.setDuration(200)
+            self._anim.setStartValue(20)
+            self._anim.setEndValue(35) # Glow more
+            self._anim.start()
+            
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        """Reset Hover"""
+        from PySide6.QtCore import QPropertyAnimation
+        
+        effect = self.graphicsEffect()
+        if effect:
+            self._anim = QPropertyAnimation(effect, b"blurRadius")
+            self._anim.setDuration(200)
+            self._anim.setStartValue(35)
+            self._anim.setEndValue(20)
+            self._anim.start()
+            
+        super().leaveEvent(event)
 
 class SpecItem(QFrame):
     """Modern Spec Item with Icon and Value"""
@@ -128,9 +190,11 @@ class SpecItem(QFrame):
         
         # Load icon from file path
         import os
-        if icon and os.path.isfile(icon):
+        full_icon_path = icon if os.path.isabs(icon) else get_resource_path(icon)
+        
+        if icon and (os.path.isfile(icon) or os.path.isfile(full_icon_path)):
             from PySide6.QtGui import QPixmap
-            pixmap = QPixmap(icon)
+            pixmap = QPixmap(full_icon_path if os.path.isfile(full_icon_path) else icon)
             if not pixmap.isNull():
                 pixmap = pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 icon_container.setPixmap(pixmap)
@@ -178,25 +242,14 @@ class DashboardWorker(QThread):
         self._stop_requested = False
         
     def run(self):
-        print(f"Worker: Starting system info check for {self.adb.current_device}...")
         try:
             if self._stop_requested or self.isInterruptionRequested():
-                print("Worker: Stop requested.")
                 return
-            
-            # Start fetch
             info = self.adb.get_detailed_system_info()
-            print(f"Worker: Info fetched. Keys: {list(info.keys()) if info else 'None'}")
-            
             if not self._stop_requested and not self.isInterruptionRequested():
                 self.data_ready.emit(info)
-            else:
-                print("Worker: Interrupted after fetch.")
         except Exception as e:
             if not self._stop_requested:
-                print(f"Worker Error: {e}")
-                import traceback
-                traceback.print_exc()
                 self.data_ready.emit({})
     
     def stop(self):
@@ -228,27 +281,28 @@ class DashboardWidget(QWidget):
         
     def get_icon_path(self, icon_name):
         """Get path to icon file in resources/icons folder"""
-        from pathlib import Path
-        # dashboard.py is in src/ui/widgets, need to go up 3 levels to reach root
-        # widgets -> ui -> src -> Xiaomi_ADB_Commander (root)
-        base_path = Path(__file__).resolve().parent.parent.parent.parent / 'resources' / 'icons' / icon_name
-        return str(base_path)
+        return get_resource_path('resources', 'icons', icon_name)
         
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(25)
-        
-        # Scroll Area
+        # === Main Content (Scrollable) ===
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        scroll.setStyleSheet("""
+            QScrollArea { 
+                border: none; 
+                background: transparent; 
+            }
+        """)
         
         content = QWidget()
         content.setStyleSheet("background: transparent;")
         self.content_layout = QVBoxLayout(content)
         self.content_layout.setSpacing(25)
-        self.content_layout.setContentsMargins(0, 0, 0, 20)
+        # Restore bottom margin to 120px to prevent FAB from covering content
+        self.content_layout.setContentsMargins(0, 0, 0, 120)
         
         # 1. Hero Section (Xiaomi Style)
         self.setup_hero()
@@ -259,6 +313,7 @@ class DashboardWidget(QWidget):
         # 3. Detailed Info
         self.setup_details_section()
         
+        # Add stretch back to Dashboard layout
         self.content_layout.addStretch()
         
         scroll.setWidget(content)
@@ -267,21 +322,34 @@ class DashboardWidget(QWidget):
         # Floating Action Button
         self.setup_fab()
         
+
     def setup_hero(self):
-        """Xiaomi Style Hero Section - Modern Revamp (Fixed)"""
+        """Xiaomi Style Hero Section - Modern Revamp"""
         self.hero = QFrame()
-        self.hero.setFixedHeight(220)
+        self.hero.setFixedHeight(210) # Restored from 150/180
         self.hero.setObjectName("HeroFrame")
-        # Force Dark Premium Look regardless of app theme to match S23 Ultra reference
+        # Theme Adapting Gradient
+        if not ThemeManager.is_dark():
+            # Light Sea Blue Gradient for Hero
+            hero_bg = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #E0F7FA, stop:1 #B3E5FC)"
+            border_color = "rgba(0, 151, 167, 0.2)"
+            text_color = ThemeManager.LIGHT["COLOR_TEXT_PRIMARY"]
+        else:
+            # Force Dark Premium Look
+            hero_bg = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #141e30, stop:1 #243b55)"
+            border_color = "rgba(255, 255, 255, 0.1)"
+            text_color = "white"
+
         self.hero.setStyleSheet(f"""
             #HeroFrame {{
-                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #141e30, stop:1 #243b55);
+                background: {hero_bg};
                 border-radius: 20px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border: 1px solid {border_color};
             }}
             QLabel {{
                 border: none;
                 background: transparent;
+                color: {text_color};
             }}
         """)
         # Shadow
@@ -292,20 +360,22 @@ class DashboardWidget(QWidget):
         self.hero.setGraphicsEffect(shadow)
         
         layout = QHBoxLayout(self.hero)
-        layout.setContentsMargins(40, 30, 40, 30)
-        layout.setSpacing(30)
+        layout.setContentsMargins(30, 15, 30, 15) # Shrunk margins
+        layout.setSpacing(25)
         
         # --- COL 1: Device Image ---
         img_container = QLabel()
-        img_container.setFixedSize(110, 160)
-        # Removed border, added subtle glow/bg
+        img_container.setFixedSize(110, 160) # Restored
         img_container.setStyleSheet(f"""
             background: rgba(255, 255, 255, 0.05);
             border-radius: 16px;
         """)
         img_container.setAlignment(Qt.AlignCenter)
+        
+        # Image Label
         img_label = QLabel("📱")
-        img_label.setStyleSheet("font-size: 60px; background: transparent; border: none;") # Increased size
+        img_label.setStyleSheet("font-size: 60px; background: transparent; border: none;") 
+        
         img_layout = QVBoxLayout(img_container)
         img_layout.addWidget(img_label)
         img_layout.setAlignment(Qt.AlignCenter)
@@ -320,10 +390,11 @@ class DashboardWidget(QWidget):
         # Title and Clock Row
         title_row = QHBoxLayout()
         self.device_name_lbl = QLabel("Checking Device...")
-        self.device_name_lbl.setStyleSheet(f"font-size: 30px; font-weight: 800; color: white; background: transparent; border: none; letter-spacing: 0.5px;")
+        self.device_name_lbl.setStyleSheet(f"font-size: 30px; font-weight: 800; color: {text_color}; background: transparent; border: none; letter-spacing: 0.5px;")
         
         self.time_lbl = QLabel("--:--:--")
-        self.time_lbl.setStyleSheet("font-size: 16px; color: rgba(255, 255, 255, 0.4); font-weight: 600; font-family: 'Consolas', monospace;")
+        sub_text_color = "rgba(0, 51, 102, 0.5)" if not ThemeManager.is_dark() else "rgba(255, 255, 255, 0.4)"
+        self.time_lbl.setStyleSheet(f"font-size: 16px; color: {sub_text_color}; font-weight: 600; font-family: 'Consolas', monospace;")
         
         title_row.addWidget(self.device_name_lbl)
         title_row.addStretch()
@@ -412,8 +483,32 @@ class DashboardWidget(QWidget):
         """)
         btn_wifi.clicked.connect(self.switch_to_wireless_debug)
         
+        # B2: Copy Device Info button
+        btn_copy = QPushButton(" Sao chép Thông Tin")
+        btn_copy.setIcon(QIcon(self.get_icon_path("files.png")))
+        btn_copy.setCursor(Qt.PointingHandCursor)
+        btn_copy.setFixedHeight(44)
+        btn_copy.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba(255, 255, 255, 0.08);
+                color: rgba(255, 255, 255, 0.75);
+                border-radius: 12px;
+                font-weight: 600;
+                font-size: 12px;
+                padding: 0 15px;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(255, 255, 255, 0.15);
+                color: white;
+            }}
+        """)
+        btn_copy.clicked.connect(self.copy_device_info)
+        
         action_layout.addWidget(btn_mirror)
         action_layout.addWidget(btn_wifi)
+        action_layout.addWidget(btn_copy)
         
         layout.addLayout(action_layout, stretch=25)
         
@@ -444,12 +539,17 @@ class DashboardWidget(QWidget):
             if not pixmap.isNull():
                 pixmap = pixmap.scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 icon_lbl.setPixmap(pixmap)
+        else:
+            # Try to load as emoji if not a path
+            if len(icon_name) <= 2:
+                icon_lbl.setText(icon_name)
         
         layout.addWidget(icon_lbl)
         
         # Text
+        text_color = ThemeManager.get_theme()["COLOR_TEXT_PRIMARY"] if not ThemeManager.is_dark() else "rgba(255, 255, 255, 0.9)"
         label = QLabel(placeholder)
-        label.setStyleSheet(f"color: rgba(255, 255, 255, 0.9); font-size: 12px; font-weight: 600; background: transparent; border: none;")
+        label.setStyleSheet(f"color: {text_color}; font-size: 12px; font-weight: 600; background: transparent; border: none;")
         layout.addWidget(label)
         
         def set_text(text):
@@ -458,23 +558,45 @@ class DashboardWidget(QWidget):
         
         return container
 
+    def copy_device_info(self):
+        """B2: Sao chép thông tin thiết bị vào clipboard."""
+        if not self.adb.current_device:
+            LogManager.log("Dashboard", "⚠️ Chưa kết nối thiết bị nào", "warning")
+            return
+        # Thu thập thông tin hiện có từ các label
+        rows_info = []
+        for key, item in self.rows.items():
+            val = item.value_lbl.text() if hasattr(item, 'value_lbl') else "-"
+            rows_info.append(f"{key}: {val}")
+        
+        device_name = self.device_name_lbl.text()
+        from datetime import datetime
+        text = (
+            f"=== {device_name} ===\n"
+            f"Device ID: {self.adb.current_device}\n"
+            + "\n".join(rows_info) +
+            f"\n\n[Đã xuất lúc {datetime.now().strftime('%d/%m/%Y %H:%M')}]"
+        )
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(text)
+        LogManager.log("Dashboard", "📋 Đã sao chép thông tin thiết bị vào clipboard!", "success")
+
     def launch_scrcpy(self):
         """Helper to find and launch scrcpy"""
         if not self.adb.current_device:
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Lỗi", "Vui lòng chọn hoặc kết nối thiết bị trước khi sử dụng Mirror Screen.")
+            LogManager.log("Lỗi", "Vui lòng chọn hoặc kết nối thiết bị trước khi sử dụng Mirror Screen.", "warning")
             return
 
         import shutil
         import os
         scrcpy_path = shutil.which("scrcpy")
         
-        # Check bundled locations
+        # Check bundled locations using get_resource_path
         if not scrcpy_path:
             local_paths = [
-                os.path.join(os.getcwd(), "resources", "scrcpy", "scrcpy.exe"),
-                os.path.join(os.getcwd(), "scripts", "scrcpy.exe"),
-                os.path.join(os.getcwd(), "scrcpy", "scrcpy.exe")
+                get_resource_path('resources', 'scrcpy', 'scrcpy.exe'),
+                get_resource_path('scripts', 'scrcpy.exe'),
             ]
             for p in local_paths:
                 if os.path.exists(p):
@@ -483,19 +605,20 @@ class DashboardWidget(QWidget):
                     
         if not scrcpy_path:
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Lỗi", "Không tìm thấy scrcpy.exe. Vui lòng cài đặt scrcpy hoặc sao chép vào thư mục resources/scrcpy/")
+            LogManager.log("Lỗi", "Không tìm thấy scrcpy.exe. Vui lòng cài đặt scrcpy hoặc sao chép vào thư mục resources/scrcpy/", "warning")
             return
 
-        # Simple launch
-        import subprocess
+        # Launch with QProcess for better lifecycle management
+        from PySide6.QtCore import QProcess
         try:
-            # CREATE_NO_WINDOW (0x08000000) might hide errors, 
-            # but we usually want it to avoid cmd popup.
             cmd = [scrcpy_path, "-s", self.adb.current_device, "--no-audio"]
-            subprocess.Popen(cmd, creationflags=0x08000000) 
-            self.window().statusBar().showMessage("✓ Đang khởi chạy Mirror Screen...", 3000)
+            self._scrcpy_process = QProcess(self)
+            self._scrcpy_process.setProgram(cmd[0])
+            self._scrcpy_process.setArguments(cmd[1:])
+            self._scrcpy_process.start()
+            LogManager.log("Dashboard", "✓ Đang khởi chạy Mirror Screen...", "info")
         except Exception as e:
-            print(f"Failed to launch scrcpy: {e}")
+            LogManager.log("Dashboard", f"Không thể khởi chạy scrcpy: {e}", "error")
 
     def switch_to_wireless_debug(self):
         """Find main window and switch to wireless debug tab"""
@@ -503,20 +626,20 @@ class DashboardWidget(QWidget):
         
         # Find QStackedWidget named 'pages' in MainWindow
         if hasattr(parent, "pages"):
-            # Index 4 is General Tools
-            parent.pages.setCurrentIndex(4)
+            # Index 5 is Developer Page
+            parent.pages.setCurrentIndex(5)
             
-            # Find GeneralToolsWidget and its tabs
-            if hasattr(parent, "general_tools"):
-                # Index 5 is Wireless tab
-                parent.general_tools.tabs.setCurrentIndex(5)
-                parent.statusBar().showMessage("✓ Đã chuyển sang Kết nối không dây", 3000)
+            # Find DeveloperPage and its tabs
+            if hasattr(parent, "developer"):
+                # Index 2 is Wireless tab (AI Script=0, Adv=1, Wireless=2)
+                parent.developer.nav_list.setCurrentRow(2)
+                LogManager.log("Dashboard", "✓ Đã chuyển sang Kết nối không dây", "success")
         else:
             # Fallback for complex nesting
             # Try to find nav buttons in sidebar and click one
             if hasattr(parent, "sidebar") and hasattr(parent.sidebar, "buttons"):
                 for btn in parent.sidebar.buttons:
-                    if "Công Cụ" in btn.text():
+                    if "Dev" in btn.text():
                         btn.click()
                         break
         
@@ -668,7 +791,13 @@ class DashboardWidget(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.fab.move(self.width() - 94, self.height() - 94)
+        # Keep FAB at bottom right with padding
+        if hasattr(self, 'fab'):
+            padding = 30
+            fab_size = 64
+            x = self.width() - fab_size - padding
+            y = self.height() - fab_size - padding
+            self.fab.move(x, y)
 
     def show_power_menu(self):
         """Extended Power Menu"""

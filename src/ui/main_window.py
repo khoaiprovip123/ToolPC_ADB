@@ -7,13 +7,13 @@ Style: Modern Glassmorphism with Colored Icons
 import sys
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QStackedWidget, QPushButton, QLabel, QFrame,
     QComboBox, QStatusBar, QMessageBox, QGraphicsDropShadowEffect,
-    QApplication
+    QApplication, QScrollArea
 )
 from PySide6.QtCore import Qt, QSize, QTimer, QEvent, Signal, QThread, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QIcon, QColor, QFont, QPixmap
+import os
 
 # Import Core
 from src.core.adb.adb_manager import ADBManager, DeviceStatus
@@ -24,16 +24,21 @@ from src.ui.theme_manager import ThemeManager
 
 # Import Widgets
 from src.ui.widgets.dashboard import DashboardWidget
-from src.ui.widgets.app_manager import AppManagerWidget
+# from .widgets.app_manager import AppManagerWidget # Wrapped in AppsAndAPKPage
 from src.ui.widgets.file_manager import FileManagerWidget
-# from src.ui.widgets.screen_mirror import ScreenMirrorWidget # Removed
-from src.ui.widgets.unified_tools import (
-    XiaomiSuiteWidget, GeneralToolsWidget
-)
+# Redundant imports removed after page refactoring
+
 from src.ui.widgets.settings import SettingsWidget
 from src.ui.widgets.notification_center import NotificationCenter
+from src.ui.widgets.badge_button import NotifBadgeButton
 from src.ui.dialogs.update_dialog import UpdateNotificationDialog, UpdateProgressDialog
 from src.core.plugin_manager import PluginManager
+
+from src.ui.pages import (
+    AboutPage, AppsAndAPKPage, XiaomiToolsPage, 
+    ScreenAndDebugPage, DeveloperPage
+)
+from src.core.resource_utils import get_resource_path
 
 
 class Sidebar(QFrame):
@@ -53,8 +58,8 @@ class Sidebar(QFrame):
         self.apply_theme()
         
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(16, 30, 16, 30)
-        self.main_layout.setSpacing(8)
+        self.main_layout.setContentsMargins(16, 20, 16, 20)
+        self.main_layout.setSpacing(10)
         
         # App Logo/Title
         self.title_container = QFrame()
@@ -74,8 +79,7 @@ class Sidebar(QFrame):
         logo_lbl.setGeometry(0, 0, 44, 44)
         
         # Load logo image
-        import os
-        logo_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'logo.png')
+        logo_path = get_resource_path('resources', 'logo.png')
         if os.path.exists(logo_path):
             pixmap = QPixmap(logo_path)
             # Scale to fit while maintaining aspect ratio
@@ -95,56 +99,77 @@ class Sidebar(QFrame):
         self.title_spacer = self.title_layout.addStretch()
         self.main_layout.addWidget(self.title_container)
         
-        self.main_layout.addSpacing(30)
+        self.main_layout.addSpacing(20)
         
-        # Navigation Buttons
+        # === SCROLLABLE NAVIGATION AREA ===
+        self.nav_area = QScrollArea()
+        self.nav_area.setWidgetResizable(True)
+        self.nav_area.setFrameShape(QFrame.NoFrame)
+        self.nav_area.setStyleSheet("""
+            QScrollArea { background: transparent; border: none; }
+            QScrollBar:vertical { width: 4px; background: transparent; }
+            QScrollBar::handle:vertical { background: rgba(255, 255, 255, 0.2); border-radius: 2px; }
+        """)
+        
+        self.nav_content = QWidget()
+        self.nav_content.setStyleSheet("background: transparent;")
+        self.nav_layout = QVBoxLayout(self.nav_content)
+        self.nav_layout.setContentsMargins(0, 0, 0, 0)
+        self.nav_layout.setSpacing(5) # Compact spacing
+        
+        # Navigation Buttons (FLATTENED 8-ITEM STRUCTURE)
         self.buttons = []
         
-        # Main
+        # 1. Main
         self.add_nav_button("Tổng Quan", "dashboard", 0, active=True)
-        self.main_layout.addSpacing(20)
+        self.nav_layout.addSpacing(10)
         
-        # Quản lý
+        # 2. Quản lý
         self.add_group_label("QUẢN LÝ")
-        self.add_nav_button("Ứng Dụng", "apps", 1)
-        self.add_nav_button("Tệp Tin", "files", 2)
-        self.main_layout.addSpacing(20)
+        self.add_nav_button("Ứng Dụng & APK", "apps", 1)
+        self.add_nav_button("Quản Lý Tệp Tin", "files", 2)
+        self.nav_layout.addSpacing(10)
         
-        # Công cụ
+        # 3. Công cụ
         self.add_group_label("CÔNG CỤ")
-        self.add_nav_button("Bộ Xiaomi", "xiaomi", 3)
-        self.add_nav_button("Công Cụ Khác", "tools", 4)
-        self.main_layout.addSpacing(20)
+        self.add_nav_button("Công Cụ Xiaomi", "xiaomi", 3)
+        self.add_nav_button("Màn Hình & Debug", "debug", 4)
+        self.add_nav_button("Dành Cho Dev", "developer", 5)
         
-        # Hệ thống
+        self.nav_layout.addSpacing(10)
+        
+        # 4. Hệ thống
         self.add_group_label("HỆ THỐNG")
-        self.add_nav_button("Cài Đặt", "settings", 5)
+        self.add_nav_button("Cài Đặt", "settings", 6)
+        self.add_nav_button("Giới Thiệu", "about", 7)
         
-        self.main_layout.addStretch()
+        self.nav_layout.addStretch()
         
-        # Version
+        self.nav_area.setWidget(self.nav_content)
+        self.main_layout.addWidget(self.nav_area)
+        
+        # Version - Moved back to Main Layout (Bottom)
         from src.version import __version__
         self.version_label = QLabel(f"v{__version__} • HyperOS Style")
-        self.version_label.setStyleSheet(f"""
-            color: {theme['COLOR_TEXT_SECONDARY']}; 
-            padding: 12px; 
-            background: transparent; 
-            border: none; 
-            font-size: 12px;
-            font-weight: 500;
-        """)
+        self.version_label.setStyleSheet(f"color: {theme['COLOR_TEXT_SECONDARY']}; padding: 12px; font-size: 12px; font-weight: 500; border: none; background: transparent;")
         self.version_label.setAlignment(Qt.AlignCenter)
         self.main_layout.addWidget(self.version_label)
         
-        self.main_layout.addSpacing(10)
-        
-        # Bottom Toggle Button - Back to Bottom
+        # Bottom Toggle Button - Moved back to Main Layout (Bottom)
         self.collapse_btn = QPushButton("  ☰   Thu gọn")
         self.collapse_btn.setFixedHeight(50)
         self.collapse_btn.setCursor(Qt.PointingHandCursor)
         self.collapse_btn.setStyleSheet(ThemeManager.get_nav_button_style("16px", alignment="left"))
         self.collapse_btn.clicked.connect(self.toggle_collapse)
         self.main_layout.addWidget(self.collapse_btn)
+        
+        # NOTE: No stretch here, content will define its height. 
+        # But if window is tall, we need one stretch to keep footer at bottom.
+        # self.main_layout.addStretch() 
+        # Actually, let's NOT add stretch to the main sidebar layout if we want it to hug.
+        # But for QMainWindow compatibility, we usually want it.
+        
+
     
     def apply_theme(self):
         theme = ThemeManager.get_theme()
@@ -159,7 +184,7 @@ class Sidebar(QFrame):
         theme = ThemeManager.get_theme()
         label = QLabel(text)
         label.setStyleSheet(ThemeManager.get_sidebar_group_label_style())
-        self.main_layout.addWidget(label)
+        self.nav_layout.addWidget(label)
         self.group_labels.append(label)
     
     def add_nav_button(self, text, icon_key, index, active=False):
@@ -169,11 +194,10 @@ class Sidebar(QFrame):
         btn = QPushButton(text)
         
         # Check for image icon
-        import os
-        icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icons', icon_val)
+        icon_path = get_resource_path('resources', 'icons', icon_val)
         
         has_icon = False
-        if icon_val.endswith('.png') and os.path.exists(icon_path):
+        if icon_val.endswith(('.png', '.svg')) and os.path.exists(icon_path):
             btn.setIcon(QIcon(icon_path))
             btn.setIconSize(QSize(26, 26))
             has_icon = True
@@ -199,7 +223,7 @@ class Sidebar(QFrame):
         
         self.buttons.append(btn)
         self.nav_buttons.append(btn)
-        self.main_layout.addWidget(btn)
+        self.nav_layout.addWidget(btn)
         
         return btn
 
@@ -290,7 +314,7 @@ class DeviceSelector(QComboBox):
     
     def __init__(self):
         super().__init__()
-        self.setFixedWidth(260)
+        self.setFixedWidth(280)
         self.apply_theme()
     
     def apply_theme(self):
@@ -314,7 +338,13 @@ class MainWindow(QMainWindow):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         
-        self.resize(1450, 850)
+        # Balanced Resolution: 1400x800 (as requested by user)
+        # Using setMinimumSize to ensure usability while allowing expansion
+        self.resize(1400, 800)
+        self.setMinimumSize(1100, 600)
+        
+        # Restore Maximize Button/Resizability
+        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint)
         
         # Initialize Settings & Theme
         from PySide6.QtCore import QSettings
@@ -358,11 +388,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'window_effect'):
             # Detect Dark Mode for tint
             is_dark = ThemeManager.is_dark()
-            # ABGR format: 0xAABBGGRR
-            # Low alpha (0x20 = ~12%) for crystal clear glass effect
-            # Light Mode: 0x40FFFFFF (White tint)
+            # Low alpha (0x20-0x60) for crystal clear glass effect
+            # Light Mode: 0x30FCE5B3 (Sea Blue tint - Lower alpha for more glassiness)
             # Dark Mode: 0x40000000 (Black tint)
-            tint = 0x40000000 if is_dark else 0x40FFFFFF
+            tint = 0x40000000 if is_dark else 0x30FCE5B3
             self.window_effect.apply_acrylic(self.winId(), tint)
 
     def apply_theme(self):
@@ -390,8 +419,9 @@ class MainWindow(QMainWindow):
         # Content Area
         content_area = QWidget()
         content_layout = QVBoxLayout(content_area)
-        content_layout.setContentsMargins(28, 28, 28, 28)
-        content_layout.setSpacing(20)
+        # Further reduced margins for 680px height compatibility
+        content_layout.setContentsMargins(10, 5, 10, 5)
+        content_layout.setSpacing(5)
 
         # Header
         header = self.create_header()
@@ -414,6 +444,11 @@ class MainWindow(QMainWindow):
         # Initialize Notification Center
         # Parent to centralWidget to ensure correct Z-order and geometry as an overlay
         self.notif_center = NotificationCenter(self.centralWidget(), self.adb)
+        
+        # Connect LogManager to Notification Center
+        from src.core.log_manager import LogManager
+        log_manager = LogManager.get_instance()
+        log_manager.log_signal.connect(self.on_log_received)
 
     def create_header(self):
         theme = ThemeManager.get_theme()
@@ -429,7 +464,7 @@ class MainWindow(QMainWindow):
         header.setGraphicsEffect(shadow)
 
         layout = QHBoxLayout(header)
-        layout.setContentsMargins(24, 18, 24, 18)
+        layout.setContentsMargins(20, 10, 20, 10)
 
         # Page Title
         self.page_title = QLabel("Tổng Quan")
@@ -448,19 +483,19 @@ class MainWindow(QMainWindow):
         self.device_selector = DeviceSelector()
         self.device_selector.currentIndexChanged.connect(self.on_device_changed)
         layout.addWidget(self.device_selector)
-        layout.addSpacing(12)
+        layout.addSpacing(10)
 
         # Refresh Button with icon
         refresh_btn = QPushButton("↻")
         refresh_btn.setToolTip("Làm mới danh sách thiết bị")
-        refresh_btn.setFixedSize(44, 44)
+        refresh_btn.setFixedSize(36, 36)
         refresh_btn.clicked.connect(self.refresh_devices)
         refresh_btn.setCursor(Qt.PointingHandCursor)
         refresh_btn.setStyleSheet(ThemeManager.get_icon_button_style())
 
         # Control Center Button
         ctrl_btn = QPushButton()
-        ctrl_btn.setFixedSize(44, 44)
+        ctrl_btn.setFixedSize(36, 36)
         ctrl_btn.setCursor(Qt.PointingHandCursor)
         ctrl_btn.setToolTip("Trung tâm Điều khiển")
         ctrl_btn.clicked.connect(lambda checked: self.toggle_notification_center(0))
@@ -471,31 +506,20 @@ class MainWindow(QMainWindow):
         ctrl_icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icons', 'control_center.png')
         if os.path.exists(ctrl_icon_path):
             ctrl_btn.setIcon(QIcon(ctrl_icon_path))
-            ctrl_btn.setIconSize(QSize(24, 24))
+            ctrl_btn.setIconSize(QSize(18, 18))
         else:
             ctrl_btn.setText("🎛️")
 
-        # Notification Button
-        notif_btn = QPushButton()
-        notif_btn.setFixedSize(44, 44)
-        notif_btn.setCursor(Qt.PointingHandCursor)
-        notif_btn.setToolTip("Thông báo")
-        notif_btn.clicked.connect(lambda checked: self.toggle_notification_center(1))
-        notif_btn.setStyleSheet(ThemeManager.get_icon_button_style())
-
-        # Load notification icon
+        # Notification Button (B1: đổi sang NotifBadgeButton có badge)
         notif_icon_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'icons', 'notification.png')
-        if os.path.exists(notif_icon_path):
-            notif_btn.setIcon(QIcon(notif_icon_path))
-            notif_btn.setIconSize(QSize(24, 24))
-        else:
-            notif_btn.setText("🔔")
+        self.notif_btn = NotifBadgeButton(notif_icon_path, tooltip="Thông báo")
+        self.notif_btn.clicked.connect(lambda checked: self.toggle_notification_center(1))
 
         layout.addWidget(refresh_btn)
-        layout.addSpacing(10)
+        layout.addSpacing(8)
         layout.addWidget(ctrl_btn)
-        layout.addSpacing(10)
-        layout.addWidget(notif_btn)
+        layout.addSpacing(8)
+        layout.addWidget(self.notif_btn)
 
         return header
 
@@ -505,25 +529,33 @@ class MainWindow(QMainWindow):
         self.dashboard = DashboardWidget(self.adb)
         self.pages.addWidget(self.dashboard)
 
-        # 1. App Manager
-        self.app_manager = AppManagerWidget(self.adb)
-        self.pages.addWidget(self.app_manager)
+        # 1. Apps & APKs (Replaces standalone App Manager)
+        self.apps_and_apk = AppsAndAPKPage(self.adb)
+        self.pages.addWidget(self.apps_and_apk)
 
         # 2. File Manager
         self.file_manager = FileManagerWidget(self.adb)
         self.pages.addWidget(self.file_manager)
 
-        # 3. Xiaomi Suite
-        self.xiaomi_suite = XiaomiSuiteWidget(self.adb)
-        self.pages.addWidget(self.xiaomi_suite)
+        # 3. Xiaomi Tools (Replaces Xiaomi Suite Hub)
+        self.xiaomi_tools = XiaomiToolsPage(self.adb)
+        self.pages.addWidget(self.xiaomi_tools)
 
-        # 4. General Tools
-        self.general_tools = GeneralToolsWidget(self.adb)
-        self.pages.addWidget(self.general_tools)
+        # 4. Screen & Debug
+        self.screen_debug = ScreenAndDebugPage(self.adb)
+        self.pages.addWidget(self.screen_debug)
+
+        # 5. Developer (Replaces General Tools)
+        self.developer = DeveloperPage(self.adb)
+        self.pages.addWidget(self.developer)
 
         # 5. Settings
         self.settings_widget = SettingsWidget(self.adb)
         self.pages.addWidget(self.settings_widget)
+
+        # 6. About
+        self.about_page = AboutPage(self.adb)
+        self.pages.addWidget(self.about_page)
 
     def setup_timers(self):
         """Setup background timers"""
@@ -537,9 +569,14 @@ class MainWindow(QMainWindow):
         index = btn.property("page_index")
         self.pages.setCurrentIndex(index)
 
-        text = btn.text().strip().split("    ")[-1].strip()
+        text = btn.property("full_text")
         self.page_title.setText(text)
         self.status_bar.showMessage(f"✓ {text}")
+        
+        # Animation: Fade In New Page
+        current_page = self.pages.currentWidget()
+        if current_page:
+            ThemeManager.AnimationHelper.fade_in(current_page, duration=250)
 
     def refresh_devices(self):
         """Refresh connected devices list in background"""
@@ -623,7 +660,7 @@ class MainWindow(QMainWindow):
                     if not adb_devices:
                         fastboot_devices = self.adb.get_fastboot_devices()
                     self.count_ready.emit(len(adb_devices) + len(fastboot_devices))
-                except:
+                except Exception as _e:
                     self.count_ready.emit(-1)
 
         self._check_worker = CheckWorker(self.adb)
@@ -677,10 +714,17 @@ class MainWindow(QMainWindow):
             else:
                 self.status_bar.showMessage(f"✓ Đã chọn thiết bị: {serial}")
                 
-                if hasattr(self, 'app_manager'): self.app_manager.reset()
-                if hasattr(self, 'file_manager'): self.file_manager.reset()
-                if hasattr(self, 'xiaomi_suite'): self.xiaomi_suite.reset()
-                if hasattr(self, 'general_tools'): self.general_tools.reset()
+                # Reset widgets on device change
+                if hasattr(self, 'apps_and_apk'):
+                    self.apps_and_apk.reset()
+                if hasattr(self, 'file_manager'):
+                    self.file_manager.reset()
+                if hasattr(self, 'xiaomi_tools'):
+                    self.xiaomi_tools.reset()
+                if hasattr(self, 'screen_debug'):
+                    self.screen_debug.reset()
+                if hasattr(self, 'developer'):
+                    self.developer.reset()
                 
                 if hasattr(self, 'dashboard'):
                     self.dashboard.start_updates()
@@ -689,8 +733,9 @@ class MainWindow(QMainWindow):
                     brand = self.adb.shell("getprop ro.product.brand")
                     if brand and "Xiaomi" in brand:
                         self.status_bar.showMessage(f"✓ Thiết bị Xiaomi: {serial}")
-                except:
-                    pass
+                except Exception as _e:
+
+                    pass  # TODO: consider LogManager.log
         else:
             if hasattr(self, 'dashboard'):
                 self.dashboard.stop_updates()
@@ -718,17 +763,34 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         """Ensure Notification Center stays on the right edge"""
-        if hasattr(self, 'notif_center'):
-            # Height: Match window height
-            self.notif_center.setFixedHeight(self.height())
-            
-            # Position: Right aligned
-            # x = width - notif_width
-            # y = 0
-            new_x = self.width() - self.notif_center.width()
-            self.notif_center.move(new_x, 0)
-        
         super().resizeEvent(event)
+        if hasattr(self, 'notif_center') and self.notif_center.isVisible():
+            # Adjust Y position to account for header/toolbar
+            parent_rect = self.centralWidget().rect()
+            self.notif_center.setFixedHeight(parent_rect.height())
+            self.notif_center.setGeometry(
+                parent_rect.width() - self.notif_center.width(),
+                0,
+                self.notif_center.width(),
+                parent_rect.height()
+            )
+
+    def on_log_received(self, title: str, message: str, level: str):
+        """Handle log signal from LogManager and forward to notification center"""
+        level_map = {
+            'error': 'error', 'warning': 'warning',
+            'info': 'info', 'success': 'success'
+        }
+        notif_type = level_map.get(level.lower(), 'info')
+        full_message = f"{title}: {message}" if title else message
+
+        if hasattr(self, 'notif_center'):
+            self.notif_center.add_notification(notif_type, full_message)
+
+        # B1: Tăng badge nếu notification panel đang đóng
+        if hasattr(self, 'notif_btn') and hasattr(self, 'notif_center'):
+            if not self.notif_center.isVisible():
+                self.notif_btn.increment(level.lower())
 
     def eventFilter(self, obj, event):
         """Handle global events for Auto-Hide logic"""
@@ -782,6 +844,9 @@ class MainWindow(QMainWindow):
     def toggle_notification_center(self, tab_index=None):
         if hasattr(self, 'notif_center'):
             self.notif_center.toggle(tab_index)
+            # B1: Reset badge khi user mở notification panel (tab 1)
+            if tab_index == 1 and hasattr(self, 'notif_btn'):
+                self.notif_btn.reset()
     
     def check_for_updates_startup(self):
         """Check for updates silently on startup"""
@@ -797,8 +862,9 @@ class MainWindow(QMainWindow):
             from PySide6.QtCore import QDateTime
             current_time = QDateTime.currentDateTime().toString(Qt.ISODate)
             self.settings.setValue("last_update_check", current_time)
-        except:
-            pass  # Silent fail on startup
+        except Exception as _e:
+
+            pass  # TODO: consider LogManager.log  # Silent fail on startup
     
     def on_startup_update_found(self, update_info: dict):
         """Handle update found on startup"""
@@ -818,8 +884,9 @@ class MainWindow(QMainWindow):
             elif dialog.user_choice == 'skip':
                 # Save skip version
                 self.settings.setValue("skip_version", update_info['version'])
-        except:
-            pass  # Fail silently on startup
+        except Exception as _e:
+
+            pass  # TODO: consider LogManager.log  # Fail silently on startup
     
     def start_update_download(self, update_info: dict):
         """Start downloading update"""
@@ -828,4 +895,4 @@ class MainWindow(QMainWindow):
             progress_dialog.start_download()
             progress_dialog.exec()
         except Exception as e:
-            QMessageBox.warning(self, "Lỗi", f"Không thể tải cập nhật:\n{str(e)}")
+            LogManager.log("Lỗi", f"Không thể tải cập nhật:\n{str(e)}", "warning")

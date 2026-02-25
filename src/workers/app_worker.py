@@ -72,7 +72,9 @@ class InstallerThread(QThread):
                 try:
                     if os.path.isdir(path): shutil.rmtree(path, ignore_errors=True)
                     elif os.path.isfile(path): os.remove(path)
-                except: pass
+                except Exception as _e:
+
+                    pass  # TODO: consider LogManager.log
 
 class BackupThread(QThread):
     progress = Signal(str)
@@ -167,7 +169,9 @@ class AppScanner(QThread):
                 for line in self.adb.shell("pm list packages -d").splitlines():
                     if line.startswith("package:"): disabled.add(line[8:].strip())
                 print(f"[AppScanner] Found {len(disabled)} disabled packages")
-            except: pass
+            except Exception as _e:
+
+                pass  # TODO: consider LogManager.log
             
             # Note: We no longer need to check suspended packages
             # because we now use 'pm uninstall -k --user 0' which is tracked by pm list packages
@@ -176,7 +180,9 @@ class AppScanner(QThread):
             try:
                  for line in self.adb.shell("pm list packages").splitlines():
                     if line.startswith("package:"): installed.add(line[8:].strip())
-            except: pass
+            except Exception as _e:
+
+                pass  # TODO: consider LogManager.log
             
             output = self.adb.shell("pm list packages -u -f")
             if not output: 

@@ -82,16 +82,18 @@ class FileDownloader(QThread):
             if os.path.exists(self.destination):
                 try:
                     os.remove(self.destination)
-                except:
-                    pass
+                except Exception as _e:
+
+                    pass  # TODO: consider LogManager.log
                     
         except Exception as e:
             self.error.emit(f"Lỗi không xác định: {str(e)}")
             if os.path.exists(self.destination):
                 try:
                     os.remove(self.destination)
-                except:
-                    pass
+                except Exception as _e:
+
+                    pass  # TODO: consider LogManager.log
     
     def cancel(self):
         """Cancel the download"""

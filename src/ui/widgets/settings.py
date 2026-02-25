@@ -15,6 +15,8 @@ from src.ui.theme_manager import ThemeManager
 from src.version import __version__, __app_name__
 from src.core.update_manager import UpdateChecker
 from src.ui.dialogs.update_dialog import UpdateNotificationDialog, UpdateProgressDialog
+from src.workers.callable_worker import CallableWorker
+from src.core.log_manager import LogManager
 
 class SettingsWidget(QWidget):
     """
@@ -44,12 +46,20 @@ class SettingsWidget(QWidget):
         title.setStyleSheet(f"font-size: 24px; font-weight: 800; color: {ThemeManager.COLOR_ACCENT}; margin-bottom: 5px;")
         header_layout.addWidget(title)
         
-        # Tab Buttons Container
+        # Tab Pills Container (Pills/Segmented Control)
         tabs_container = QFrame()
-        tabs_container.setStyleSheet("background: transparent;")
+        tabs_container.setObjectName("PillsContainer")
+        tabs_container.setStyleSheet(f"""
+            #PillsContainer {{
+                background: rgba(45, 45, 45, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 24px;
+                padding: 4px;
+            }}
+        """)
         tabs_layout = QHBoxLayout(tabs_container)
         tabs_layout.setContentsMargins(4, 4, 4, 4)
-        tabs_layout.setSpacing(8)
+        tabs_layout.setSpacing(4)
         
         self.btn_group = QButtonGroup(self)
         self.btn_group.setExclusive(True)
@@ -58,32 +68,37 @@ class SettingsWidget(QWidget):
             ("Chung", 0),
             ("Cấu hình ADB", 1),
             ("Cloud Sync", 2),
-            ("Cập Nhật", 3),
-            ("Giới thiệu", 4)
+            ("Cập Nhật", 3)
         ]
         
         for text, index in tabs:
             btn = QPushButton(text)
             btn.setCheckable(True)
             btn.setCursor(Qt.PointingHandCursor)
-            # Apply Segmented Button Style directly here or via class
+            btn.setObjectName("PillTab")
+            # Modern Pills Style with glassmorphism
             btn.setStyleSheet(f"""
-                QPushButton {{
+                #PillTab {{
                     background-color: transparent;
                     border: none;
-                    border-radius: 8px;
-                    font-weight: 600;
-                    color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']};
-                    padding: 8px 20px;
+                    border-radius: 16px;
+                    font-weight: 500;
+                    color: #B4B4B4;
+                    padding: 10px 24px;
                     font-size: 14px;
                 }}
-                QPushButton:checked {{
+                #PillTab:checked {{
                     background-color: {ThemeManager.COLOR_ACCENT};
                     color: white;
-                    font-weight: 700;
+                    font-weight: 600;
+                    border-radius: 16px;
                 }}
-                QPushButton:hover {{
-                    background-color: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']};
+                #PillTab:hover:!checked {{
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #FFFFFF;
+                }}
+                #PillTab:focus {{
+                    outline: none;
                 }}
             """)
             
@@ -93,7 +108,6 @@ class SettingsWidget(QWidget):
             if index == 0:
                 btn.setChecked(True)
                 
-        tabs_layout.addStretch()
         header_layout.addWidget(tabs_container)
         
         main_layout.addWidget(header_frame)
@@ -118,131 +132,12 @@ class SettingsWidget(QWidget):
         update_page = self.create_update_page()
         self.stack.addWidget(update_page)
 
-        # About Page
-        about_page = self.create_about_page()
-        self.stack.addWidget(about_page)
+
         
         # Connect Group
         self.btn_group.idClicked.connect(self.stack.setCurrentIndex)
 
-    def create_general_page(self):
-        """Create the general settings page"""
-        page = QWidget()
-        content_layout = QVBoxLayout(page)
-        
-        # General Settings Card
-        general_card = self.create_card("Chung")
-        general_layout = QFormLayout(general_card)
-        general_layout.setContentsMargins(20, 25, 20, 20)
-        general_layout.setVerticalSpacing(15)
-        
-        self.theme_combo = QComboBox()
-        themes = ThemeManager.get_available_themes()
-        for name, key in themes:
-            self.theme_combo.addItem(name, key)
-            
-        current = ThemeManager._current_theme
-        index = self.theme_combo.findData(current)
-        if index >= 0: self.theme_combo.setCurrentIndex(index)
-            
-        self.theme_combo.setStyleSheet(ThemeManager.get_input_style())
-        self.theme_combo.currentIndexChanged.connect(self.on_theme_changed) 
-        
-        lbl_theme = QLabel("Giao diện:")
-        lbl_theme.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 600;")
-        general_layout.addRow(lbl_theme, self.theme_combo)
-        
-        self.lang_combo = QComboBox()
-        self.lang_combo.addItems(["Tiếng Việt", "Tiếng Anh"])
-        self.lang_combo.setStyleSheet(ThemeManager.get_input_style())
-        
-        lbl_lang = QLabel("Ngôn ngữ:")
-        lbl_lang.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 600;")
-        general_layout.addRow(lbl_lang, self.lang_combo)
-        
-        content_layout.addWidget(general_card)
-        
-        # Menu Visibility Card
-        menu_card = self.create_card("Hiển thị Menu / Menu Visibility")
-        menu_layout = QVBoxLayout(menu_card)
-        menu_layout.setContentsMargins(20, 25, 20, 20)
-        
-        menu_desc = QLabel("Bật/tắt các menu trong thanh điều hướng bên trái:")
-        menu_desc.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-size: 13px; margin-bottom: 10px;")
-        menu_layout.addWidget(menu_desc)
-        
-        self.advanced_menu_checkbox = QCheckBox("⚡ Hiện menu 'Nâng Cao' / Show 'Advanced' menu")
-        show_advanced = self.settings.value("show_advanced_menu", True, type=bool)
-        self.advanced_menu_checkbox.setChecked(show_advanced)
-        self.advanced_menu_checkbox.stateChanged.connect(self.on_advanced_menu_changed)
-        self.advanced_menu_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 14px; padding: 5px;")
-        menu_layout.addWidget(self.advanced_menu_checkbox)
-        
-        content_layout.addWidget(menu_card)
-        content_layout.addStretch()
-        
-        return page
 
-    def create_card(self, title_text):
-        """Create a Glass Card with a Title"""
-        card = QFrame()
-        card.setObjectName("SettingsCard")
-        card.setStyleSheet(f"""
-            #SettingsCard {{
-                background-color: {ThemeManager.get_theme()['COLOR_GLASS_CARD']};
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
-                border-radius: {ThemeManager.RADIUS_CARD};
-            }}
-        """)
-        
-        # Overlay Title (Label on top of the frame)
-        # Note: In a simple VBoxLayout, we just add the title inside.
-        # But to have it look like a "Section Header", we style it.
-        
-        # We return the card widget. The caller should create a layout for it.
-        # WAIT: The caller needs to add the title to the layout first.
-        # Let's change this: create_card returns (card_widget, content_layout)?
-        # No, let's keep it simple. We can't easily add the title 'outside' the layout inside this method if we return just the widget.
-        # Actually, let's follow the pattern: The card is the container.
-        
-        # Let's manually add the title label *inside* the card as the first item.
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(0, 0, 0, 0) # Clear margins for internal logic, but caller might set layout
-        # Re-creating layout? No, caller usually does 'layout = QFormLayout(card)'. 
-        
-        # To support different layouts (Form vs VBox), let's just return the styled frame.
-        # AND let's handle the title by returning a container that HAS the title?
-        # Or, we just use a helper to CREATE the title label.
-        
-        # Changing approach: create_group_box replacement.
-        
-        return card
-
-    # ... wait, we need to inject the Title if we replace QGroupBox.
-    # Let's modify usage above:
-    # general_card = self.create_card("Chung") -> The helper adds the title?
-    
-    # Correction: The code above `general_layout = QFormLayout(general_card)` will OVERWRITE the layout if I set one in `create_card`.
-    # So `create_card` should just return the Frame.
-    # AND I should add the title manually?
-    # BETTER: `create_card` returns a Frame, and I add a QLabel "Header" to it?
-    
-    # Revised implementation for `create_card`:
-    # It acts as a factory. But QFormLayout can't easily have a "Header" unless it's a spanning row.
-    
-    # Let's look at `create_general_page` again.
-    # I can use a VBoxLayout for expectation, and nest the FormLayout?
-    
-    # Let's stick to the Plan:
-    # 1. create_general_page creates a QFrame (card).
-    # 2. Inside, a QVBoxLayout.
-    # 3. Add Title Label.
-    # 4. Add FormLayout (or widget with form layout).
-    
-    # Let's Rewrite `create_general_page` completely in the Replacement Content to be safer.
-    
-    # REVISED REPLACEMENT CONTENT below imports the new logic.
-    pass
 
     def create_card_frame(self, title):
         card = QFrame()
@@ -289,9 +184,16 @@ class SettingsWidget(QWidget):
         lbl_theme.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 600;")
         form_layout.addRow(lbl_theme, self.theme_combo)
         
+        # A2: Language selector — kết nối save setting
         self.lang_combo = QComboBox()
-        self.lang_combo.addItems(["Tiếng Việt", "Tiếng Anh"])
+        self.lang_combo.addItem("Tiếng Việt", "vi")
+        self.lang_combo.addItem("Tiếng Anh", "en")
+        saved_lang = self.settings.value("language", "vi")
+        lang_idx = self.lang_combo.findData(saved_lang)
+        if lang_idx >= 0:
+            self.lang_combo.setCurrentIndex(lang_idx)
         self.lang_combo.setStyleSheet(ThemeManager.get_input_style())
+        self.lang_combo.currentIndexChanged.connect(self.on_lang_changed)  # A2: kết nối
         
         lbl_lang = QLabel("Ngôn ngữ:")
         lbl_lang.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-weight: 600;")
@@ -300,20 +202,6 @@ class SettingsWidget(QWidget):
         card_layout.addLayout(form_layout)
         content_layout.addWidget(card)
         
-        # Menu Visibility
-        menu_card, menu_layout = self.create_card_frame("Hiển thị Menu / Menu Visibility")
-        
-        menu_desc = QLabel("Bật/tắt các menu trong thanh điều hướng bên trái:")
-        menu_desc.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-size: 13px;")
-        menu_layout.addWidget(menu_desc)
-        
-        self.advanced_menu_checkbox = QCheckBox("⚡ Hiện menu 'Nâng Cao' / Show 'Advanced' menu")
-        self.advanced_menu_checkbox.setChecked(self.settings.value("show_advanced_menu", True, type=bool))
-        self.advanced_menu_checkbox.stateChanged.connect(self.on_advanced_menu_changed)
-        self.advanced_menu_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 14px; padding: 5px;")
-        menu_layout.addWidget(self.advanced_menu_checkbox)
-        
-        content_layout.addWidget(menu_card)
         content_layout.addStretch()
         return page
 
@@ -334,22 +222,23 @@ class SettingsWidget(QWidget):
         theme_key = self.theme_combo.itemData(index)
         if theme_key:
             ThemeManager.set_theme(theme_key)
-            # Update UI immediately
             if self.window():
                 try:
                     self.window().apply_theme()
                     self.setStyleSheet("") # Force refresh
                     self._save_setting("theme", theme_key, f"Đã đổi giao diện: {self.theme_combo.currentText()}")
-                except: pass
+                except Exception as e:
+                    LogManager.log("Settings", f"Lỗi khi đổi theme: {e}", "error")
 
-    def on_advanced_menu_changed(self, state):
-        """Handle advanced menu toggle with auto-save"""
-        is_checked = self.advanced_menu_checkbox.isChecked()
-        self._save_setting("show_advanced_menu", is_checked, "Đã lưu cài đặt Menu")
-        
-        # Notify main window
-        if self.window() and hasattr(self.window(), 'update_menu_visibility'):
-            self.window().update_menu_visibility('advanced', is_checked)
+    def on_lang_changed(self, index):
+        """A2: Lưu cài đặt ngôn ngữ và thông báo cần khởi động lại"""
+        lang_key = self.lang_combo.itemData(index)
+        if lang_key:
+            self.settings.setValue("language", lang_key)
+            lang_name = self.lang_combo.currentText()
+            self.show_toast(f"Đã chọn {lang_name} — Khởi động lại ứng dụng để áp dụng")
+            LogManager.log("Settings", f"🌐 Ngôn ngữ được đổi sang: {lang_name}", "info")
+
 
     def create_adb_page(self):
         """Create the ADB configuration page"""
@@ -371,8 +260,6 @@ class SettingsWidget(QWidget):
         browse_btn = QPushButton("Duyệt")
         browse_btn.clicked.connect(self.browse_adb)
         browse_btn.setStyleSheet(ThemeManager.get_button_style("outline"))
-        adb_path_layout.addWidget(browse_btn)
-        
         adb_path_layout.addWidget(browse_btn)
         
         adb_layout.addLayout(adb_path_layout)
@@ -425,12 +312,6 @@ class SettingsWidget(QWidget):
         
         layout.addLayout(path_layout)
         
-        browse_btn.clicked.connect(self.browse_cloud_folder)
-        browse_btn.setStyleSheet(ThemeManager.get_button_style("outline"))
-        path_layout.addWidget(browse_btn)
-        
-        layout.addLayout(path_layout)
-        
         # Auto-save Cloud Path
         self.cloud_path_input.editingFinished.connect(self.save_cloud_path_auto)
         
@@ -474,7 +355,7 @@ class SettingsWidget(QWidget):
         update_layout.addWidget(self.auto_check_checkbox)
         
         self.prerelease_checkbox = QCheckBox("Bao gồm phiên bản beta (pre-release)")
-        include_prerelease = self.settings.value("include_prerelease", True, type=bool)
+        include_prerelease = self.settings.value("include_prerelease", False, type=bool)
         self.prerelease_checkbox.setChecked(include_prerelease)
         self.prerelease_checkbox.stateChanged.connect(self.save_update_settings_auto)
         self.prerelease_checkbox.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY}; font-size: 13px;")
@@ -543,11 +424,10 @@ class SettingsWidget(QWidget):
         # Check if this version should be skipped
         skip_version = self.settings.value("skip_version", "")
         if skip_version == update_info['version']:
-            QMessageBox.information(
-                self,
+            LogManager.log(
                 "Cập Nhật",
-                f"Phiên bản {update_info['version']} có sẵn (bạn đã chọn bỏ qua).\n\n"
-                f"Bạn có thể kiểm tra lại để cập nhật."
+                f"Phiên bản {update_info['version']} có sẵn (bạn đã chọn bỏ qua).\nBạn có thể kiểm tra lại để cập nhật.",
+                "info"
             )
             return
         
@@ -561,7 +441,7 @@ class SettingsWidget(QWidget):
         elif dialog.user_choice == 'skip':
             # Save skip version
             self.settings.setValue("skip_version", update_info['version'])
-            QMessageBox.information(self, "Thông báo", f"Đã bỏ qua phiên bản {update_info['version']}.")
+            LogManager.log("Thông báo", f"Đã bỏ qua phiên bản {update_info['version']}.", "success")
     
     def on_no_update(self):
         """Handle no update available"""
@@ -569,10 +449,10 @@ class SettingsWidget(QWidget):
             current_time = QDateTime.currentDateTime().toString("dd/MM/yyyy HH:mm")
             self.last_check_label.setText(f"Lần kiểm tra cuối: {current_time}")
         
-        QMessageBox.information(
-            self,
+        LogManager.log(
             "Cập Nhật",
-            f"Bạn đang sử dụng phiên bản mới nhất ({__version__})! 🎉"
+            f"Bạn đang sử dụng phiên bản mới nhất ({__version__})! 🎉",
+            "success"
         )
     
     def on_update_error(self, error_msg: str):
@@ -581,11 +461,10 @@ class SettingsWidget(QWidget):
             current_time = QDateTime.currentDateTime().toString("dd/MM/yyyy HH:mm")
             self.last_check_label.setText(f"Lần kiểm tra cuối: {current_time} (Lỗi)")
         
-        QMessageBox.warning(
-            self,
+        LogManager.log(
             "Lỗi Kiểm Tra Cập Nhật",
-            f"Không thể kiểm tra cập nhật:\n{error_msg}\n\n"
-            f"Vui lòng kiểm tra kết nối internet và thử lại."
+            f"Không thể kiểm tra cập nhật:\n{error_msg}\nVui lòng kiểm tra kết nối internet.",
+            "error"
         )
     
     def start_update_download(self, update_info: dict):
@@ -606,106 +485,7 @@ class SettingsWidget(QWidget):
         
         self.show_toast("Đã lưu cài đặt cập nhật")
 
-    def create_about_page(self):
-        """Create the detailed about page"""
-        page = QWidget()
-        content_layout = QVBoxLayout(page)
-        
-        # Scroll Area for long content
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("border: none; background: transparent;")
-        
-        content_container = QWidget()
-        content_layout_inner = QVBoxLayout(content_container)
-        
-        # About Header
-        about_group = QGroupBox("Giới thiệu")
-        about_group.setStyleSheet(self.get_group_style())
-        about_layout = QVBoxLayout(about_group)
-        
-        about_text = QLabel(
-            "<h2>📱 Xiaomi ADB Commander</h2>"
-            f"<p><b>Phiên bản:</b> {__version__} (Latest)</p>"
-            "<p><b>Tác giả:</b> Van Khoai</p>"
-            "<p>Công cụ quản lý thiết bị Android toàn diện, tối ưu hóa đặc biệt cho Xiaomi/MIUI/HyperOS.</p>"
-        )
-        about_text.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY};")
-        about_layout.addWidget(about_text)
-        content_layout_inner.addWidget(about_group)
-        
-        # New Features / Changelog Preview (Dynamic from Release Notes)
-        changelog_group = QGroupBox(f"Cập nhật mới (v{__version__})")
-        changelog_group.setStyleSheet(self.get_group_style())
-        changelog_layout = QVBoxLayout(changelog_group)
-        
-        # Release Notes v2.5.5.2 mapped content
-        changelog_html = """
-        <h3 style="margin-bottom: 5px;">✨ UI Polish & Dialog Fixes (v2.5.5.2)</h3>
-        <ul style="margin-top: 0px; margin-bottom: 10px; margin-left: -20px; color: #333;">
-            <li>🎨 <b>Glass Dialogs:</b> Hộp thoại thông báo mới với hiệu ứng kính mờ (Glassmorphism), không còn bị lỗi đen nền.</li>
-            <li>🧹 <b>Clean UI:</b> Loại bỏ hoàn toàn các viền dư thừa (boxy borders) trên tiêu đề các nhóm chức năng.</li>
-            <li>🛡️ <b>Stability:</b> Thêm kiểm tra kết nối thiết bị chặt chẽ trước khi chạy lệnh tối ưu hóa.</li>
-            <li>🐛 <b>Bug Fixes:</b> Sửa lỗi Crash khởi động và các lỗi hiển thị nhỏ khác.</li>
-        </ul>
-        """
-        if ThemeManager.get_theme() == "dark":
-             changelog_html = changelog_html.replace("#333", "#eee")
-             
-        changelog_label = QLabel(changelog_html)
-        changelog_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY};")
-        changelog_layout.addWidget(changelog_label)
-        content_layout_inner.addWidget(changelog_group)
-        
-        # Features List
-        features_group = QGroupBox("Tính năng Chính")
-        features_group.setStyleSheet(self.get_group_style())
-        features_layout = QVBoxLayout(features_group)
-        
-        features_html = """
-        <ul style="margin-top: 0px; margin-bottom: 0px; margin-left: -20px; color: #333;">
-            <li><b>Dashboard:</b> Xem thông tin chi tiết thiết bị, tình trạng pin, bộ nhớ.</li>
-            <li><b>Quản lý Ứng dụng:</b> Cài đặt, gỡ bỏ, vô hiệu hóa ứng dụng hệ thống (Debloat).</li>
-            <li><b>File Manager:</b> Quản lý tệp tin, kéo thả, upload/download nhanh chóng.</li>
-            <li><b>Screen Mirror:</b> Phản chiếu màn hình điện thoại lên máy tính (Scrcpy tích hợp).</li>
-            <li><b>Xiaomi Tools:</b> Bỏ qua tài khoản Mi, tắt quảng cáo hệ thống (MSA), tối ưu MIUI.</li>
-            <li><b>Fastboot & Recovery:</b> Các công cụ nạp ROM, xóa dữ liệu, reboot nâng cao.</li>
-        </ul>
-        """
-        if ThemeManager.get_theme() == "dark":
-             features_html = features_html.replace("#333", "#eee")
-             
-        features_label = QLabel(features_html)
-        features_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY};")
-        features_layout.addWidget(features_label)
-        content_layout_inner.addWidget(features_group)
-        
-        # Roadmap / Dev Status
-        dev_group = QGroupBox("Lộ trình Phát triển (Roadmap)")
-        dev_group.setStyleSheet(self.get_group_style())
-        dev_layout = QVBoxLayout(dev_group)
-        
-        dev_html = """
-        <p><b>Đang phát triển (Upcoming):</b></p>
-        <ul style="margin-top: 0px; margin-left: -20px;">
-            <li>☁️ <b>Cloud Sync Global:</b> Đồng bộ trực tiếp Google Drive API (Không cần qua thư mục máy tính).</li>
-            <li>🐧 <b>Linux/Mac Support:</b> Hỗ trợ đa nền tảng tốt hơn.</li>
-            <li>⚡ <b>Flash ROM Auto:</b> Tự động tải và flash ROM Stock cho Xiaomi.</li>
-            <li>🔋 <b>Battery Cycle Reset:</b> (Cần Root) Reset số lần sạc pin.</li>
-        </ul>
-        <p><i>Mọi ý kiến đóng góp xin vui lòng liên hệ tác giả.</i></p>
-        """
-        dev_label = QLabel(dev_html)
-        dev_label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY};")
-        dev_layout.addWidget(dev_label)
-        content_layout_inner.addWidget(dev_group)
-        
-        content_layout_inner.addStretch()
-        
-        scroll.setWidget(content_container)
-        content_layout.addWidget(scroll)
 
-        return page
         
     def get_group_style(self):
         return f"""
@@ -748,7 +528,7 @@ class SettingsWidget(QWidget):
         else:
             # Only warn if not empty (user might be clearing it)
             if path:
-                QMessageBox.warning(self, "Lỗi", "Đường dẫn ADB không hợp lệ")
+                LogManager.log("Lỗi", "Đường dẫn ADB không hợp lệ", "warning")
 
     def save_cloud_path_auto(self):
         """Auto save Cloud path"""
@@ -756,79 +536,32 @@ class SettingsWidget(QWidget):
         self._save_setting("cloud_sync_path", path, "Đã lưu đường dẫn Cloud")
 
     def fix_connection(self):
-        """Run ADB Fix Connection"""
-    def fix_connection(self):
-        """Run ADB Fix Connection"""
-        # QMessageBox.information(self, "Thông báo", "Đang tiến hành sửa lỗi kết nối...\nVui lòng đợi trong giây lát.")
-        
-        from PySide6.QtWidgets import QApplication
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-        if self.window():
-            self.window().statusBar().showMessage("🛠️ Đang sửa lỗi kết nối ADB... Vui lòng đợi...")
-            QApplication.processEvents() # Force UI update
-            
-        try:
-            # Run in background to avoid freezing UI? For now run directly as it's short
-            result = self.adb.fix_connection()
-            
-            from PySide6.QtWidgets import QMessageBox
-            # Use a fresh message box with explicit style
-            msg = QMessageBox(self)
-            msg.setWindowTitle("Kết quả")
-            msg.setText(result)
-            msg.setIcon(QMessageBox.Information)
-            msg.setStyleSheet(f"background-color: {ThemeManager.get_theme()['COLOR_BG_MAIN']}; color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};")
-            msg.exec()
-            
-        finally:
-            QApplication.restoreOverrideCursor()
-            if self.window():
-                self.window().statusBar().showMessage("✓ Đã hoàn tất")
+        """A1: Chạy ADB Fix Connection trên background thread (không đơ UI)"""
+        # Disable button trong lúc chạy
+        btn = self.sender()
+        if isinstance(btn, QPushButton):
+            btn.setEnabled(False)
+            btn.setText("⏳ Đang sửa lỗi...")
 
-    def change_theme(self, index):
-        """Handle theme change"""
-        theme_key = self.theme_combo.itemData(index)
-        if theme_key:
-            ThemeManager.set_theme(theme_key)
-            
-            # Try to update parent window
-            if self.window():
-                try:
-                    self.window().apply_theme()
-                    # Also refresh self to apply new styles to inputs/buttons
-                    self.setStyleSheet("")  # Reset to force refresh
-                    
-                    # Notify user with themed message box
-                    msg_box = QMessageBox(self)
-                    msg_box.setWindowTitle("Đổi Giao Diện")
-                    msg_box.setText(f"Đã chuyển sang giao diện: {self.theme_combo.currentText()}.")
-                    msg_box.setInformativeText("Một số thành phần có thể cần khởi động lại ứng dụng để hiển thị đúng hoàn toàn.")
-                    msg_box.setIcon(QMessageBox.Information)
-                    
-                    # Apply theme styling to message box
-                    theme = ThemeManager.get_theme()
-                    msg_box.setStyleSheet(f"""
-                        QMessageBox {{
-                            background-color: {theme['COLOR_GLASS_WHITE']};
-                            color: {theme['COLOR_TEXT_PRIMARY']};
-                        }}
-                        QMessageBox QLabel {{
-                            color: {theme['COLOR_TEXT_PRIMARY']};
-                            background: transparent;
-                        }}
-                        QPushButton {{
-                            background: {ThemeManager.COLOR_ACCENT};
-                            color: white;
-                            border: none;
-                            padding: 8px 20px;
-                            border-radius: 6px;
-                            font-weight: bold;
-                            min-width: 80px;
-                        }}
-                        QPushButton:hover {{
-                            opacity: 0.9;
-                        }}
-                    """)
-                    msg_box.exec()
-                except Exception as e:
-                    print(f"Error applying theme: {e}")
+        LogManager.log("Settings", "🛠️ Đang sửa lỗi kết nối ADB...", "info")
+
+        self._fix_worker = CallableWorker(self.adb.fix_connection)
+
+        def on_done(result):
+            LogManager.log("Settings", f"✓ Kết quả sửa kết nối: {result}", "success")
+            if isinstance(btn, QPushButton):
+                btn.setEnabled(True)
+                btn.setText("🔧 Sửa lỗi kết nối ADB")
+
+        def on_error(err):
+            LogManager.log("Settings", f"❌ Lỗi khi sửa kết nối: {err}", "error")
+            if isinstance(btn, QPushButton):
+                btn.setEnabled(True)
+                btn.setText("🔧 Sửa lỗi kết nối ADB")
+
+        self._fix_worker.finished.connect(on_done)
+        self._fix_worker.error.connect(on_error)
+        self._fix_worker.start()
+
+
+

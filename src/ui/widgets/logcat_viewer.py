@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtGui import QColor, QTextCursor, QFont
 from src.ui.theme_manager import ThemeManager
 import re
+import shlex
 
 class LogcatWorker(QThread):
     log_received = Signal(str)
@@ -27,14 +28,16 @@ class LogcatWorker(QThread):
         # Use subprocess directly to read stream
         import subprocess
         # -v color is nice for terminal but we parse manually. -v time is good.
-        cmd = f"{self.adb.adb_path} logcat -v time {self.filters}"
+        # Build command list instead of string (no shell=True)
+        import os
+        cmd_list = [self.adb.adb_path, 'logcat', '-v', 'time'] + shlex.split(self.filters)
         
         try:
             # Creation flags for no window
-            creation_flags = 0x08000000 if subprocess.os.name == 'nt' else 0
+            creation_flags = 0x08000000 if os.name == 'nt' else 0
             
             self.process = subprocess.Popen(
-                cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                cmd_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 text=True, encoding='utf-8', errors='replace',
                 creationflags=creation_flags
             )
@@ -60,7 +63,8 @@ class LogcatWorker(QThread):
         if hasattr(self, 'process'):
             try:
                 self.process.terminate()
-            except: pass
+            except Exception:
+                pass  # Process may already be terminated
 
 class LogcatViewerWidget(QWidget):
     def __init__(self, adb_manager):
@@ -204,7 +208,7 @@ class LogcatViewerWidget(QWidget):
                 
             return package_name, None
             
-        except:
+        except Exception:
             return None, None
 
     def toggle_logcat(self):

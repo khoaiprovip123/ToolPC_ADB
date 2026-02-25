@@ -32,8 +32,9 @@ def scan_battery():
                 try:
                     val = adb.shell(f"cat {base}/{node}").strip()
                     print(f"  {node}: {val}")
-                except:
-                    pass
+                except Exception as _e:
+
+                    pass  # TODO: consider LogManager.log
                     
             # Try to list all files just in case
             # ls = adb.shell(f"ls {base}")
@@ -45,7 +46,9 @@ def scan_battery():
     print("\n--- Dumpsys Battery ---")
     try:
         print(adb.shell("dumpsys battery"))
-    except: pass
+    except Exception as _e:
+
+        pass  # TODO: consider LogManager.log
 
 if __name__ == "__main__":
     scan_battery()

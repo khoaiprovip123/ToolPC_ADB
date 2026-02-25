@@ -1,5 +1,52 @@
 # Changelog
 
+## [2.5.5.4] - 2026-02-25
+### Added
+- **Log Rotation**: Triển khai `RotatingFileHandler` cho `LogManager` (5 files × 5MB), chống phình log.
+- **Unit Tests**: 22 bài test tự động cho `LogManager`, `ADBManager`, `CallableWorker` (pytest).
+- **SECURITY.md**: Tài liệu hóa các thực hành bảo mật (subprocess safety, exception handling, worker thread safety).
+
+### Changed
+- **🎨 Battery Health UI Redesign**: Thiết kế lại hoàn toàn widget Pin & Sức khỏe:
+  - Dark glass morphism cards (`#1a1a2e`), circular battery gauge lớn hơn.
+  - Stat mini-cards riêng biệt cho từng chỉ số, badge trạng thái nhiệt độ.
+  - Cải thiện contrast text trên nền gradient.
+- **🎨 Cleaner Widget Redesign**: Thiết kế lại hoàn toàn widget Dọn Rác:
+  - Dark glass cards, icon circles lớn, gradient header.
+  - Phản hồi trạng thái (✓/✗) sau mỗi thao tác dọn dẹp.
+  - Kiểm tra kết nối thiết bị trước khi thực thi, log chi tiết qua `LogManager`.
+- **🎨 Debloater Widget Redesign**: Thiết kế lại hoàn toàn trang Gỡ Ứng Dụng:
+  - Cards tương thích cả nền sáng/tối (ThemeManager-based colors).
+  - **Chọn nhóm**: Nút tích/bỏ chọn theo từng danh mục (category).
+  - **Real-time counter**: Số lượng ứng dụng được chọn cập nhật ngay khi tích.
+  - **Progress tracking**: Hiển thị tiến trình xử lý từng package (Đang xử lý: X/Y).
+  - **Visual feedback**: Badge "✓ Đã gỡ" / "✗ Lỗi" trên mỗi card sau khi gỡ.
+  - Nút "Gỡ bỏ" tự disable và đổi text khi đang xử lý, kết nối `finished` signal.
+- **Cleaner Logic (ADB)**: Mở rộng `clean_messenger_data` hỗ trợ thêm Telegram Audio, Documents, Nekogram cache.
+- **QProcess Refactor**: Chuyển `subprocess.Popen` → `QProcess` cho `scrcpy` trên Dashboard.
+- **Sidebar Spacing**: Tăng khoảng cách giữa logo và menu điều hướng (2px → 20px).
+
+### Fixed
+- **Version Label Border**: Xóa viền khung dư thừa quanh nhãn phiên bản trên sidebar.
+- **Debloater Counter Bug**: Sửa lỗi counter "0 ứng dụng" không cập nhật khi tích chọn.
+- **Debloater Finished Handler**: Kết nối `DebloatWorker.finished` signal (trước đó bị bỏ sót).
+
+## [2.5.5.3] - 2026-02-11
+### Added
+- **Navigation Architecture Overhaul**: Thay đổi hoàn toàn cấu trúc điều hướng làm phẳng (Flat Management). Chuyển từ các tab ngang lồng nhau sang **Thanh điều hướng dọc thứ cấp (Secondary Sidebar)** cho các trang phức tạp (Xiaomi Tools, Dev Tools).
+- **AIO Optimizer (Consolidated)**: Hợp nhất 3 tab "Tối ưu nhanh", "Tính năng ẩn" và "Tinh chỉnh hệ thống" thành một widget **"Tối Ưu & Tinh Chỉnh (AIO)"** duy nhất với bố cục thẻ lưới (Grid Card) hiện đại.
+- **Confirmation System**: Triển khai hệ thống xác nhận an toàn mới (`ConfirmationDialog`) thay thế hoàn toàn `QMessageBox` mặc định, tích hợp cho tất cả các hành động gỡ ứng dụng, dọn rác và tinh chỉnh hệ thống.
+- **Ocean Breeze / Sea Blue Theme**: Cập nhật toàn diện chủ đề sáng (Light Theme) sang tông xanh nước biển và trắng, sử dụng hiệu ứng kính mờ (Acrylic tint) cao cấp theo phong cách HyperOS.
+- **Centralized Notifications**: Đồng bộ hóa toàn bộ phản hồi từ hệ thống, ADB, Fastboot về Trung tâm thông báo (Notification Center - LogManager).
+
+### Changed
+- **UI Responsiveness**: Tối ưu hóa giao diện cho độ phân giải động (mặc định 1400x800), đảm bảo các thành phần không bị cắt hoặc tràn khi thay đổi kích thước cửa sổ.
+- **Cleanup**: Xóa bỏ các file và widget dư thừa (`system_tweaks.py`, `unified_tools.py`, `screen_mirror.py`) để tối ưu dung lượng và tốc độ khởi động.
+
+### Fixed
+- **Stability**: Sửa lỗi `ImportError` nghiêm trọng sau khi gộp công cụ Xiaomi, đảm bảo tab AIO hoạt động ổn định.
+- **Bug Fixes**: Sửa lỗi hiển thị màu sắc trên các hộp thoại kết quả và cải thiện logic nhảy trang từ Dashboard.
+
 ## [2.5.5.2] - 2026-01-30
 ### Added
 - **UI Polish**: Sửa lỗi "boxy borders" (viền dư thừa) trên tiêu đề các nhóm chức năng trong Xiaomi Optimizer.

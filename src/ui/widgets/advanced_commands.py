@@ -693,12 +693,16 @@ class AdvancedCommandsWidget(QWidget):
         })
         
     def do_put_setting(self):
-        reply = QMessageBox.warning(
-            self, "Cảnh báo",
-            "Thay đổi system settings có thể gây ra sự cố. Tiếp tục?",
-            QMessageBox.Yes | QMessageBox.No
+        dlg = ConfirmationDialog(
+            self,
+            title="Cảnh báo",
+            message="Thay đổi cài đặt hệ thống?",
+            details="Việc thay đổi System Settings (Global/Secure) có thể gây ra sự cố nếu nhập sai giá trị.\n\nBạn có muốn tiếp tục?",
+            confirm_text="Tiến hành",
+            cancel_text="Hủy",
+            warning_mode=True
         )
-        if reply == QMessageBox.Yes:
+        if dlg.exec_() == QDialog.Accepted:
             self.run_command("put_setting", {
                 "namespace": self.put_namespace.currentText(),
                 "key": self.put_key.text(),
@@ -709,21 +713,29 @@ class AdvancedCommandsWidget(QWidget):
         self.run_command("immersive", {"mode": mode})
         
     def do_selinux(self, enable):
-        reply = QMessageBox.warning(
-            self, "Cảnh báo",
-            f"{'Bật' if enable else 'Tắt'} SELinux? (Yêu cầu Root)",
-            QMessageBox.Yes | QMessageBox.No
+        dlg = ConfirmationDialog(
+            self,
+            title="Cảnh báo",
+            message=f"{'Bật' if enable else 'Tắt'} SELinux?",
+            details="Thao tác này yêu cầu quyền ROOT và có thể ảnh hưởng đến tính bảo mật/ổn định của hệ thống.\n\nTiếp tục?",
+            confirm_text="Xác nhận",
+            cancel_text="Hủy",
+            warning_mode=True
         )
-        if reply == QMessageBox.Yes:
+        if dlg.exec_() == QDialog.Accepted:
             self.run_command("selinux", {"enable": enable})
             
     def do_verity(self, enable):
-        reply = QMessageBox.warning(
-            self, "Cảnh báo",
-            f"{'Bật' if enable else 'Tắt'} dm_verity? Thiết bị sẽ cần reboot.",
-            QMessageBox.Yes | QMessageBox.No
+        dlg = ConfirmationDialog(
+            self,
+            title="Cảnh báo",
+            message=f"{'Bật' if enable else 'Tắt'} dm_verity?",
+            details="Thao tác này yêu cầu quyền ROOT. Thiết bị sẽ cần khởi động lại để áp dụng.\n\nTiếp tục?",
+            confirm_text="Xác nhận",
+            cancel_text="Hủy",
+            warning_mode=True
         )
-        if reply == QMessageBox.Yes:
+        if dlg.exec_() == QDialog.Accepted:
             cmd = "enable-verity" if enable else "disable-verity"
             result = self.adb.run_adb([cmd])
             self.log(result if result else f"✓ {cmd} executed")
@@ -738,22 +750,26 @@ class AdvancedCommandsWidget(QWidget):
     def do_sideload(self):
         path = self.sideload_path.text()
         if not path:
-            QMessageBox.warning(self, "Lỗi", "Vui lòng chọn file update.zip")
+            LogManager.log("Lỗi", "Vui lòng chọn file update.zip trước khi sideload.", "error")
             return
             
-        reply = QMessageBox.information(
-            self, "Sideload",
-            "Đảm bảo thiết bị đang ở chế độ Recovery và đã chọn 'Apply update from ADB'.\n\nTiếp tục?",
-            QMessageBox.Yes | QMessageBox.No
+        dlg = ConfirmationDialog(
+            self,
+            title="Sideload",
+            message="Bắt đầu quá trình Sideload?",
+            details="Đảm bảo thiết bị đang ở chế độ Recovery và đã chọn 'Apply update from ADB'.\n\nHành động này không thể hoàn tác giữa chừng.\nTiếp tục?",
+            confirm_text="Sideload ngay",
+            cancel_text="Hủy",
+            warning_mode=True
         )
-        if reply == QMessageBox.Yes:
+        if dlg.exec_() == QDialog.Accepted:
             result = self.adb.run_adb(["sideload", path])
             self.log(result if result else "✓ Sideload started")
             
     def do_monkey(self):
         package = self.monkey_package.text()
         if not package:
-            QMessageBox.warning(self, "Lỗi", "Vui lòng nhập package name")
+            LogManager.log("Lỗi", "Vui lòng nhập Package Name để chạy Monkey Test.", "error")
             return
             
         self.run_command("monkey", {

@@ -167,8 +167,9 @@ class OptimizationWorker(QThread):
                          # 4. Remove from App Standby
                          self.adb.shell(f"am set-inactive {pkg} false", log_error=False)
                          count += 1
-                    except:
-                         pass
+                    except Exception as _e:
+
+                        pass  # TODO: consider LogManager.log
                  
                  self.progress.emit(f"✅ Đã tối ưu hóa {count} ứng dụng!")
                  

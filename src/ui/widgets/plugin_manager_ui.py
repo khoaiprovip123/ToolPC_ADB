@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from src.ui.theme_manager import ThemeManager
+from src.core.log_manager import LogManager
 from src.core.plugin_manager import PluginManager
 
 class PluginManagerWidget(QWidget):
@@ -87,7 +88,7 @@ class PluginManagerWidget(QWidget):
             
     def on_reload(self):
         self.refresh_list()
-        QMessageBox.information(self, "Đã tải lại", f"Đã tải {len(self.plugin_manager.plugins)} plugins.")
+        LogManager.log("Đã tải lại", f"Đã tải {len(self.plugin_manager.plugins)} plugins.", "success")
         
     def open_folder(self):
         folder = self.plugin_manager.plugins_dir

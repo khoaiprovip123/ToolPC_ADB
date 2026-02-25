@@ -1,5 +1,7 @@
 
 from PySide6.QtCore import QObject, Signal
+import logging
+import logging.handlers
 
 class LogManager(QObject):
     """
@@ -13,12 +15,10 @@ class LogManager(QObject):
     log_signal = Signal(str, str, str)
     
     def __new__(cls):
+        # Simple singleton pattern without interfering with QObject initialization
         if cls._instance is None:
-            cls._instance = super(LogManager, cls).__new__(cls)
-            # Must call QObject init if we were creating it normally, 
-            # but for singletons inheriting QObject, it's tricky with __new__.
-            # We initialize signals by ensuring proper PySide object creation or just composition.
-            # Best practice for PySide singletons is usually a class attribute or global instance.
+            # Create instance without calling __init__ yet
+            cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -30,10 +30,11 @@ class LogManager(QObject):
         self._setup_file_logging()
 
     def _setup_file_logging(self):
-        """Setup log file path and ensure directory exists"""
+        """Setup log file with rotation: 5 files x 5MB max."""
         try:
             from pathlib import Path
             import sys
+            import os
             
             # Determine base path
             if hasattr(sys, '_MEIPASS'):
@@ -46,12 +47,34 @@ class LogManager(QObject):
             self.log_dir.mkdir(parents=True, exist_ok=True)
             self.log_file = self.log_dir / "app_log.txt"
             
+            # Ensure file has restricted permissions (rw-------)
+            if not self.log_file.exists():
+                self.log_file.touch()
+                try:
+                    os.chmod(self.log_file, 0o600)
+                except Exception:
+                    pass
+            
+            # Setup RotatingFileHandler: 5MB per file, keep 5 backups
+            self._file_handler = logging.handlers.RotatingFileHandler(
+                self.log_file,
+                maxBytes=5 * 1024 * 1024,  # 5MB
+                backupCount=5,
+                encoding='utf-8'
+            )
+            self._file_handler.setFormatter(
+                logging.Formatter('[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
+            )
+            self._logger = logging.getLogger('XiaomiADB')
+            self._logger.setLevel(logging.DEBUG)
+            # Avoid duplicate handlers on re-init
+            if not self._logger.handlers:
+                self._logger.addHandler(self._file_handler)
+            
             # Write session start separator
-            from datetime import datetime
-            with open(self.log_file, "a", encoding="utf-8") as f:
-                f.write(f"\n{'='*50}\n")
-                f.write(f"SESSION START: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"{'='*50}\n")
+            self._logger.info(f"{'='*50}")
+            self._logger.info(f"SESSION START")
+            self._logger.info(f"{'='*50}")
         except Exception as e:
             print(f"Failed to setup file logging: {e}")
 
@@ -69,15 +92,15 @@ class LogManager(QObject):
         inst._write_to_file(title, message, level)
 
     def _write_to_file(self, title: str, message: str, level: str):
-        """Write log entry to file"""
+        """Write log entry to file via RotatingFileHandler, filtering sensitive info."""
         try:
-             if not hasattr(self, 'log_file'): return
-             
-             from datetime import datetime
-             timestamp = datetime.now().strftime('%H:%M:%S')
-             log_entry = f"[{timestamp}] [{level.upper()}] [{title}] {message}\n"
-             
-             with open(self.log_file, "a", encoding="utf-8") as f:
-                 f.write(log_entry)
-        except:
-             pass
+            if not hasattr(self, '_logger'):
+                return
+            # Filter out environment variable values like GEMINI_API_KEY
+            if "GEMINI_API_KEY" in message or "GEMINI_API_KEY" in title:
+                title = title.replace("GEMINI_API_KEY", "[REDACTED]")
+                message = message.replace("GEMINI_API_KEY", "[REDACTED]")
+            log_entry = f"[{level.upper()}] [{title}] {message}"
+            self._logger.info(log_entry)
+        except Exception as e:
+            print(f"[LogManager] Không thể ghi log ra file: {e}")

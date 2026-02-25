@@ -192,4 +192,7 @@ class AdvancedOptimizerWidget(QWidget):
             
         worker.finished.connect(on_done)
         worker.start()
+        # Guard: wait for old worker if still running
+        if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
+            self.worker.wait(3000)
         self.worker = worker

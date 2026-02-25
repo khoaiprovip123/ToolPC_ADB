@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from src.ui.theme_manager import ThemeManager
+from src.core.log_manager import LogManager
 
 class PermissionWorker(QThread):
     finished = Signal(str)
@@ -164,38 +165,52 @@ class PermissionToolsWidget(QWidget):
         cmd = f"pm grant {pkg} android.permission.WRITE_SECURE_SETTINGS && pm grant {pkg} android.permission.DUMP && pm grant {pkg} android.permission.PACKAGE_USAGE_STATS"
         self._run_perm_cmd("Cấp quyền SystemUI Tuner", cmd)
 
+
     def run_brevent_activation(self):
         """Kích hoạt Brevent qua OptimizationWorker"""
         from src.workers.optimization_worker import OptimizationWorker
-        from src.core.log_manager import LogManager
         
-        confirm = QMessageBox.question(
-            self, "Kích hoạt Brevent", 
-            "Giữ thiết bị kết nối. Lệnh này sẽ kích hoạt Brevent Server (Rootless) và cấp quyền Write Secure Settings.\n\nTiếp tục?",
-            QMessageBox.Yes | QMessageBox.No
+        dlg = ConfirmationDialog(
+            self,
+            title="Kích hoạt Brevent",
+            message="Bạn muốn thực hiện kích hoạt Brevent Server?",
+            details="Giữ thiết bị kết nối. Lệnh này sẽ kích hoạt Brevent Server (Rootless) và cấp quyền Write Secure Settings.\n\n⚠️ Lưu ý: Hành động này sẽ thay đổi thiết lập ứng dụng chạy ngầm.",
+            confirm_text="Kích hoạt ngay",
+            cancel_text="Hủy",
+            warning_mode=True
         )
-        if confirm == QMessageBox.Yes:
+        if dlg.exec_() == QDialog.Accepted:
             # We use PermissionWorker for simple commands, but activate_brevent is complex logic
             # However, for consistency with other perm tools, let's see if we can use the existing manager method
             # Actually OptimizationManager has activate_brevent()
             self.opt_worker = OptimizationWorker(self.adb, "activate_brevent")
             self.opt_worker.progress.connect(lambda msg: LogManager.log("Brevent", msg, "info"))
             self.opt_worker.start()
-            QMessageBox.information(self, "Đã gửi lệnh", "Lệnh kích hoạt Brevent đã được gửi. Vui lòng kiểm tra Log để xem tiến trình.")
+            LogManager.log("Hệ thống", "Đang gửi lệnh kích hoạt Brevent...", "info")
 
     def _run_perm_cmd(self, title, cmd, show_output=False):
         if not self.adb.current_device:
-            QMessageBox.warning(self, "Lỗi", "Chưa kết nối thiết bị!")
+            LogManager.log("Cảnh báo", "Vui lòng kết nối thiết bị trước!", "warning")
             return
 
         # Show Loading
         self.progress = QDialog(self)
         self.progress.setWindowTitle(title)
-        self.progress.setFixedSize(300, 100)
+        self.progress.setFixedSize(320, 110)
+        self.progress.setStyleSheet(ThemeManager.get_main_window_style())
+        
         l = QVBoxLayout(self.progress)
-        l.addWidget(QLabel(f"Đang thực hiện: {title}..."))
+        l.setContentsMargins(20, 20, 20, 20)
+        
+        msg_lbl = QLabel(f"<b>{title}</b><br>Đang thực hiện, vui lòng đợi...")
+        msg_lbl.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']}; font-size: 13px;")
+        msg_lbl.setAlignment(Qt.AlignCenter)
+        l.addWidget(msg_lbl)
         self.progress.show()
         
+        # Guard: stop old worker before creating new
+        if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
+            self.worker.wait(3000)
         self.worker = PermissionWorker(self.adb, cmd)
         self.worker.finished.connect(lambda out: self._on_cmd_done(title, out, show_output))
         self.worker.start()
@@ -206,20 +221,45 @@ class PermissionToolsWidget(QWidget):
         if show_output or ("Error" in output and len(output) > 20):
             result_dialog = QDialog(self)
             result_dialog.setWindowTitle(f"Kết quả: {title}")
-            result_dialog.resize(400, 300)
+            result_dialog.resize(450, 350)
+            result_dialog.setStyleSheet(ThemeManager.get_main_window_style())
+            
             l = QVBoxLayout(result_dialog)
+            l.setContentsMargins(20, 20, 20, 20)
+            
+            # Label with contrast color
+            header_lbl = QLabel(f"<b>Chi tiết lệnh:</b> {title}")
+            header_lbl.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']}; font-size: 14px;")
+            l.addWidget(header_lbl)
+            
             txt = QTextEdit()
+            txt.setStyleSheet(ThemeManager.get_text_edit_style())
             txt.setPlainText(output)
             txt.setReadOnly(True)
             l.addWidget(txt)
             
+            status_container = QHBoxLayout()
             if "info: shizuku_starter exit with 0" in output or not output.strip():
-                l.addWidget(QLabel("✅ Thực hiện thành công!"))
+                status_lbl = QLabel("✅ Thực hiện thành công!")
+                status_lbl.setStyleSheet(f"color: {ThemeManager.COLOR_SUCCESS}; font-weight: bold; font-size: 13px;")
             else:
-                l.addWidget(QLabel("⚠️ Có thông báo hoặc lỗi phát sinh."))
+                status_lbl = QLabel("⚠️ Có thông báo hoặc lỗi phát sinh.")
+                status_lbl.setStyleSheet(f"color: {ThemeManager.COLOR_WARNING if not ThemeManager.is_dark() else '#F2994A'}; font-weight: bold; font-size: 13px;")
+            
+            status_container.addWidget(status_lbl)
+            status_container.addStretch()
+            
+            btn_close = QPushButton("Đóng")
+            btn_close.setFixedSize(80, 32)
+            btn_close.setCursor(Qt.PointingHandCursor)
+            btn_close.setStyleSheet(ThemeManager.get_button_style("outline"))
+            btn_close.clicked.connect(result_dialog.close)
+            status_container.addWidget(btn_close)
+            
+            l.addLayout(status_container)
             result_dialog.exec()
         else:
-            QMessageBox.information(self, "Thành công", f"Đã thực hiện xong lệnh: {title}")
+            LogManager.log("Thành công", f"Đã thực hiện xong lệnh: {title}", "success")
 
     def reset(self):
         pass

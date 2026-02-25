@@ -19,6 +19,7 @@ from src.workers.app_worker import (
     InstallerThread, BackupThread, AppScanner, SmartAppActionThread
 )
 from src.core.log_manager import LogManager
+from src.ui.dialogs.confirmation_dialog import ConfirmationDialog
 
 # OneDrive APK Repository
 ONEDRIVE_APK_FOLDER = "https://4wl8ft-my.sharepoint.com/:f:/g/personal/vankhoai_4wl8ft_onmicrosoft_com/IgDXdoT3HHxqTLwC2ClHOMPsATiYFsuCYtWBDTH1zBQaYG0?e=mjZW4R"
@@ -106,66 +107,7 @@ class InstallApkDialog(SoftDialog):
         
         self.set_content(layout)
 
-class AppConfirmDialog(SoftDialog):
-    def __init__(self, action_type, app_name, pkg_name, parent=None):
-        super().__init__(parent)
-        
-        layout = QVBoxLayout()
-        
-        # Header
-        icon_map = {"uninstall": "🗑️", "disable": "🚫", "restore": "♻️"}
-        title_map = {"uninstall": "Gỡ ứng dụng?", "disable": "Tắt ứng dụng?", "restore": "Khôi phục?"}
-        
-        header = QHBoxLayout()
-        icon = QLabel(icon_map.get(action_type, "❓"))
-        icon.setStyleSheet("font-size: 28px;")
-        title = QLabel(title_map.get(action_type, "Xác nhận?"))
-        title.setStyleSheet(f"font-size: 20px; font-weight: 800; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
-        header.addWidget(icon)
-        header.addWidget(title)
-        header.addStretch()
-        layout.addLayout(header)
-        
-        # Info
-        info_bg = ThemeManager.COLOR_BG_SECONDARY
-        info_box = QFrame()
-        info_box.setStyleSheet(f"background: {info_bg}; border-radius: 12px; padding: 10px;")
-        ib_layout = QVBoxLayout(info_box)
-        
-        lbl_name = QLabel(app_name)
-        lbl_name.setStyleSheet("font-weight: bold; font-size: 14px; border: none; background: transparent;")
-        lbl_pkg = QLabel(pkg_name)
-        lbl_pkg.setStyleSheet("color: #7f8c8d; font-size: 12px; font-family: Consolas; border: none; background: transparent;")
-        
-        ib_layout.addWidget(lbl_name)
-        ib_layout.addWidget(lbl_pkg)
-        layout.addWidget(info_box)
-        
-        label = QLabel("Hành động này sẽ thực thi lệnh ADB trực tiếp.")
-        label.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; margin-top: 5px;")
-        label.setWordWrap(True)
-        layout.addWidget(label)
-        
-        # Buttons
-        btns = QHBoxLayout()
-        btns.addStretch()
-        
-        btn_cancel = QPushButton("Hủy bỏ")
-        btn_cancel.setCursor(Qt.PointingHandCursor)
-        btn_cancel.setStyleSheet(ThemeManager.get_button_style("outline"))
-        btn_cancel.clicked.connect(self.reject)
-        
-        btn_ok = QPushButton("Tiến hành")
-        btn_ok.setCursor(Qt.PointingHandCursor)
-        color = "danger" if action_type == "uninstall" else "warning" if action_type == "disable" else "success"
-        btn_ok.setStyleSheet(ThemeManager.get_button_style(color))
-        btn_ok.clicked.connect(self.accept)
-        
-        btns.addWidget(btn_cancel)
-        btns.addWidget(btn_ok)
-        layout.addLayout(btns)
-        
-        self.set_content(layout)
+# Local AppConfirmDialog removed in favor of src.ui.dialogs.confirmation_dialog.ConfirmationDialog
 
 class BackupOptionsDialog(SoftDialog):
     def __init__(self, count, parent=None):
@@ -476,8 +418,9 @@ class AppManagerWidget(QWidget):
                 self.scanner.stop()
                 self.scanner.wait(1000)  # Wait max 1 second
                 self.scanner.deleteLater()
-            except:
-                pass
+            except Exception as _e:
+
+                pass  # TODO: consider LogManager.log
         
         self.lbl_stats.setText("Đang quét...")
         self.clear_list()
@@ -557,15 +500,29 @@ class AppManagerWidget(QWidget):
         print(f"DEBUG: handle_row_action called. Action={action}, App={app.package}")
         if not self.adb.is_online():
             print("DEBUG: ADB not online")
-            QMessageBox.warning(self, "Lỗi", "Thiết bị mất kết nối!")
+            LogManager.log("App Manager", "Thiết bị mất kết nối!", "error")
             return
             
         if action != "enable":
             print(f"DEBUG: Showing confirmation dialog for {action}")
-            dlg = AppConfirmDialog(action, app.name, app.package, self)
-            result = dlg.exec()
-            print(f"DEBUG: Confirmation dialog result: {result}")
-            if result != QDialog.Accepted:
+            title_map = {"uninstall": "Gỡ ứng dụng?", "disable": "Xử lý ứng dụng?", "restore": "Khôi phục?"}
+            msg_map = {
+                "uninstall": f"Bạn có chắc muốn gỡ bỏ hoàn toàn ứng dụng này?",
+                "disable": f"Bạn muốn vô hiệu hóa ứng dụng này?",
+                "restore": f"Khôi phục ứng dụng về trạng thái ban đầu?"
+            }
+            
+            dlg = ConfirmationDialog(
+                self,
+                title=title_map.get(action, "Xác nhận"),
+                message=msg_map.get(action, "Bạn có chắc chắn?"),
+                details=f"Ứng dụng: {app.name}\nPackage: {app.package}\n\n⚠️ Lưu ý: Hành động này sẽ thay đổi hệ thống.",
+                confirm_text="Tiến hành",
+                cancel_text="Hủy",
+                warning_mode=(action != "restore")
+            )
+            
+            if dlg.exec_() != QDialog.Accepted:
                 print("DEBUG: User cancelled")
                 return
 
@@ -579,9 +536,12 @@ class AppManagerWidget(QWidget):
         pd.setWindowTitle("Vui lòng đợi")
         pd.setWindowModality(Qt.WindowModal)
         pd.setCancelButton(None)
-        
+        pd.setStyleSheet(ThemeManager.get_main_window_style())
         pd.show()
         
+        # Guard: wait for old worker before creating new
+        if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
+            self.worker.wait(3000)
         self.worker = SmartAppActionThread(self.adb, [app], action)
         
         def on_finished(success, msg):
@@ -623,17 +583,14 @@ class AppManagerWidget(QWidget):
             else:
                 # Only show error if truly failed (no success at all)
                 LogManager.log("App Manager", f"✗ Không thể xử lý {app.name}: {msg}", "error")
-                QMessageBox.warning(self, "Thất bại", f"Lỗi: {msg}")
 
         self.worker.finished.connect(on_finished)
         self.worker.start()
 
-
-
         
     def on_install_apk_clicked(self):
         if not self.adb.is_online():
-            QMessageBox.warning(self, "Lỗi", "Thiết bị mất kết nối!")
+            LogManager.log("App Manager", "Thiết bị mất kết nối!", "error")
             return
             
         file_path, _ = QFileDialog.getOpenFileName(
@@ -647,6 +604,7 @@ class AppManagerWidget(QWidget):
         self.install_pd = QProgressDialog("Đang cài đặt APK...", "Hủy", 0, 0, self)
         self.install_pd.setWindowTitle("Cài đặt")
         self.install_pd.setWindowModality(Qt.WindowModal)
+        self.install_pd.setStyleSheet(ThemeManager.get_main_window_style())
         self.install_pd.show()
         
         # Start Installer Thread
@@ -659,10 +617,8 @@ class AppManagerWidget(QWidget):
         self.install_pd.close()
         if success:
             LogManager.log("App Manager", f"✓ Cài đặt APK thành công!", "success")
-            QMessageBox.information(self, "Thành công", "Ứng dụng đã được cài đặt thành công!")
             self.refresh_data()
         else:
             LogManager.log("App Manager", f"✗ Cài đặt APK thất bại: {msg}", "error")
-            QMessageBox.warning(self, "Thất bại", f"Lỗi cài đặt: {msg}")
 
     def reset(self): self.refresh_data()

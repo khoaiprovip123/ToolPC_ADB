@@ -11,25 +11,21 @@ from pathlib import Path
 # Add src to python path
 current_dir = Path(__file__).parent
 root_dir = current_dir.parent
-sys.path.insert(0, str(root_dir)) # Force local priority
-print(f"DEBUG: Root Dir: {root_dir}")
-print(f"DEBUG: sys.path[0]: {sys.path[0]}")
+sys.path.insert(0, str(root_dir))  # Force local priority
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
+import PySide6.QtSvg # Required for SVG icons
 from src.core.adb.adb_manager import ADBManager
 from src.ui.main_window import MainWindow
 from src.ui.theme_manager import ThemeManager
-import src.ui.widgets.xiaomi_optimizer
-print(f"DEBUG: Loaded xiaomi_optimizer from: {src.ui.widgets.xiaomi_optimizer.__file__}")
-
-
+from src.core.resource_utils import get_resource_path
 
 
 def main():
     """Main entry point"""
     # Create Win32 Mutex to prevent multiple instances and support installer lock
-    mutex_name = "XiaomiADBCommanderMutex"
+    mutex_name = "XiaomiADBCommanderMutex_v4"
     kernel32 = ctypes.windll.kernel32
     mutex = kernel32.CreateMutexW(None, False, mutex_name)
     last_error = kernel32.GetLastError()
@@ -48,9 +44,9 @@ def main():
     app._app_mutex = mutex
     
     # Set app icon
-    icon_path = root_dir / 'resources' / 'icon.ico'
-    if icon_path.exists():
-        app.setWindowIcon(QIcon(str(icon_path)))
+    icon_path = get_resource_path('resources', 'icon.ico')
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
     
     # Create and show main window
     adb = ADBManager()
@@ -63,10 +59,9 @@ def main():
     
     window = MainWindow(adb)
     window.show()
-    
+
     # Run event loop
     sys.exit(app.exec())
-
 
 if __name__ == "__main__":
     try:

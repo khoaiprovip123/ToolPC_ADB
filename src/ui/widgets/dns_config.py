@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from src.ui.theme_manager import ThemeManager
+from src.core.log_manager import LogManager
 
 class DNSConfigWidget(QWidget):
     """
@@ -163,7 +164,7 @@ class DNSConfigWidget(QWidget):
             
     def apply_dns(self):
         if not self.adb.current_device:
-            QMessageBox.warning(self, "Lỗi", "Chưa kết nối thiết bị")
+            LogManager.log("Lỗi", "Chưa kết nối thiết bị", "warning")
             return
             
         try:
@@ -174,16 +175,16 @@ class DNSConfigWidget(QWidget):
             elif self.rb_hostname.isChecked():
                 hostname = self.input_hostname.text().strip()
                 if not hostname:
-                    QMessageBox.warning(self, "Lỗi", "Vui lòng nhập hostname")
+                    LogManager.log("Lỗi", "Vui lòng nhập hostname", "warning")
                     return
                 self.adb.shell(f"settings put global private_dns_specifier {hostname}")
                 self.adb.shell("settings put global private_dns_mode hostname")
                 
-            QMessageBox.information(self, "Thành công", "Đã cập nhật cấu hình DNS")
+            LogManager.log("Thành công", "Đã cập nhật cấu hình DNS", "success")
             self.check_current_dns()
             
         except Exception as e:
-            QMessageBox.critical(self, "Lỗi", f"Không thể cập nhật DNS: {e}")
+            LogManager.log("Lỗi", f"Không thể cập nhật DNS: {e}", "error")
             
     def reset(self):
         self.check_current_dns()

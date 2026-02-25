@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtGui import QIcon
 from src.ui.theme_manager import ThemeManager
+from src.core.log_manager import LogManager
 from src.core.optimization_manager import OptimizationManager
 
 # Import sub-modules for integration
@@ -475,7 +476,7 @@ class GeneralTweaksWidget(QWidget):
             tasks.append(("reboot", None, "Khởi động lại thiết bị"))
 
         if not tasks:
-            QMessageBox.warning(self, "Chưa chọn mục nào", "Vui lòng chọn ít nhất một tác vụ để thực hiện!")
+            LogManager.log("Chưa chọn mục nào", "Vui lòng chọn ít nhất một tác vụ để thực hiện!", "warning")
             return
             
         self.apply_btn.setEnabled(False)
@@ -485,6 +486,9 @@ class GeneralTweaksWidget(QWidget):
         self.status_lbl.setText(f"Đang xử lý {len(tasks)} tác vụ...")
         self.sub_status_lbl.setText("Vui lòng không ngắt kết nối...")
         
+        # Guard: wait for old worker before creating new
+        if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
+            self.worker.wait(5000)
         self.worker = OptimizerThread(self.opt_manager, tasks)
         self.worker.progress.connect(self.update_status)
         self.worker.finished_all.connect(self.on_process_done)
@@ -500,7 +504,7 @@ class GeneralTweaksWidget(QWidget):
         self.status_lbl.setText("✅ Hoàn tất tất cả tác vụ!")
         self.sub_status_lbl.setText("Đã tối ưu hóa thành công.")
         self.progress_bar.setValue(100)
-        QMessageBox.information(self, "Thành công", "Đã thực hiện xong các tối ưu hóa đã chọn!")
+        LogManager.log("Thành công", "Đã thực hiện xong các tối ưu hóa đã chọn!", "success")
         QTimer.singleShot(3000, self.progress_bar.hide) # Clean up after 3s
 
 
@@ -529,8 +533,9 @@ class GeneralTweaksWidget(QWidget):
                  
                  # 4. Remove from App Standby
                  self.adb.shell(f"am set-inactive {pkg} false", log_error=False)
-            except:
-                 pass
+            except Exception as _e:
+
+                pass  # TODO: consider LogManager.log
 
 
 class GlobalOptimizerWidget(QWidget):

@@ -67,5 +67,6 @@ class WindowEffect:
             data.SizeOfData = sizeof(accent)
             
             self.SetWindowCompositionAttribute(int(hwnd), byref(data))
-        except:
-            pass
+        except Exception as _e:
+
+            pass  # TODO: consider LogManager.log

@@ -1,10 +1,12 @@
 import subprocess
+import shlex
 import os
 import re
 import platform
 from pathlib import Path
 from enum import Enum, auto
 import sys
+from src.core.log_manager import LogManager
 
 class DeviceStatus(Enum):
     ONLINE = auto()
@@ -97,13 +99,12 @@ class ADBManager:
             if "platform-tools" not in fastboot_path and "adb" == self.adb_path:
                  fastboot_path = "fastboot"
                  
-            cmd = f'"{fastboot_path}" devices'
-            
-            # Execute manually since self.execute uses adb_path
-            creation_flags = 0x08000000 if os.name == 'nt' else 0
+            # Build command list without shell for security
+            cmd_list = [fastboot_path, "devices"]
             out = subprocess.check_output(
-                cmd, shell=True, stderr=subprocess.STDOUT, 
-                creationflags=creation_flags, encoding='utf-8', errors='replace'
+                cmd_list, stderr=subprocess.STDOUT,
+                creationflags=0x08000000 if os.name == 'nt' else 0,
+                encoding='utf-8', errors='replace', timeout=30
             ).strip()
             
             lines = out.split('\n')
@@ -111,8 +112,8 @@ class ADBManager:
                 parts = line.split()
                 if len(parts) >= 2 and parts[1] == 'fastboot':
                     devices.append(parts[0])
-        except:
-             pass
+        except Exception as e:
+            LogManager.log('ADB', f'Unexpected error: {e}', 'error')
         return devices
 
     def check_connection(self):
@@ -129,22 +130,27 @@ class ADBManager:
         if isinstance(command, list):
             cmd_list = [self.adb_path] + [str(arg) for arg in command]
         else:
-            cmd_list = f'"{self.adb_path}" {command}'
+            # Convert string to list for security (no shell injection)
+            args = shlex.split(command)
+            cmd_list = [self.adb_path] + args
             
         try:
-            # Use shell=True for string command
-            use_shell = isinstance(command, str)
             return subprocess.check_output(
                 cmd_list, 
-                shell=use_shell,
                 stderr=subprocess.STDOUT, 
                 creationflags=0x08000000 if os.name == 'nt' else 0,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                timeout=30
             ).strip()
         except subprocess.CalledProcessError as e:
+            LogManager.log('ADB Error', f'Command failed', 'error')
             return e.output.strip()
+        except subprocess.TimeoutExpired:
+            LogManager.log('ADB Timeout', 'Command timed out after 30s', 'error')
+            return 'Error: Timeout after 30s'
         except Exception as e:
+            LogManager.log('ADB Exception', str(e), 'error')
             return f"Error: {e}"
 
     def shell(self, command, *args, **kwargs):
@@ -277,7 +283,8 @@ class ADBManager:
             info['ram_raw_total'] = total
             info['ram_raw_free'] = available if available > 0 else free
             
-        except: pass
+        except Exception as e:
+            LogManager.log('ADB', f'Unexpected error: {e}', 'error')
         return info
 
     def get_storage_info(self):
@@ -327,9 +334,10 @@ class ADBManager:
                          info['total'] = t
                          info['used'] = u
                          info['free'] = a
-                     except:
-                         pass
-        except: pass
+                     except Exception as e:
+                         LogManager.log('ADB', f'Unexpected error: {e}', 'error')
+        except Exception as e:
+            LogManager.log('ADB', f'Unexpected error: {e}', 'error')
         return info
         
     def screenshot(self, filename="screenshot.png"):
@@ -388,7 +396,8 @@ class ADBManager:
                                 info['charge_full'] = int(c / 100000)
                             else:
                                 info['charge_full'] = int(c / 1000) # Normal uAh
-                        except: pass
+                        except Exception as e:
+                            LogManager.log('ADB', f'Unexpected error: {e}', 'error')
 
             # Design Capacity Lookup (Xiaomi)
             design_map = {
@@ -414,7 +423,8 @@ class ADBManager:
                    
                    if cap:
                        info['charge_full_design'] = cap
-                except: pass
+                except Exception as e:
+                    LogManager.log('ADB', f'Unexpected error: {e}', 'error')
                 
         except Exception as e:
             print(f"Error getting battery info: {e}")
@@ -447,8 +457,8 @@ class ADBManager:
                 # Fallback
                 info['charge_full_design'] = 4500 # Default fallback
                 
-        except:
-             pass
+        except Exception as e:
+            LogManager.log('ADB', f'Unexpected error: {e}', 'error')
              
         # Normalize voltage and temp
         if 'voltage' in info and info['voltage'] > 100:
@@ -477,8 +487,16 @@ class ADBManager:
         return self.shell("cmd package prune-dex-opt")
         
     def clean_messenger_data(self):
-         # Example for Telegram
-         return self.shell("rm -rf /sdcard/Telegram/Telegram\ Video/* /sdcard/Telegram/Telegram\ Images/*")
+         """Clean Telegram/Nekogram downloaded media cache"""
+         paths = " ".join([
+             "/sdcard/Telegram/Telegram\\ Video/*",
+             "/sdcard/Telegram/Telegram\\ Images/*",
+             "/sdcard/Telegram/Telegram\\ Audio/*",
+             "/sdcard/Telegram/Telegram\\ Documents/*",
+             "/sdcard/Android/data/org.telegram.messenger/cache/*",
+             "/sdcard/Android/data/nekox.nekogram/cache/*",
+         ])
+         return self.shell(f"rm -rf {paths}")
 
     def fix_connection(self):
         """Kill-server and Start-server to fix connection issues"""

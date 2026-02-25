@@ -16,8 +16,10 @@ import os
 import tempfile
 import math
 from src.ui.theme_manager import ThemeManager
+from src.core.log_manager import LogManager
 from src.workers.file_worker import FileWorker
 from src.data.file_data import FileEntry
+from src.ui.dialogs.confirmation_dialog import ConfirmationDialog
 
 # --- Helper Classes ---
 
@@ -849,7 +851,7 @@ class FileManagerWidget(QWidget):
         if entry.name.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
              self.preview_image(entry)
         else:
-             QMessageBox.information(self, "Thông tin", f"Mở: {entry.name}\n(Tính năng mở file khác đang phát triển)")
+             LogManager.log("Thông tin", f"Mở: {entry.name}\n(Tính năng mở file khác đang phát triển)", "success")
 
     def preview_image(self, entry):
         local_path = os.path.join(self.cache_dir, entry.name)
@@ -867,7 +869,7 @@ class FileManagerWidget(QWidget):
                  dlg.exec()
         except Exception as e:
              progress.close()
-             QMessageBox.critical(self, "Lỗi", str(e))
+             LogManager.log("Lỗi", str(e), "error")
 
     def reset(self):
         """Reset to initial state"""
@@ -891,7 +893,7 @@ class FileManagerWidget(QWidget):
              if any(x in msg_low for x in conn_errors):
                  self.status_bar.setText(f"Lỗi: {msg}")
                  return 
-             QMessageBox.warning(self, "Thông báo", msg)
+             LogManager.log("Thông báo", msg, "warning")
         else:
              self.status_bar.setText(msg)
              
@@ -942,7 +944,16 @@ class FileManagerWidget(QWidget):
             self.worker.rename_item(entry.path, f"{self.current_path}/{name}")
 
     def delete_item(self, entry):
-        if QMessageBox.question(self, "Xóa", f"Bạn có chắc muốn xóa {entry.name}?") == QMessageBox.Yes:
+        dlg = ConfirmationDialog(
+            self,
+            title="Xác nhận xóa",
+            message=f"Bạn có chắc muốn xóa '{entry.name}'?",
+            details=f"Đường dẫn: {entry.path}\n\n⚠️ Lưu ý: Hành động này không thể hoàn tác.",
+            confirm_text="Xóa tập tin",
+            cancel_text="Hủy",
+            warning_mode=True
+        )
+        if dlg.exec_() == QDialog.Accepted:
             self.worker.delete_item(entry.path)
 
     def download_item(self, entry):
@@ -950,9 +961,9 @@ class FileManagerWidget(QWidget):
         if target:
             try:
                 self.adb.pull_file(entry.path, target)
-                QMessageBox.information(self, "Thành công", f"Đã tải {entry.name}")
+                LogManager.log("Thành công", f"Đã tải {entry.name}", "success")
             except Exception as e:
-                QMessageBox.critical(self, "Lỗi", str(e))
+                LogManager.log("Lỗi", str(e), "error")
 
     def upload_dialog(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Chọn tập tin để tải lên")
@@ -975,10 +986,10 @@ class FileManagerWidget(QWidget):
                 self.adb.push_file(local_path, dest)
                 progress.setValue(i+1)
             
-            QMessageBox.information(self, "Hoàn tất", f"Đã tải lên {len(files)} tập tin.")
+            LogManager.log("Hoàn tất", f"Đã tải lên {len(files)} tập tin.", "success")
             self.refresh()
         except Exception as e:
-            QMessageBox.critical(self, "Lỗi", str(e))
+            LogManager.log("Lỗi", str(e), "error")
         finally:
             progress.close()
 

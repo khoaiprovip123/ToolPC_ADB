@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Signal, QUrl
 from PySide6.QtGui import QDesktopServices
 from src.ui.theme_manager import ThemeManager
+from src.core.log_manager import LogManager
 import httpx
 import asyncio
 
@@ -49,8 +50,9 @@ class ROMSearchWorker(QThread):
                                     "size": "Check Link",
                                     "link": rom.get('download', '')
                                 })
-            except:
-                pass # Fail silently and use fallback
+            except Exception as _e:
+
+                pass  # TODO: consider LogManager.log # Fail silently and use fallback
             
             # 2. If no results (Newer device like 'lisa' or API fail), add Web Fallback
             if not results:
@@ -148,13 +150,15 @@ class OTADownloaderWidget(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setStyleSheet(f"""
             QTableWidget {{
-                background-color: rgba(255, 255, 255, 0.8);
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
                 border-radius: {ThemeManager.RADIUS_BUTTON};
-                border: 1px solid rgba(0,0,0,0.1);
-                gridline-color: rgba(0,0,0,0.1);
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+                gridline-color: {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
             }}
             QHeaderView::section {{
-                background-color: rgba(0,0,0,0.05);
+                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']};
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
                 padding: 5px;
                 border: none;
                 font-weight: bold;
@@ -173,15 +177,16 @@ class OTADownloaderWidget(QWidget):
             if product:
                 self.input_codename.setText(product)
                 self.status_label.setText(f"Đã phát hiện thiết bị: {product}")
+                LogManager.log("Thiết bị", f"Phát hiện: {product}", "success")
             else:
-                QMessageBox.warning(self, "Lỗi", "Không thể đọc thông tin thiết bị")
+                LogManager.log("Thiết bị", "Không thể đọc thông tin thiết bị", "error")
         else:
-            QMessageBox.warning(self, "Lỗi", "Vui lòng kết nối thiết bị trước")
+            LogManager.log("Thiết bị", "Vui lòng kết nối thiết bị trước", "warning")
 
     def search_roms(self):
         codename = self.input_codename.text().strip()
         if not codename:
-            QMessageBox.warning(self, "Thiếu thông tin", "Vui lòng nhập tên mã thiết bị")
+            LogManager.log("ROM", "Vui lòng nhập tên mã thiết bị", "warning")
             return
             
         self.btn_search.setEnabled(False)
@@ -189,6 +194,9 @@ class OTADownloaderWidget(QWidget):
         self.status_label.setText(f"Đang tìm ROM cho {codename}...")
         self.table.setRowCount(0)
         
+        # Guard: wait for old worker before creating new
+        if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
+            self.worker.wait(5000)
         self.worker = ROMSearchWorker(codename, self.combo_region.currentText(), "Recovery")
         self.worker.finished.connect(self.on_search_finished)
         self.worker.error.connect(self.on_search_error)
@@ -393,9 +401,9 @@ class HyperOSAppsWidget(QWidget):
             if product:
                 self.input_gcam_device.setText(product)
             else:
-                QMessageBox.warning(self, "Lỗi", "Không thể đọc thông tin thiết bị")
+                LogManager.log("Thiết bị", "Không thể đọc thông tin thiết bị", "error")
         else:
-            QMessageBox.warning(self, "Lỗi", "Vui lòng kết nối thiết bị trước")
+            LogManager.log("Thiết bị", "Vui lòng kết nối thiết bị trước", "warning")
             
     def open_gcam(self):
         code = self.input_gcam_device.text().strip()
@@ -404,5 +412,5 @@ class HyperOSAppsWidget(QWidget):
             url = f"https://hyperosupdates.com/hyperos/{code}/gcam"
             QDesktopServices.openUrl(QUrl(url))
         else:
-            QMessageBox.warning(self, "Thiếu thông tin", "Vui lòng nhập tên mã thiết bị (Codename)")
+            LogManager.log("GCam", "Vui lòng nhập tên mã máy (Codename)", "warning")
 

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from src.ui.theme_manager import ThemeManager
+from src.core.log_manager import LogManager
 
 # ShizukuWorker removed - moved to permission_tools.py
 
@@ -146,46 +147,46 @@ class WirelessDebugWidget(QWidget):
         code = self.pair_code.text().strip()
         
         if not ip or not port or not code:
-            QMessageBox.warning(self, "Thiếu thông tin", "Vui lòng nhập IP, Port và Code")
+            LogManager.log("Thiếu thông tin", "Vui lòng nhập IP, Port và Code", "warning")
             return
             
         try:
             result = self.adb.execute(f"pair {ip}:{port} {code}")
             if "Successfully paired" in result:
-                QMessageBox.information(self, "Thành công", f"Đã ghép đôi với {ip}:{port}")
+                LogManager.log("Thành công", f"Đã ghép đôi với {ip}:{port}", "success")
                 self.connect_ip.setText(ip)
                 self.connect_port.setText("") 
             else:
-                QMessageBox.warning(self, "Thất bại", f"Không thể ghép đôi:\n{result}")
+                LogManager.log("Thất bại", f"Không thể ghép đôi:\n{result}", "warning")
         except Exception as e:
-            QMessageBox.critical(self, "Lỗi", str(e))
+            LogManager.log("Lỗi", str(e), "error")
 
     def on_connect(self):
         ip = self.connect_ip.text().strip()
         port = self.connect_port.text().strip()
         
         if not ip:
-            QMessageBox.warning(self, "Thiếu thông tin", "Vui lòng nhập IP")
+            LogManager.log("Thiếu thông tin", "Vui lòng nhập IP", "warning")
             return
             
         addr = f"{ip}:{port}" if port else ip
         
         try:
             if self.adb.connect_wireless(ip, int(port) if port else 5555):
-                QMessageBox.information(self, "Thành công", f"Đã kết nối với {addr}")
+                LogManager.log("Thành công", f"Đã kết nối với {addr}", "success")
             else:
-                QMessageBox.warning(self, "Thất bại", "Không thể kết nối. Kiểm tra lại IP/Port hoặc ghép đôi trước.")
+                LogManager.log("Thất bại", "Không thể kết nối. Kiểm tra lại IP/Port hoặc ghép đôi trước.", "warning")
         except Exception as e:
-            QMessageBox.critical(self, "Lỗi", str(e))
+            LogManager.log("Lỗi", str(e), "error")
 
     def on_enable_tcpip(self):
         if not self.adb.current_device:
-            QMessageBox.warning(self, "Lỗi", "Cần kết nối USB trước")
+            LogManager.log("Lỗi", "Cần kết nối USB trước", "warning")
             return
             
         if self.adb.enable_wireless_adb():
-            QMessageBox.information(self, "Thành công", "Đã mở cổng 5555. Bây giờ bạn có thể rút cáp và kết nối qua IP.")
+            LogManager.log("Thành công", "Đã mở cổng 5555. Bây giờ bạn có thể rút cáp và kết nối qua IP.", "success")
         else:
-            QMessageBox.warning(self, "Lỗi", "Không thể kích hoạt TCP/IP")
+            LogManager.log("Lỗi", "Không thể kích hoạt TCP/IP", "warning")
 
     # start_shizuku moved to permission_tools.py

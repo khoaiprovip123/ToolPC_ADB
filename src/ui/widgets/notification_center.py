@@ -14,6 +14,7 @@ import os
 import shutil
 from src.ui.theme_manager import ThemeManager
 from src.core.log_manager import LogManager
+from src.ui.widgets.notification_card import create_notification_card, create_empty_state
 
 class NotificationCenter(QFrame):
     """
@@ -27,6 +28,7 @@ class NotificationCenter(QFrame):
         self.adb = adb_manager
         self.scrcpy_process = None
         self.settings = QSettings("XiaomiADB", "ScreenMirror")
+        self.turn_screen_off_enabled = False  # Track screen-off state
         
         # Geometry: Right side drawer
         self.setFixedWidth(380)
@@ -45,52 +47,49 @@ class NotificationCenter(QFrame):
         self.poll_timer.timeout.connect(self.update_status)
         
     def setup_ui(self):
-        # Apply Glassmorphism & Base Styling
+        # Tech Gradient Style with Blur Background
         self.setStyleSheet(f"""
             NotificationCenter {{
-                background-color: rgba(255, 255, 255, 0.98);
-                border-left: 1px solid rgba(0, 0, 0, 0.1);
+                background-color: rgba(255, 255, 255, 0.95);
+                border-left: 1px solid rgba(0, 0, 0, 0.08);
             }}
             QProgressBar {{
-                background-color: rgba(0,0,0,0.05);
-                border-radius: 4px;
+                background-color: rgba(255,255,255,0.3);
+                border-radius: 3px;
                 text-align: center;
                 border: none;
                 height: 6px;
                 color: transparent;
             }}
             QProgressBar::chunk {{
-                border-radius: 4px;
-            }}
-            /* Enhanced Slider Styling */
-            QSlider::groove:horizontal {{
-                border: 1px solid #e0e0e0;
-                background: #f5f5f5;
-                height: 6px;
                 border-radius: 3px;
-                margin: 0px;
+            }}
+            /* Simplified Slider - NO MARGINS */
+            QSlider::groove:horizontal {{
+                border: none;
+                background: rgba(0,0,0,0.08);
+                height: 20px;
+                border-radius: 10px;
             }}
             QSlider::sub-page:horizontal {{
-                background: {ThemeManager.COLOR_ACCENT};
-                border-radius: 3px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4facfe, stop:1 #00f2fe);
+                border-radius: 10px;
             }}
             QSlider::add-page:horizontal {{
-                background: #e0e0e0;
-                border-radius: 3px;
+                background: rgba(0,0,0,0.08);
+                border-radius: 10px;
             }}
             QSlider::handle:horizontal {{
                 background: white;
-                border: 1px solid #d0d0d0;
+                border: 3px solid #4facfe;
                 width: 20px;
                 height: 20px;
-                margin: -7px 0; /* Center handle verticaly */
                 border-radius: 10px;
-                margin-right: -10px; /* Fix cut-off */
-                margin-left: -10px;
             }}
             QSlider::handle:horizontal:hover {{
-                border-color: {ThemeManager.COLOR_ACCENT};
+                border-color: #00f2fe;
                 background: #fff;
+                border-width: 4px;
             }}
         """)
         
@@ -109,6 +108,8 @@ class NotificationCenter(QFrame):
         header = QHBoxLayout()
         self.title = QLabel("Trung tâm Điều khiển")
         self.title.setStyleSheet(f"font-size: 18px; font-weight: 800; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
+        self.title.setWordWrap(False)  # Không cho xuống dòng
+        self.title.setMinimumWidth(200)  # Đủ rộng cho text
         
         close_btn = QPushButton("✕")
         close_btn.setFixedSize(30, 30)
@@ -155,32 +156,7 @@ class NotificationCenter(QFrame):
         status_layout.addWidget(self.store_card)
         scroll_l.addLayout(status_layout)
         
-        # > Sliders
-        sliders_frame = QFrame()
-        sliders_frame.setStyleSheet("background: rgba(0,0,0,0.03); border-radius: 12px; padding: 10px;")
-        sliders_layout = QVBoxLayout(sliders_frame)
-        sliders_layout.setSpacing(10)
-        # Brightness
-        b_row = QHBoxLayout()
-        b_row.addWidget(QLabel("🔆"))
-        self.bright_slider = QSlider(Qt.Horizontal)
-        self.bright_slider.setRange(0, 255)
-        self.bright_slider.setValue(128)
-        self.bright_slider.sliderReleased.connect(self.on_brightness_change)
-        b_row.addWidget(self.bright_slider)
-        sliders_layout.addLayout(b_row)
-        # Volume
-        v_row = QHBoxLayout()
-        v_row.addWidget(QLabel("🔊"))
-        self.vol_slider = QSlider(Qt.Horizontal)
-        self.vol_slider.setRange(0, 15)
-        self.vol_slider.setValue(8)
-        self.vol_slider.sliderReleased.connect(self.on_volume_change)
-        v_row.addWidget(self.vol_slider)
-        sliders_layout.addLayout(v_row)
-        scroll_l.addWidget(sliders_frame)
-        
-        # > Quick Toggles
+        # > Quick Toggles (no sliders)
         quick_label = QLabel("Tác vụ Nhanh")
         quick_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #888; text-transform: uppercase;")
         scroll_l.addWidget(quick_label)
@@ -197,6 +173,7 @@ class NotificationCenter(QFrame):
         self.create_toggle_btn(grid, "Dev Ops", "🛠️", lambda: self.adb.shell("am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS"), 2, 1)
         self.create_toggle_btn(grid, "Reboot", "↻", self.adb.reboot, 2, 2)
         self.create_toggle_btn(grid, "Màn hình", "📺", self.adb.toggle_screen, 2, 3)
+        self.screen_off_btn = self.create_toggle_btn(grid, "Screen Off", "🌙", self.toggle_screen_off, 3, 0, checkable=True)
         scroll_l.addLayout(grid)
         
         scroll_l.addStretch()
@@ -210,25 +187,53 @@ class NotificationCenter(QFrame):
         notif_layout = QVBoxLayout(notif_page)
         notif_layout.setContentsMargins(0, 5, 0, 0)
         
-        # Clear All Btn
-        clear_row = QHBoxLayout()
-        clear_row.addStretch()
-        clear_btn = QPushButton("Xóa tất cả")
-        clear_btn.setCursor(Qt.PointingHandCursor)
-        clear_btn.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; border: none; font-weight: 600;")
-        clear_btn.clicked.connect(self.clear_notifications)
-        clear_row.addWidget(clear_btn)
-        notif_layout.addLayout(clear_row)
+        notif_layout.setSpacing(10)
         
-        self.notif_list = QListWidget()
-        self.notif_list.setStyleSheet(f"""
-            QListWidget {{ background: transparent; border: none; }}
-            QListWidget::item {{
-                background: white; border-radius: 8px; padding: 2px;
-                margin-bottom: 6px; border: 1px solid rgba(0,0,0,0.05);
-            }}
+        # Header with Clear All button
+        header = QHBoxLayout()
+        header_label = QLabel(" ")
+        header.addWidget(header_label)
+        header.addStretch()
+        self.clear_all_btn = QPushButton("Xóa tất cả")
+        self.clear_all_btn.setCursor(Qt.PointingHandCursor)
+        self.clear_all_btn.clicked.connect(self.clear_all_notifications)
+        self.clear_all_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                color: #888;
+                font-size: 13px;
+                font-weight: 600;
+                padding: 4px 8px;
+            }
+            QPushButton:hover {
+                color: #4facfe;
+            }
         """)
-        notif_layout.addWidget(self.notif_list)
+        header.addWidget(self.clear_all_btn)
+        notif_layout.addLayout(header)
+        
+        # Scroll area for notifications
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        
+        self.notif_container = QWidget()
+        self.notif_container_layout = QVBoxLayout(self.notif_container)
+        self.notif_container_layout.setContentsMargins(5, 0, 5, 0)
+        self.notif_container_layout.setSpacing(10)
+        self.notif_container_layout.setAlignment(Qt.AlignTop)  # Align top instead of stretch
+        
+        scroll.setWidget(self.notif_container)
+        notif_layout.addWidget(scroll)
+        
+        # Empty state (initially shown)
+        self.empty_state = create_empty_state()
+        self.notif_container_layout.addWidget(self.empty_state)
+        
+        # Store notification cards
+        self.notification_cards = []
         
         self.stack.addWidget(notif_page)
         
@@ -239,57 +244,66 @@ class NotificationCenter(QFrame):
         else:
             self.toggle()
             
-    def switch_tab(self, id):
-        self.stack.setCurrentIndex(id)
-        # Update Title based on mode
-        if id == 0:
+    def switch_tab(self, idx):
+        self.stack.setCurrentIndex(idx)
+        if idx == 0:
             self.title.setText("Trung tâm Điều khiển")
         else:
             self.title.setText("Thông báo")
 
     def create_status_card(self, title, icon, value, color):
         card = QFrame()
-        card.setFixedHeight(94) # Fixed height
+        card.setFixedHeight(100)
         card.setObjectName("StatusCard")
-        # Fix: QLabel inherits QFrame, so we must explicitly remove border from children
-        card.setStyleSheet("""
-            #StatusCard {
-                background: white; 
-                border-radius: 16px; 
-                border: 1px solid #f0f0f0;
-            }
-            QLabel {
+        
+        # Gradient background based on title
+        if "Pin" in title or "PIN" in title:
+            gradient_bg = "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #11998e, stop:1 #38ef7d)"
+            shadow_color = QColor(17, 153, 142, 60)
+        else:  # Storage
+            gradient_bg = "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f093fb, stop:1 #f5576c)"
+            shadow_color = QColor(240, 147, 251, 60)
+        
+        card.setStyleSheet(f"""
+            #StatusCard {{
+                background: {gradient_bg};
+                border-radius: 20px;
+                border: none;
+            }}
+            QLabel {{
                 border: none;
                 background: transparent;
-            }
+                color: white;
+            }}
         """)
-        # Light shadow
+        
+        # Gradient glow shadow
         shadow = QGraphicsDropShadowEffect(card)
-        shadow.setBlurRadius(10)
-        shadow.setColor(QColor(0,0,0,10))
-        shadow.setOffset(0, 4)
+        shadow.setBlurRadius(20)
+        shadow.setColor(shadow_color)
+        shadow.setOffset(0, 8)
         card.setGraphicsEffect(shadow)
         
         l = QVBoxLayout(card)
-        l.setSpacing(4)
-        l.setContentsMargins(12, 12, 12, 12)
+        l.setSpacing(6)
+        l.setContentsMargins(16, 14, 16, 14)
         
         top = QHBoxLayout()
         lbl_icon = QLabel(icon)
-        lbl_icon.setStyleSheet("font-size: 20px;")
+        lbl_icon.setStyleSheet("font-size: 24px; color: white;")
         
         l_info = QVBoxLayout()
-        l_info.setSpacing(0)
+        l_info.setSpacing(2)
+        lbl_title = QLabel(title.upper())
+        lbl_title.setStyleSheet("font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; letter-spacing: 0.5px;")
         lbl_val = QLabel(value)
         lbl_val.setObjectName("value_label")
-        lbl_val.setStyleSheet(f"font-weight: 800; font-size: 14px; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
-        lbl_title = QLabel(title)
-        lbl_title.setStyleSheet("font-size: 11px; color: #999; font-weight: 600; text-transform: uppercase;")
+        lbl_val.setStyleSheet("font-weight: 800; font-size: 16px; color: white;")
         l_info.addWidget(lbl_title)
         l_info.addWidget(lbl_val)
         
         top.addWidget(lbl_icon)
-        top.addSpacing(10)
+        top.addSpacing(12)
         top.addLayout(l_info)
         top.addStretch()
         l.addLayout(top)
@@ -297,33 +311,54 @@ class NotificationCenter(QFrame):
         pbar = QProgressBar()
         pbar.setTextVisible(False)
         pbar.setFixedHeight(6)
-        pbar.setStyleSheet(f"QProgressBar {{ background: #f0f0f0; border-radius: 3px; }} QProgressBar::chunk {{ background-color: {color}; border-radius: 3px; }}")
+        pbar.setStyleSheet("QProgressBar { background: rgba(255,255,255,0.3); border-radius: 3px; } QProgressBar::chunk { background: rgba(255,255,255,0.95); border-radius: 3px; }")
         l.addWidget(pbar)
         
         return card
 
     def create_big_toggle(self, grid, text, icon, color, callback, r, c):
         btn = QPushButton()
-        btn.setFixedSize(140, 60)
+        btn.setFixedSize(145, 65)
         btn.setCursor(Qt.PointingHandCursor)
         btn.clicked.connect(callback)
         l = QHBoxLayout(btn)
+        l.setContentsMargins(12, 0, 12, 0)
         
         lbl_icon = QLabel(icon)
-        lbl_icon.setStyleSheet("font-size: 20px; background: transparent;")
+        lbl_icon.setStyleSheet("font-size: 24px; background: transparent; color: white;")
         lbl_text = QLabel(text)
-        lbl_text.setStyleSheet("font-size: 13px; font-weight: 600; color: white;")
+        lbl_text.setStyleSheet("font-size: 14px; font-weight: 700; color: white;")
         
         l.addWidget(lbl_icon)
         l.addWidget(lbl_text)
         l.addStretch()
         
-        btn.setStyleSheet(f"background-color: {color}; border-radius: 10px; border: none;")
+        # Gradient backgrounds
+        if "Mirror" in text:
+            gradient = "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff9a56, stop:1 #ff6a88)"
+        else:  # Wireless
+            gradient = "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #a8edea, stop:1 #fed6e3)"
+        
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {gradient};
+                border-radius: 16px;
+                border: none;
+            }}
+            QPushButton:hover {{
+                margin-top: -2px;
+                margin-bottom: 2px;
+            }}
+            QPushButton:pressed {{
+                margin-top: 1px;
+                margin-bottom: -1px;
+            }}
+        """)
         grid.addWidget(btn, r, c, 1, 2)
 
     def create_toggle_btn(self, grid, text, icon, callback, r, c, checkable=False):
         btn = QPushButton(icon)
-        btn.setFixedSize(65, 65)
+        btn.setFixedSize(68, 68)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setCheckable(checkable)
         btn.setToolTip(text)
@@ -331,10 +366,25 @@ class NotificationCenter(QFrame):
         
         style = f"""
             QPushButton {{
-                background-color: rgba(0,0,0,0.05); border-radius: 14px; border: none; font-size: 24px;
+                background: rgba(255, 255, 255, 0.6);
+                border: 1px solid rgba(255, 255, 255, 0.8);
+                border-radius: 18px;
+                font-size: 28px;
             }}
-            QPushButton:hover {{ background-color: rgba(0,0,0,0.1); }}
-            QPushButton:checked {{ background-color: {ThemeManager.COLOR_ACCENT}; color: white; }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.9);
+                margin-top: -1px;
+                margin-bottom: 1px;
+            }}
+            QPushButton:checked {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #667eea, stop:1 #764ba2);
+                color: white;
+                border: none;
+            }}
+            QPushButton:pressed {{
+                margin-top: 1px;
+                margin-bottom: -1px;
+            }}
         """
         btn.setStyleSheet(style)
         grid.addWidget(btn, r, c)
@@ -390,7 +440,7 @@ class NotificationCenter(QFrame):
             self.poll_timer.start()
 
     def update_status(self):
-        """Fetch and update system info - Optimized"""
+        """Fetch and update system info - Optimized with Real Values"""
         if not self.adb.current_device: return
         
         # Battery
@@ -399,7 +449,9 @@ class NotificationCenter(QFrame):
             level = info.get('level', 0)
             self.batt_bar.setValue(level)
             self.batt_card.findChild(QLabel, "value_label").setText(f"{level}%")
-        except: pass
+        except Exception as _e:
+
+            pass  # TODO: consider LogManager.log
         
         # Storage
         try:
@@ -417,16 +469,97 @@ class NotificationCenter(QFrame):
                 
             self.store_card.findChild(QLabel, "value_label").setText(f"{used_gb:.1f}/{total_gb:.0f} GB")
             self.store_bar.setValue(pct)
-        except: pass
+        except Exception as _e:
+
+            pass  # TODO: consider LogManager.log
+        
+        # Get Real Brightness from Device
+        try:
+            result = self.adb.shell("settings get system screen_brightness")
+            if result and result.strip().isdigit():
+                brightness = int(result.strip())
+                self.bright_slider.blockSignals(True)
+                self.bright_slider.setValue(brightness)
+                self.bright_slider.blockSignals(False)
+                pct = int((brightness / 255) * 100)
+                self.bright_value_lbl.setText(f"{pct}%")
+        except Exception as _e:
+
+            pass  # TODO: consider LogManager.log
+        
+        # Get Real Volume from Device (try multiple streams)
+        try:
+            # Try media volume first (stream 3)
+            result = self.adb.shell("cmd media_session volume --show --stream 3")
+            if not result or "volume" not in result.lower():
+                # Fallback: get from settings
+                result = self.adb.shell("settings get system volume_music")
+            
+            # Parse volume value
+            if result and result.strip():
+                # Extract number from result
+                import re
+                match = re.search(r'\d+', result.strip())
+                if match:
+                    volume = int(match.group())
+                    # Ensure in range 0-15
+                    volume = max(0, min(15, volume))
+                    self.vol_slider.blockSignals(True)
+                    self.vol_slider.setValue(volume)
+                    self.vol_slider.blockSignals(False)
+                    self.vol_value_lbl.setText(str(volume))
+                    # Check if muted
+                    if volume == 0 and not self.vol_muted:
+                        self.vol_muted = True
+                        self.vol_icon_btn.setText("🔇")
+                    elif volume > 0 and self.vol_muted:
+                        self.vol_muted = False
+                        self.vol_icon_btn.setText("🔊")
+        except Exception as _e:
+
+            pass  # TODO: consider LogManager.log
 
     # --- Actions ---
+    def toggle_mute(self):
+        """Toggle volume mute/unmute"""
+        if self.vol_muted:
+            # Unmute: restore previous volume
+            self.vol_slider.setValue(self.vol_before_mute)
+            self.adb.set_volume(self.vol_before_mute)
+            self.vol_icon_btn.setText("🔊")
+            self.vol_muted = False
+        else:
+            # Mute: save current volume and set to 0
+            self.vol_before_mute = self.vol_slider.value()
+            self.vol_slider.setValue(0)
+            self.adb.set_volume(0)
+            self.vol_icon_btn.setText("🔇")
+            self.vol_muted = True
+    
     def on_brightness_change(self):
         val = self.bright_slider.value()
+        pct = int((val / 255) * 100)
+        self.bright_value_lbl.setText(f"{pct}%")
         self.adb.set_brightness(val)
         
     def on_volume_change(self):
         val = self.vol_slider.value()
-        self.adb.set_volume(val)
+        self.vol_value_lbl.setText(str(val))
+        # Use media session to set volume (more reliable)
+        try:
+            # Method 1: Use media session (Android 5+)
+            self.adb.shell(f"cmd media_session volume --set {val} --stream 3")
+        except Exception as _e:
+            # Fallback: Traditional method
+            self.adb.set_volume(val)
+        
+        # Update mute icon based on volume
+        if val == 0:
+            self.vol_icon_btn.setText("🔇")
+            self.vol_muted = True
+        else:
+            self.vol_icon_btn.setText("🔊")
+            self.vol_muted = False
         
     def toggle_taps(self):
         btn = self.sender()
@@ -441,6 +574,16 @@ class NotificationCenter(QFrame):
         val = 1 if btn.isChecked() else 0
         self.adb.shell(f"settings put global airplane_mode_on {val}")
         self.adb.shell("am broadcast -a android.intent.action.AIRPLANE_MODE")
+    
+    def toggle_screen_off(self):
+        """Toggle screen-off mode for mirroring"""
+        btn = self.sender()
+        self.turn_screen_off_enabled = btn.isChecked()
+        
+        if btn.isChecked():
+            self.add_notification("info", "🌙 Screen Off enabled - Màn hình phone sẽ tắt khi mirror")
+        else:
+            self.add_notification("info", "☀️ Screen Off disabled - Màn hình phone sẽ bật khi mirror")
 
     def on_mirror(self):
         # Toggle Mirror
@@ -448,9 +591,82 @@ class NotificationCenter(QFrame):
             self.stop_mirroring()
         else:
             self.start_mirroring()
-            # Close center to see the mirror
-            self.toggle()
+    
+    # === Notification Methods ===
+    # create_empty_state() và create_notification_card()
+    # đã được chuyển sang src/ui/widgets/notification_card.py (C1)
 
+    def add_notification(self, title='System', message='', notif_type='info'):
+        """Add a new notification to the panel"""
+        # Hide empty state
+        self.empty_state.hide()
+        
+        # C1: Dùng module-level helper từ notification_card.py
+        card = create_notification_card(self, notif_type, message, title)
+        # Thêm nút Đóng riêng (vì helper không biết dismiss callback)
+        from PySide6.QtWidgets import QPushButton as _QPushButton
+        close_btn = _QPushButton("×")
+        close_btn.setFixedSize(24, 24)
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet("""
+            QPushButton { background: transparent; border: none; color: white; font-size: 20px; font-weight: bold; }
+            QPushButton:hover { background: rgba(255,255,255,0.2); border-radius: 12px; }
+        """)
+        close_btn.clicked.connect(lambda: self.dismiss_notification(card))
+        card.layout().addWidget(close_btn)
+        
+        self.notification_cards.append(card)
+        
+        # Insert at top (after empty_state which is at index 0)
+        insert_pos = len(self.notification_cards)
+        self.notif_container_layout.insertWidget(insert_pos, card)
+        
+        # Auto-open notification center if hidden
+        if not self.isVisible():
+            parent = self.parent()
+            if parent:
+                # Set geometry
+                parent_rect = parent.rect()
+                self.setFixedHeight(parent_rect.height())
+                self.setGeometry(
+                    parent_rect.width() - self.width(), 
+                    0, 
+                    self.width(), 
+                    parent_rect.height()
+                )
+                # Force show
+                self.raise_()
+                self.show()
+                self.is_open = True
+                # Start polling
+                self.update_status()
+                self.poll_timer.start()
+        
+        # Switch to notification tab
+        self.switch_tab(1)
+        
+        # Show clear all button
+        self.clear_all_btn.setVisible(True)
+    
+    def dismiss_notification(self, card):
+        """Remove a specific notification"""
+        if card in self.notification_cards:
+            self.notification_cards.remove(card)
+        card.deleteLater()
+        
+        # Show empty state if no cards left
+        if len(self.notification_cards) == 0:
+            self.empty_state.show()
+            self.clear_all_btn.setVisible(False)
+    
+    def clear_all_notifications(self):
+        """Clear all notifications"""
+        for card in self.notification_cards:
+            card.deleteLater()
+        self.notification_cards.clear()
+        self.empty_state.show()
+        self.clear_all_btn.setVisible(False)
+    
     def start_mirroring(self):
         if not self.adb.current_device:
             self.add_notification("Mirror Error", "Chưa kết nối thiết bị", "error")
@@ -475,6 +691,10 @@ class NotificationCenter(QFrame):
             "--window-title", f"Mirror - {self.adb.current_device}"
         ]
         
+        # Add --turn-screen-off if enabled
+        if self.turn_screen_off_enabled:
+            args.append("--turn-screen-off")
+        
         # Start Process
         self.scrcpy_process = QProcess()
         self.scrcpy_process.finished.connect(self.on_mirror_finished)
@@ -485,7 +705,8 @@ class NotificationCenter(QFrame):
         
         self.scrcpy_process.start(scrcpy_path, args)
         if self.scrcpy_process.waitForStarted(1000):
-            self.add_notification("Mirror", "Đã bắt đầu phản chiếu (Optimized)", "success")
+            mode_text = " (Screen Off)" if self.turn_screen_off_enabled else ""
+            self.add_notification("Mirror", f"Đã bắt đầu phản chiếu{mode_text}", "success")
         else:
             self.add_notification("Mirror Error", f"Lỗi khởi động: {self.scrcpy_process.errorString()}", "error")
 
@@ -524,67 +745,10 @@ class NotificationCenter(QFrame):
         return shutil.which("scrcpy")
 
     def on_debug(self):
-        self.toggle()
-        
+        pass
+    
     def on_screenshot(self):
-        self.adb.screenshot("recents_screenshot.png")
-        self.add_notification("Screenshot", "Đã chụp màn hình", "success")
-
-    def add_notification(self, title, message, type="info"):
-        try:
-            item = QListWidgetItem()
-            widget = QWidget()
-            l = QVBoxLayout(widget)
-            l.setContentsMargins(10, 8, 10, 8)
-            l.setSpacing(2)
-            
-            t = QLabel(title)
-            col = ThemeManager.COLOR_TEXT_PRIMARY
-            if type == "error": col = ThemeManager.COLOR_DANGER
-            elif type == "success": col = ThemeManager.COLOR_SUCCESS
-            
-            # Add timestamp
-            import datetime
-            time_str = datetime.datetime.now().strftime("%H:%M:%S")
-            t.setText(f"{title}  <span style='color:#999; font-weight:normal; font-size:10px;'>{time_str}</span>")
-            t.setTextFormat(Qt.RichText)
-            
-            t.setStyleSheet(f"font-weight: 700; font-size: 13px; color: {col};")
-            
-            m = QLabel(message)
-            m.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 11px;")
-            m.setWordWrap(True)
-            
-            l.addWidget(t)
-            l.addWidget(m)
-            
-            widget.adjustSize()
-            item.setSizeHint(QSize(self.notif_list.width() - 25, widget.sizeHint().height() + 10))
-            
-            self.notif_list.addItem(item)
-            self.notif_list.setItemWidget(item, widget)
-            
-            self.notif_list.scrollToBottom()
-
-            # [AUTO-OPEN] Automatically open notification tab on new message
-            # Check if C++ object is still valid
-            try:
-                if not self.isVisible():
-                    self.toggle(tab_index=1)
-                elif self.stack.currentIndex() != 1:
-                    self.switch_tab(1)
-            except RuntimeError:
-                pass # Object deleted
-            except AttributeError:
-                pass 
-                
-        except Exception as e:
-            # print(f"Error adding notification: {e}") # Silent fail
-            pass
-
-    def clear_notifications(self):
-        self.notif_list.clear()
+        self.adb.screenshot()
 
     def eventFilter(self, obj, event):
-        # Allow MainWindow to use this filter if needed, but logic is mainly in MainWindow
         return super().eventFilter(obj, event)

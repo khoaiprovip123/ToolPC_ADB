@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QIcon
 from src.ui.theme_manager import ThemeManager
 from src.core.log_manager import LogManager
+from src.ui.dialogs.confirmation_dialog import ConfirmationDialog
 import os
 
 class FastbootToolboxWidget(QWidget):
@@ -25,28 +26,29 @@ class FastbootToolboxWidget(QWidget):
         
         # 1. Tabs (Moved to top)
         self.tabs = QTabWidget()
-        self.tabs.setStyleSheet("""
-            QTabWidget::pane {
-                border: 1px solid rgba(0,0,0,0.1);
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
                 border-radius: 8px;
-                background: white; 
+                background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']}; 
                 margin-top: -1px; 
-            }
-            QTabBar::tab {
-                background: #f0f0f0;
-                color: #333;
+            }}
+            QTabBar::tab {{
+                background: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']};
+                color: {ThemeManager.COLOR_TEXT_SECONDARY};
                 padding: 10px 20px;
-                border: 1px solid #ccc;
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
                 border-bottom: none;
                 border-top-left-radius: 6px;
                 border-top-right-radius: 6px;
                 margin-right: 2px;
-            }
-            QTabBar::tab:selected {
-                background: white;
+            }}
+            QTabBar::tab:selected {{
+                background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                color: {ThemeManager.COLOR_ACCENT};
                 font-weight: bold;
-                border-bottom: 2px solid #007bff;
-            }
+                border-bottom: 2px solid {ThemeManager.COLOR_ACCENT};
+            }}
         """)
         
         # Tab 1: Menu Chính (Basic)
@@ -287,19 +289,46 @@ class FastbootToolboxWidget(QWidget):
         self.log_output.appendPlainText(result)
         
     def fastboot_action(self, cmd, confirm):
-        if QMessageBox.question(self, "Xác nhận", confirm) == QMessageBox.Yes:
+        dlg = ConfirmationDialog(
+            self,
+            title="Xác nhận lệnh Fastboot",
+            message="Bạn có chắc chắn muốn thực hiện lệnh này?",
+            details=f"Lệnh: fastboot {cmd}\n\n{confirm}",
+            confirm_text="Thực hiện",
+            cancel_text="Hủy",
+            warning_mode=True
+        )
+        if dlg.exec_() == QDialog.Accepted:
             self.run_command(cmd)
 
     def run_flash(self, partition, file_path):
         if not file_path or not os.path.exists(file_path):
-            QMessageBox.warning(self, "Lỗi", "Vui lòng chọn file hợp lệ!")
+            LogManager.log("Lỗi", "Vui lòng chọn file hợp lệ!", "warning")
             return
         
-        if QMessageBox.question(self, "Flash", f"Bạn có chắc muốn flash vào phân vùng '{partition}'?\nFile: {os.path.basename(file_path)}") == QMessageBox.Yes:
+        dlg = ConfirmationDialog(
+            self,
+            title="Xác nhận Flash",
+            message=f"Bạn sắp nạp (flash) dữ liệu vào phân vùng '{partition}'",
+            details=f"Tệp tin: {os.path.basename(file_path)}\n\n⚠️ CẢNH BÁO: Nạp sai tệp có thể gây hỏng thiết bị (Brick). Hãy đảm bảo đây là tệp tin đúng cho thiết bị của bạn!",
+            confirm_text="Flash ngay",
+            cancel_text="Hủy",
+            warning_mode=True
+        )
+        if dlg.exec_() == QDialog.Accepted:
             self.run_command(f"flash {partition} \"{file_path}\"")
 
     def run_frp_unlock(self):
-        if QMessageBox.question(self, "FRP Unlock", "Thực hiện xóa FRP (Google Account)?\nLệnh: erase frp & erase config") == QMessageBox.Yes:
+        dlg = ConfirmationDialog(
+            self,
+            title="Xác nhận Xóa FRP",
+            message="Bạn muốn thực hiện xóa khóa FRP (Google Account)?",
+            details="Lệnh: erase frp & erase config\n\n⚠️ Hành động này sẽ xóa các cài đặt bảo mật của hệ thống.",
+            confirm_text="Tiến hành",
+            cancel_text="Hủy",
+            warning_mode=True
+        )
+        if dlg.exec_() == QDialog.Accepted:
             self.log_output.appendPlainText("\n> Chạy FRP Unlock...")
             res = self.adb.fastboot_unlock_frp()
             self.log_output.appendPlainText(res)

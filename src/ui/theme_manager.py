@@ -10,18 +10,23 @@ class ThemeManager:
     
     # ==================== ICON MAPPING (Vibrant Emojis for Windows) ====================
     ICONS = {
-        # Navigation
-        "dashboard": "dashboard.png",
-        "apps": "apps.png",
-        "files": "files.png",
-        "xiaomi": "xiaomi.png",
-        "mirror": "mirror.png",
-        "devtools": "devtools.png",
+        # Navigation (Updated with Fluent UI SVGs)
+        "dashboard": "dashboard_new.svg",
+        "apps": "apps_new.svg",
+        "files": "files_new.svg",
+        "xiaomi": "xiaomi_new.svg", # Updated to Flash/Fast Icon
+        "mirror": "mirror.png", # Legacy backup
+        "devtools": "devtools.png", # Legacy backup
         "cloud": "cloud.png",
-        "settings": "settings.png",
-        "fastboot": "devtools.png", # Re-use devtools
-        "tools": "tools.png",
-        "advanced": "⚡",  # Advanced commands - use emoji fallback
+        "settings": "settings_new.svg",
+        "fastboot": "developer_new.svg", 
+        "tools": "tools_new.svg",
+        "advanced": "⚡",
+        
+        # New Sidebar Mappings (Fluent UI SVGs)
+        "debug": "mirror_new.svg",
+        "developer": "developer_new.svg",
+        "about": "about_new.svg",
         
         # Actions (Keep emojis for now or find small icons later)
         "refresh": "↻",
@@ -38,22 +43,21 @@ class ThemeManager:
         "disconnected": "⚪",   # White Circle
     }
     
-    # ==================== APPLE SYSTEM COLORS (iOS 15+) ====================
-    # Light Mode
+    # Light Mode (Modern Sea Blue & White)
     LIGHT = {
-        "COLOR_BG_GRADIENT": "transparent", # Let Acrylic shine through
-        "COLOR_BG_MAIN": "rgba(255, 255, 255, 0.01)",
-        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.25)", # Very Transparent (Glass)
-        "COLOR_GLASS_HOVER": "rgba(255, 255, 255, 0.40)",
-        "COLOR_GLASS_CARD": "rgba(255, 255, 255, 0.65)",  # Cards semi-transparent
-        "COLOR_TEXT_PRIMARY": "#000000",
-        "COLOR_TEXT_SECONDARY": "#48484a", # Darker gray for contrast
+        "COLOR_BG_GRADIENT": "transparent",
+        "COLOR_BG_MAIN": "rgba(224, 247, 250, 0.10)",  # Restored Glass Transparency
+        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.35)", # Translucent glass
+        "COLOR_GLASS_HOVER": "rgba(255, 255, 255, 0.50)",
+        "COLOR_GLASS_CARD": "rgba(255, 255, 255, 0.45)",  # Much clearer cards
+        "COLOR_TEXT_PRIMARY": "#003366",                  # Deep Blue text
+        "COLOR_TEXT_SECONDARY": "#455A64",                # Blue-Grey secondary
         "COLOR_DATA": "#1C1C1E",
-        "COLOR_BG_SECONDARY": "rgba(118, 118, 128, 0.12)", # System Fill
+        "COLOR_BG_SECONDARY": "rgba(179, 229, 252, 0.2)", # Light Sea Blue separator
         "COLOR_SHADOW": "rgba(0, 0, 0, 0.05)",
-        "COLOR_BORDER": "rgba(60, 60, 67, 0.1)",           # Separator
-        "COLOR_BORDER_LIGHT": "rgba(60, 60, 67, 0.05)",
-        "COLOR_DIALOG_BG": "rgba(255, 255, 255, 0.94)",    # High Alpha Glass for Dialogs
+        "COLOR_BORDER": "rgba(0, 151, 167, 0.12)",        # Tealish Border
+        "COLOR_BORDER_LIGHT": "rgba(0, 151, 167, 0.05)",
+        "COLOR_DIALOG_BG": "rgba(240, 252, 255, 0.75)",    # Premium glass for pop-ups
     }
     
     # Dark Mode (Improved)
@@ -62,7 +66,7 @@ class ThemeManager:
         "COLOR_BG_MAIN": "rgba(26, 26, 26, 0.01)",
         "COLOR_GLASS_WHITE": "rgba(45, 45, 45, 0.35)", # Dark glass transparent
         "COLOR_GLASS_HOVER": "rgba(60, 60, 60, 0.50)",
-        "COLOR_GLASS_CARD": "rgba(30, 30, 30, 0.70)", # Cards darker opacity
+        "COLOR_GLASS_CARD": "rgba(40, 40, 40, 0.55)", # MORE Transparent (Previously 0.70)
         "COLOR_TEXT_PRIMARY": "#e8e8e8",
         "COLOR_TEXT_SECONDARY": "#a8a8a8",
         "COLOR_DATA": "#f0f0f0",
@@ -99,6 +103,60 @@ class ThemeManager:
     RADIUS_BUTTON = "12px"    # Standard button radius
     RADIUS_INPUT = "0px"
     BLUR_RADIUS = "20px"      # Standard Blur
+    
+    # ==================== ANIMATION HELPER ====================
+    class AnimationHelper:
+        @staticmethod
+        def fade_in(widget, duration=300):
+            """Apply fade in animation to a widget"""
+            from PySide6.QtCore import QPropertyAnimation, QEasingCurve
+            from PySide6.QtWidgets import QGraphicsOpacityEffect
+            
+            # Check if effect already exists
+            effect = widget.graphicsEffect()
+            if not effect or not isinstance(effect, QGraphicsOpacityEffect):
+                effect = QGraphicsOpacityEffect(widget)
+                widget.setGraphicsEffect(effect)
+            
+            def cleanup():
+                if widget:
+                    widget.setGraphicsEffect(None)
+            
+            anim = QPropertyAnimation(effect, b"opacity")
+            anim.setDuration(duration)
+            anim.setStartValue(0.0)
+            anim.setEndValue(1.0)
+            anim.setEasingCurve(QEasingCurve.OutCubic)
+            anim.finished.connect(cleanup) # Cleanup to avoid paint issues
+            anim.start()
+            
+            # Keep reference to avoid garbage collection
+            widget._fade_anim = anim
+            
+        @staticmethod
+        def slide_in(widget, duration=300, offset=20):
+            """Slide widget from bottom"""
+            from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QPoint
+            
+            start_pos = widget.pos()
+            end_pos = start_pos
+            start_pos_anim = QPoint(start_pos.x(), start_pos.y() + offset)
+            
+            # Don't actually move the widget logic geometry, just visual if possible? 
+            # QPropertyAnimation on 'pos' moves the actual widget. 
+            # Safe for initialization.
+            
+            # widget.move(start_pos_anim) # Set start
+            
+            # anim = QPropertyAnimation(widget, b"pos")
+            # anim.setDuration(duration)
+            # anim.setStartValue(start_pos_anim)
+            # anim.setEndValue(end_pos)
+            # anim.setEasingCurve(QEasingCurve.OutBack)
+            # anim.start()
+            # widget._slide_anim = anim
+            pass # Skipping complicated geometry anims for now to avoid layout fighting without a container
+            
     
     # ==================== HELPER METHODS ====================
     @classmethod
@@ -175,8 +233,9 @@ class ThemeManager:
                 val, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
                 if val == 0:
                     cls._current_theme = "dark"
-            except:
-                pass
+            except Exception as _e:
+
+                pass  # TODO: consider LogManager.log
                 
         elif theme_name == "minimal":
             cls._current_theme = "minimal"
@@ -192,6 +251,23 @@ class ThemeManager:
             cls._current_theme = "light"
             cls.COLOR_ACCENT = "#007AFF"
             cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #007AFF, stop:1 #0A84FF)"
+
+        # Update all legacy class variables to match the current theme
+        # This ensures widgets accessing ThemeManager.COLOR_XXX directly get the correct values
+        current_theme_colors = cls.get_theme()
+        cls.COLOR_BG_GRADIENT = current_theme_colors.get("COLOR_BG_GRADIENT", "transparent")
+        cls.COLOR_GLASS_WHITE = current_theme_colors["COLOR_GLASS_WHITE"]
+        cls.COLOR_GLASS_HOVER = current_theme_colors["COLOR_GLASS_HOVER"]
+        cls.COLOR_GLASS_CARD = current_theme_colors["COLOR_GLASS_CARD"]
+        cls.COLOR_TEXT_PRIMARY = current_theme_colors["COLOR_TEXT_PRIMARY"]
+        cls.COLOR_TEXT_SECONDARY = current_theme_colors["COLOR_TEXT_SECONDARY"]
+        cls.COLOR_DATA = current_theme_colors["COLOR_DATA"]
+        cls.COLOR_BG_SECONDARY = current_theme_colors["COLOR_BG_SECONDARY"]
+        cls.COLOR_SHADOW = current_theme_colors["COLOR_SHADOW"]
+        cls.COLOR_BORDER = current_theme_colors["COLOR_BORDER"]
+        cls.COLOR_BORDER_LIGHT = current_theme_colors["COLOR_BORDER_LIGHT"]
+        cls.COLOR_DIALOG_BG = current_theme_colors["COLOR_DIALOG_BG"]
+        cls.COLOR_BACKGROUND = current_theme_colors.get("COLOR_BG_MAIN", current_theme_colors.get("COLOR_BACKGROUND"))
 
     
     @classmethod
@@ -429,21 +505,24 @@ class ThemeManager:
         theme = cls.get_theme()
         return f"""
             QLineEdit, QComboBox, QSpinBox {{
-                background-color: {theme['COLOR_GLASS_CARD']};
-                border: 1px solid {theme['COLOR_BORDER']};
-                border-radius: {cls.RADIUS_INPUT};
-                padding: 10px 14px;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 18px;
+                padding: 8px 16px 8px 16px;
                 color: {theme['COLOR_TEXT_PRIMARY']};
                 font-family: {cls.FONT_FAMILY};
-                font-size: 14px;
+                font-size: 13px;
             }}
             QLineEdit:focus, QComboBox:focus {{
-                border: 2px solid {cls.COLOR_ACCENT};
-                background-color: {theme['COLOR_GLASS_HOVER']};
+                border: 1px solid #107C10;
+                background: rgba(255, 255, 255, 0.12);
+            }}
+            QLineEdit:hover, QComboBox:hover {{
+                background: rgba(255, 255, 255, 0.1);
             }}
             QComboBox::drop-down {{
                 border: none;
-                padding-right: 10px;
+                padding-right: 12px;
             }}
             QComboBox::down-arrow {{
                 width: 12px;
@@ -707,17 +786,22 @@ class ThemeManager:
         theme = cls.get_theme()
         return f"""
             QPushButton {{
-                background-color: {theme['COLOR_GLASS_CARD']};
-                border-radius: 12px;
-                border: 2px solid {theme['COLOR_BORDER']};
-                font-size: 20px;
-                color: {theme['COLOR_TEXT_PRIMARY']};
-                font-weight: bold;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 10px;
+                font-size: 18px;
+                color: rgba(255, 255, 255, 0.8);
+                font-weight: normal;
             }}
             QPushButton:hover {{
-                background-color: {cls.COLOR_ACCENT}15;
-                border: 2px solid {cls.COLOR_ACCENT};
-                color: {cls.COLOR_ACCENT};
+                background: rgba(16, 124, 16, 0.2);
+                border: 1px solid #107C10;
+                color: #FFFFFF;
+            }}
+            QPushButton:pressed {{
+                background: #107C10;
+                border: 1px solid #107C10;
+                color: #FFFFFF;
             }}
         """
 

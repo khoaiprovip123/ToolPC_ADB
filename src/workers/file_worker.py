@@ -168,7 +168,7 @@ class FileWorker(QThread):
                                  self.usage_ready.emit(total_gb, used_gb)
                                  found = True
                                  break
-                         except:
+                         except Exception as _e:
                              continue
                  
                  if found: return
@@ -271,7 +271,7 @@ class FileWorker(QThread):
                     elif sz < 1024*1024: size_str = f"{sz/1024:.1f} KB"
                     elif sz < 1024*1024*1024: size_str = f"{sz/(1024*1024):.1f} MB"
                     else: size_str = f"{sz/(1024*1024*1024):.1f} GB"
-                except:
+                except Exception as _e:
                     size_str = size
             
             entries.append(FileEntry(

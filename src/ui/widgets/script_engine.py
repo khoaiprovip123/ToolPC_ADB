@@ -13,12 +13,16 @@ from PySide6.QtWidgets import (
     QFormLayout, QLineEdit
 )
 from PySide6.QtCore import Qt, QThread, Signal
+from src.core.workers.macro_worker import MacroWorker
 from src.ui.theme_manager import ThemeManager
+from src.gemini_controller import GeminiController
+from src.core.log_manager import LogManager
 
 class ActionDialog(QDialog):
     def __init__(self, action_type, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Thêm hành động: {action_type}")
+        self.setStyleSheet(ThemeManager.get_main_window_style())
         self.action_type = action_type
         self.data = {}
         self.setup_ui()
@@ -100,54 +104,11 @@ class ActionDialog(QDialog):
                 data[k] = w.currentData()
         return data
 
-class MacroWorker(QThread):
-    progress = Signal(str)
-    finished = Signal()
-    
-    def __init__(self, adb, actions):
-        super().__init__()
-        self.adb = adb
-        self.actions = actions
-        self._running = True
-        
-    def run(self):
-        for i, action in enumerate(self.actions):
-            if not self._running:
-                break
-                
-            atype = action.get("type", "")
-            self.progress.emit(f"Step {i+1}: {atype}")
-            
-            try:
-                if atype == "Click":
-                    self.adb.shell(f"input tap {action['x']} {action['y']}")
-                elif atype == "Swipe":
-                    self.adb.shell(f"input swipe {action['x1']} {action['y1']} {action['x2']} {action['y2']} {action['duration']}")
-                elif atype == "Text":
-                    # Escape spaces
-                    text = action['text'].replace(" ", "%s")
-                    self.adb.shell(f"input text {text}")
-                elif atype == "Key":
-                    self.adb.shell(f"input keyevent {action['keycode']}")
-                elif atype == "Wait":
-                    time.sleep(action['ms'] / 1000.0)
-                    
-                # Small delay between actions by default
-                if atype != "Wait":
-                    time.sleep(0.5)
-                    
-            except Exception as e:
-                self.progress.emit(f"Error: {e}")
-                
-        self.finished.emit()
-        
-    def stop(self):
-        self._running = False
-
 class ScriptEngineWidget(QWidget):
     def __init__(self, adb_manager):
         super().__init__()
         self.adb = adb_manager
+        self.gemini_controller = GeminiController(self.adb)
         self.setup_ui()
         self.worker = None
         
@@ -156,29 +117,63 @@ class ScriptEngineWidget(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         
         # Header
-        header = QLabel("⚡ Macro Automation Builder")
+        header = QLabel("⚡ Macro & AI Automation")
         header.setStyleSheet(f"font-size: 20px; font-weight: bold; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
         main_layout.addWidget(header)
         
+        # --- START NEW GEMINI UI ---
+        gemini_group = QGroupBox("✨ Gemini AI Natural Language Control")
+        gemini_group.setStyleSheet(ThemeManager.get_group_box_style())
+        gemini_layout = QVBoxLayout(gemini_group)
+
+        # Add instructions
+        instructions_label = QLabel(
+            "<b>Hướng dẫn:</b><br>"
+            "1. Nhập lệnh bằng ngôn ngữ tự nhiên (VD: <i>mở cài đặt, tìm kiếm display</i>).<br>"
+            "2. Nhấn nút 'Thực thi bằng Gemini'.<br>"
+            "3. Quan sát điện thoại thực hiện theo lệnh."
+        )
+        instructions_label.setStyleSheet("color: #555; background: transparent; border: none; margin-bottom: 5px;")
+        instructions_label.setWordWrap(True)
+        gemini_layout.addWidget(instructions_label)
+
+        self.gemini_input = QLineEdit()
+        self.gemini_input.setPlaceholderText("Ví dụ: Mở Cài đặt, tìm kiếm 'display', sau đó nhấn back")
+        self.gemini_input.setStyleSheet("padding: 8px; border-radius: 5px;")
+        gemini_layout.addWidget(self.gemini_input)
+
+        self.gemini_run_btn = QPushButton("⚡ Thực thi bằng Gemini")
+        self.gemini_run_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
+        self.gemini_run_btn.clicked.connect(self.run_gemini_command)
+        gemini_layout.addWidget(self.gemini_run_btn)
+
+        main_layout.addWidget(gemini_group)
+        # --- END NEW GEMINI UI ---
+
         # Main Area
         h_layout = QHBoxLayout()
         
         # Action List
-        list_container = QGroupBox("Danh sách hành động")
+        list_container = QGroupBox("Danh sách hành động (Macro Builder)")
         list_container.setStyleSheet(ThemeManager.get_group_box_style())
         list_layout = QVBoxLayout(list_container)
         
         self.action_list = QListWidget()
         self.action_list.setStyleSheet(f"""
             QListWidget {{
-                background: rgba(255,255,255,0.5);
-                border: none;
+                background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
                 border-radius: 8px;
                 color: {ThemeManager.COLOR_TEXT_PRIMARY};
             }}
             QListWidget::item {{
-                padding: 5px;
-                border-bottom: 1px solid rgba(0,0,0,0.05);
+                padding: 10px;
+                border-bottom: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+            }}
+            QListWidget::item:selected {{
+                background: {ThemeManager.COLOR_ACCENT}20;
+                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+                border-radius: 6px;
             }}
         """)
         list_layout.addWidget(self.action_list)
@@ -202,7 +197,7 @@ class ScriptEngineWidget(QWidget):
         h_layout.addWidget(list_container, stretch=2)
         
         # Toolbox
-        toolbox = QGroupBox("Công cụ")
+        toolbox = QGroupBox("Công cụ Macro")
         toolbox.setStyleSheet(ThemeManager.get_group_box_style())
         toolbox_layout = QVBoxLayout(toolbox)
         
@@ -253,6 +248,27 @@ class ScriptEngineWidget(QWidget):
         self.status.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.status)
         
+    def run_gemini_command(self):
+        command_text = self.gemini_input.text().strip()
+        if not command_text:
+            LogManager.log("Script Engine", "Vui lòng nhập một câu lệnh cho Gemini.", "warning")
+            return
+
+        self.gemini_run_btn.setEnabled(False)
+        self.gemini_run_btn.setText("🔄 Đang xử lý...")
+        self.status.setText(f"Gửi lệnh '{command_text}' đến Gemini...")
+
+        def on_gemini_finished():
+            self.gemini_run_btn.setEnabled(True)
+            self.gemini_run_btn.setText("⚡ Thực thi bằng Gemini")
+            self.status.setText("Sẵn sàng cho lệnh tiếp theo.")
+
+        self.gemini_controller.execute_command(
+            command_text,
+            progress_callback=self.status.setText,
+            finished_callback=on_gemini_finished
+        )
+
     def add_action_dialog(self, action_type):
         dlg = ActionDialog(action_type, self)
         if dlg.exec():
@@ -314,7 +330,7 @@ class ScriptEngineWidget(QWidget):
                     for act in actions:
                         self.add_action_item(act)
             except Exception as e:
-                QMessageBox.warning(self, "Lỗi", f"File không hợp lệ: {e}")
+                LogManager.log("Script Engine", f"Lỗi file: {e}", "error")
 
     def run_macro(self):
         actions = []
@@ -327,6 +343,10 @@ class ScriptEngineWidget(QWidget):
         self.btn_run.setEnabled(False)
         self.btn_stop.setEnabled(True)
         
+        # Guard: stop old worker before creating new
+        if self.worker and self.worker.isRunning():
+            self.worker.stop()
+            self.worker.wait(3000)
         self.worker = MacroWorker(self.adb, actions)
         self.worker.progress.connect(self.status.setText)
         self.worker.finished.connect(self.on_finished)
