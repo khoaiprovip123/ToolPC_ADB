@@ -31,9 +31,17 @@ class CleanerWorker(QThread):
             elif self.action_type == "telegram":
                 result = self.adb.clean_messenger_data()
             
-            self.finished.emit(result or "OK")
+            # Normalize: empty/None = success, check for ADB errors
+            result = (result or "").strip()
+            error_keywords = ["exception", "error", "failed", "not found", "denied", "no device"]
+            has_error = any(kw in result.lower() for kw in error_keywords)
+            
+            if has_error:
+                self.finished.emit(f"ADB_ERROR:{result}")
+            else:
+                self.finished.emit("OK")
         except Exception as e:
-            self.finished.emit(f"Error: {str(e)}")
+            self.finished.emit(f"ADB_ERROR:{str(e)}")
 
 
 class CleanerCard(QFrame):
@@ -253,10 +261,11 @@ class CleanerWidget(QWidget):
         worker = CleanerWorker(self.adb, action_key)
         
         def on_done(result):
-            is_error = result.startswith("Error:") if result else True
+            is_error = result.startswith("ADB_ERROR:")
             if is_error:
-                card.show_result(False, result)
-                LogManager.log("Dọn Rác", f"✗ Lỗi khi dọn {display_name}: {result}", "error")
+                error_msg = result.replace("ADB_ERROR:", "").strip()
+                card.show_result(False, error_msg)
+                LogManager.log("Dọn Rác", f"✗ Lỗi khi dọn {display_name}: {error_msg}", "error")
             else:
                 card.show_result(True)
                 LogManager.log("Dọn Rác", f"✓ Đã dọn {display_name} thành công!", "success")
