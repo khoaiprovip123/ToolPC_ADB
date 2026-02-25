@@ -210,8 +210,17 @@ class CleanerWidget(QWidget):
         h_info.addWidget(h_desc)
         h_layout.addLayout(h_info, 1)
         
+        # Connection status label in header
+        self.h_status = QLabel("Chưa kết nối")
+        self.h_status.setStyleSheet("font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.2); padding: 4px 10px; border-radius: 10px;")
+        h_layout.addWidget(self.h_status, 0, Qt.AlignVCenter)
+        
         layout.addWidget(header)
         layout.addSpacing(4)
+        
+        # Initial status update
+        self.refresh_state()
+
         
         # ─── CLEANER CARDS ───
         self.card_cache = CleanerCard(
@@ -243,7 +252,21 @@ class CleanerWidget(QWidget):
         scroll.setWidget(container)
         main.addWidget(scroll)
 
+    def refresh_state(self):
+        """Update UI based on current ADB connection"""
+        if self.adb.is_online():
+            self.h_status.setText(f"● {self.adb.current_device}")
+            self.h_status.setStyleSheet("font-size: 11px; font-weight: 700; color: #2ecc71; background: rgba(0,0,0,0.2); padding: 4px 10px; border-radius: 10px;")
+        else:
+            self.h_status.setText("○ Chưa kết nối")
+            self.h_status.setStyleSheet("font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); background: rgba(0,0,0,0.2); padding: 4px 10px; border-radius: 10px;")
+
     def run_cleaner(self, action_key, card: CleanerCard):
+        # Auto-connect if serial is missing but devices are present
+        if not self.adb.current_device:
+            self.adb.check_connection()
+            self.refresh_state()
+
         # Check device online
         if not self.adb.is_online():
             card.show_result(False, "Chưa kết nối thiết bị")
@@ -264,6 +287,9 @@ class CleanerWidget(QWidget):
             is_error = result.startswith("ADB_ERROR:")
             if is_error:
                 error_msg = result.replace("ADB_ERROR:", "").strip()
+                # Specific message for dex cleaning failures
+                if "dex" in display_name.lower() and "failed" in error_msg.lower():
+                    error_msg = "ADB command failed"
                 card.show_result(False, error_msg)
                 LogManager.log("Dọn Rác", f"✗ Lỗi khi dọn {display_name}: {error_msg}", "error")
             else:

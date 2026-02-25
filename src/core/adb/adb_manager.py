@@ -481,7 +481,7 @@ class ADBManager:
 
     # Cleaner Methods
     def clean_app_cache(self):
-        return self.shell("pm trim-caches 32G")
+        return self.shell("pm trim-caches")
         
     def clean_obsolete_dex(self):
         return self.shell("cmd package prune-dex-opt")
