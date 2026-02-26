@@ -916,14 +916,14 @@ class NotificationAppItem(QFrame):
         self.setCursor(Qt.PointingHandCursor)
         
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(25, 5, 20, 5) # Tăng lề trái mạnh (25) để tránh bị clipping
+        layout.setContentsMargins(35, 5, 20, 5) # Tăng lề cực rộng (35) để tránh bo góc Card đè lên ô tích
         layout.setSpacing(15)
         
         self.cb = QCheckBox()
         self.cb.setChecked(checked)
-        self.cb.setFixedSize(32, 32) # Rộng hơn một chút
-        # Thêm margin-left cho indicator và bỏ padding gây lỗi clipping
-        self.cb.setStyleSheet(ThemeManager.get_checkbox_style().replace("padding: 4px;", "padding: 0px; margin-left: 5px;"))
+        self.cb.setFixedSize(32, 32)
+        # Bỏ margin-left bên trong checkbox để indicator nằm sát trái hơn trong vùng layout mới
+        self.cb.setStyleSheet(ThemeManager.get_checkbox_style().replace("padding: 4px;", "padding: 0px; margin-left: 0px;"))
         
         self.icon_lbl = QLabel(icon_char)
         self.icon_lbl.setFixedSize(40, 40)

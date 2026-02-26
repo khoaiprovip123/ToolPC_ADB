@@ -169,8 +169,10 @@ class OptimizationWorker(QThread):
                             self.adb.shell(f"cmd appops set {pkg} RUN_ANY_IN_BACKGROUND allow", log_error=False)
                             self.adb.shell(f"cmd appops set {pkg} BOOT_COMPLETED allow", log_error=False)
                             
-                            # Method 4: Adaptive Priority (Standard Android fallback)
+                            # Method 4: Adaptive Priority & App Standby (Standard Android fallback)
                             self.adb.shell(f"cmd power set-adaptive-priority {pkg} 0", log_error=False)
+                            self.adb.shell(f"cmd usage-stats set-state {pkg} exempted", log_error=False) # Rất quan trọng cho HyperOS
+                            self.adb.shell(f"cmd usage-stats set-state {pkg} active", log_error=False)
                         
                         # 3. Tự động chạy (Autostart & Launch)
                         if options.get('autostart'):
