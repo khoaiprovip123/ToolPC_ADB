@@ -108,11 +108,40 @@ class OptimizationManager:
         self.adb.shell("settings put system time_12_24 24")
 
     # ================== New Methods for Worker Compatibility ==================
+    def detect_hyperos_version(self):
+        """Detect HyperOS/MIUI version. Returns: 0=MIUI, 1=HyperOS1, 2=HyperOS2, 3=HyperOS3+"""
+        try:
+            os_ver = self.adb.shell("getprop ro.mi.os.version.name").strip()
+            if os_ver and os_ver.startswith("OS"):
+                major = int(os_ver[2])  # "OS2.0.1..." → 2
+                return major
+        except Exception:
+            pass
+        return 0  # MIUI or unknown
+
     def enable_hyperos_stacked_recent(self):
-        """Enable HyperOS 2 Stacked Recent View (iOS Style)"""
-        # Requires HyperOS Launcher RELEASE-6.01.03.1924+
+        """Kích hoạt Stacked Recents qua ADB (can thiệp sâu)."""
+        self.adb.shell("settings put system deviceLevelList v:1,c:3,g:3")
         self.adb.shell("settings put global task_stack_view_layout_style 2")
-        return "Đã set biến Stacked Recent (2)"
+        self.adb.shell("am force-stop com.miui.home")
+
+    def switch_to_miui_apps(self, callback=None):
+        """Chuyển đổi từ Google Dialer/SMS sang MIUI Dialer/SMS."""
+        # 1. Gỡ bỏ Google Apps
+        self.adb.shell("pm uninstall -k --user 0 com.google.android.dialer", log_error=False)
+        self.adb.shell("pm uninstall -k --user 0 com.google.android.contacts", log_error=False)
+        self.adb.shell("pm uninstall -k --user 0 com.google.android.apps.messaging", log_error=False)
+        self.adb.shell("pm uninstall -k --user 0 com.android.phone.cust.overlay.miui", log_error=False)
+        
+        # 2. Kích hoạt MIUI Apps
+        self.adb.shell("pm install-existing com.android.contacts", log_error=False)
+        self.adb.shell("pm install-existing com.android.incallui", log_error=False)
+        self.adb.shell("pm install-existing com.android.mms", log_error=False)
+        
+        # 3. Mở cài đặt Ứng dụng mặc định
+        self.adb.shell("am start -a android.settings.MANAGE_DEFAULT_APPS_SETTINGS")
+        
+        return "✅ Hoàn tất! Vui lòng chọn MIUI Apps trong phần cài đặt vừa hiện ra trên máy."
 
     def set_always_on_display(self, enable: bool):
         val = "1" if enable else "0"

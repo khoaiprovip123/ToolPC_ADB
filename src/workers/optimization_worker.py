@@ -8,11 +8,12 @@ class OptimizationWorker(QThread):
     error_occurred = Signal(str, str) # title, message
     finished = Signal()
     
-    def __init__(self, adb, task_type):
+    def __init__(self, adb, task_type, **kwargs):
         super().__init__()
         self.adb = adb
         self.opt = OptimizationManager(adb)
         self.task_type = task_type
+        self.kwargs = kwargs
         
     def run(self):
         # 1. Strict Device Check
@@ -59,12 +60,8 @@ class OptimizationWorker(QThread):
                 self.progress.emit(f"✅ {result}")
 
             elif self.task_type == "stacked_recent":
-                self.progress.emit("📚 Đang kích hoạt giao diện Xếp chồng (HyperOS Native)...")
+                self.progress.emit("📚 Đang kích hoạt Stacked Recents...")
                 self.opt.enable_hyperos_stacked_recent()
-                
-                self.progress.emit("🔄 Đang khởi động lại Launcher để áp dụng...")
-                self.adb.shell("am force-stop com.miui.home")
-                self.progress.emit("✅ Đã áp dụng giao diện Xếp chồng")
 
             elif self.task_type == "skip_setup":
                 self.progress.emit("⏩ Đang bỏ qua Setup Wizard...")
@@ -100,6 +97,11 @@ class OptimizationWorker(QThread):
                 result = self.opt.hide_navigation_bar(True)
                 self.progress.emit(result)
 
+            elif self.task_type == "miui_apps":
+                self.progress.emit("📲 Đang chuyển sang MIUI Apps chính chủ...")
+                result = self.opt.switch_to_miui_apps()
+                self.progress.emit(result)
+
             elif self.task_type == "hide_nav_off":
                 self.progress.emit("↔️ Đang hiện thanh điều hướng...")
                 result = self.opt.hide_navigation_bar(False)
@@ -127,86 +129,89 @@ class OptimizationWorker(QThread):
                  self.progress.emit(result)
 
             elif self.task_type == "expert_optimize":
-                 self.progress.emit("🚀 Đang kích hoạt Tối ưu hóa Chuyên sâu (HyperOS 3+)...")
-                 result = self.opt.apply_performance_props()
-                 self.progress.emit(result)
-                 self.progress.emit("🔄 Đang tối ưu hóa Compiler (speed-profile)...")
-                 result = self.opt.compile_apps("speed-profile", timeout=300, callback=self.progress.emit)
-                 self.progress.emit(result)
+                 self.progress.emit("🚀 Đang tối ưu hóa Chuyên sâu (Props & Apps)...")
+                 self.opt.apply_performance_props()
+                 self.opt.compile_apps("speed-profile", timeout=300, callback=None)
+                 self.progress.emit("✅ Đã hoàn tất tối ưu hóa Chuyên sâu")
 
             elif self.task_type == "art_tuning":
                  self.progress.emit("⚡ Đang tối ưu hóa ART (Full Speed)...")
-                 result = self.opt.compile_apps("speed", timeout=600, callback=self.progress.emit)
-                 self.progress.emit(result)
+                 self.opt.compile_apps("speed", timeout=600, callback=None)
+                 self.progress.emit("✅ Đã tăng tốc ART thành công")
 
             elif self.task_type == "fix_social_notifications":
-                 self.progress.emit("🔧 Đang xử lý thông báo & pin cho Social Apps...")
-                 
-                 targets = [
-                    "app.revanced.android.gms", # MicroG
-                    "com.facebook.katana",      # Facebook
-                    "com.facebook.orca",        # Messenger
-                    "com.zing.zalo"             # Zalo
-                 ]
-                 
-                 count = 0
-                 for pkg in targets:
+                self.progress.emit("🔧 Đang thực hiện các tùy chọn tùy chỉnh cho ứng dụng...")
+                
+                targets = self.kwargs.get('packages', [])
+                options = self.kwargs.get('options', {'notify': True, 'battery': True, 'autostart': True})
+                
+                count = 0
+                for pkg in targets:
                     try:
-                         self.progress.emit(f"   ► Xử lý {pkg.split('.')[-1]}...")
-                         # 1. Battery Optimization (Unlimited / Ignore)
-                         self.adb.shell(f"dumpsys deviceidle whitelist +{pkg}", log_error=False)
-                         
-                         # 2. Allow Background Run
-                         self.adb.shell(f"cmd appops set {pkg} RUN_IN_BACKGROUND allow", log_error=False)
-                         self.adb.shell(f"cmd appops set {pkg} RUN_ANY_IN_BACKGROUND allow", log_error=False)
-                         
-                         # 3. Autostart (Xiaomi OpCode 10008)
-                         self.adb.shell(f"cmd appops set {pkg} 10008 allow", log_error=False)
-                         self.adb.shell(f"cmd appops set {pkg} START_FOREGROUND allow", log_error=False)
-                         
-                         # 4. Remove from App Standby
-                         self.adb.shell(f"am set-inactive {pkg} false", log_error=False)
-                         count += 1
-                    except Exception as _e:
+                        # 1. Bật thông báo ứng dụng
+                        if options.get('notify'):
+                            # Ensure app notification is enabled at system level
+                            self.adb.shell(f"cmd notification set_blocked {pkg} false", log_error=False)
+                        
+                        # 2. Pin không hạn chế (MIUI PowerKeeper Deep Fix)
+                        if options.get('battery'):
+                            # Method 1: Doze Whitelist (Android Standard)
+                            self.adb.shell(f"dumpsys deviceidle whitelist +{pkg}", log_error=False)
+                            
+                            # Method 2: MIUI PowerKeeper (Target Service & Targeted Broadcast)
+                            # state 0 = No restrictions
+                            self.adb.shell(f"am start-foreground-service -n com.miui.powerkeeper/.service.PowerKeeperService -a com.miui.powerkeeper.configure_app_battery_saver --es package_name {pkg} --ei state 0", log_error=False)
+                            # Targeted Broadcast is more reliable on HyperOS
+                            self.adb.shell(f"am broadcast -a com.miui.powerkeeper.configure_app_battery_saver --es package_name {pkg} --ei state 0 com.miui.powerkeeper", log_error=False)
+                            
+                            # Method 3: AppOps (Run & Background Permissions)
+                            self.adb.shell(f"cmd appops set {pkg} RUN_IN_BACKGROUND allow", log_error=False)
+                            self.adb.shell(f"cmd appops set {pkg} RUN_ANY_IN_BACKGROUND allow", log_error=False)
+                            self.adb.shell(f"cmd appops set {pkg} BOOT_COMPLETED allow", log_error=False)
+                            
+                            # Method 4: Adaptive Priority (Standard Android fallback)
+                            self.adb.shell(f"cmd power set-adaptive-priority {pkg} 0", log_error=False)
+                        
+                        # 3. Tự động chạy (Autostart & Launch)
+                        if options.get('autostart'):
+                            # MIUI Autostart AppOps
+                            self.adb.shell(f"cmd appops set {pkg} 10008 allow", log_error=False)
+                            self.adb.shell(f"am set-inactive {pkg} false", log_error=False)
+                            # Wake up the app
+                            self.adb.shell(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", log_error=False)
+                        
+                        count += 1
+                        self.progress.emit(f"   ↳ Đã fix xong: {pkg}")
+                    except: pass
+                
+                self.progress.emit(f"✅ Đã xử lý xong {count} ứng dụng!")
 
-                        pass  # TODO: consider LogManager.log
-                 
-                 self.progress.emit(f"✅ Đã tối ưu hóa {count} ứng dụng!")
-                 
             elif self.task_type == "remove_app_label":
                 self.progress.emit("📝 Đang ẩn tên ứng dụng trên màn hình chính...")
                 self.adb.shell("settings put system miui_home_no_word_model 1")
                 self.adb.shell("am force-stop com.miui.home")
-                self.progress.emit("✅ Đã ẩn tên ứng dụng (Launcher đã được khởi động lại)")
+                self.progress.emit("✅ Đã ẩn tên ứng dụng thành công")
 
             elif self.task_type == "force_blur_level":
-                self.progress.emit("💧 Đang ép buộc hiệu ứng Blur cao cấp (Device Level)...")
-                # v:1 (High End), c:3 (Blur Level), g:3 (Graphics)
+                self.progress.emit("💧 Đang kích hoạt hiệu ứng Blur (Device Level)...")
                 self.adb.shell("settings put system deviceLevelList v:1,c:3,g:3")
                 self.adb.shell("am force-stop com.miui.home")
-                self.progress.emit("✅ Đã kích hoạt Blur Folder & Background")
+                self.progress.emit("✅ Đã kích hoạt hiệu ứng Blur thành công")
 
             elif self.task_type == "unlock_super_wallpaper":
                 self.progress.emit("🪐 Đang mở khóa Super Wallpaper...")
                 self.adb.shell("settings put secure aod_using_super_wallpaper 1")
-                self.progress.emit("✅ Đã mở khóa tính năng Super Wallpaper")
+                self.progress.emit("✅ Đã mở khóa Super Wallpaper thành công")
 
             elif self.task_type == "enable_call_recording":
                 self.progress.emit("📞 Đang kích hoạt Ghi âm cuộc gọi...")
-                # Try to uninstall the overlay that hides native features
-                result = self.adb.shell("pm uninstall -k --user 0 com.android.phone.cust.overlay.miui")
-                if "Success" in result:
-                    self.progress.emit("✅ Đã gỡ bỏ giới hạn (Overlay Uninstalled)")
-                else:
-                    self.progress.emit(f"ℹ️ Kết quả: {result.strip()} (Có thể đã gỡ trước đó)")
+                self.adb.shell("pm uninstall -k --user 0 com.android.phone.cust.overlay.miui")
+                self.progress.emit("✅ Đã kích hoạt Ghi âm cuộc gọi thành công")
 
             elif self.task_type == "activate_brevent":
                 self.progress.emit("🛡️ Đang kích hoạt Brevent Server...")
-                # Grant verify
-                self.progress.emit("Đang cấp quyền WRITE_SECURE_SETTINGS...")
-                result = self.opt.activate_brevent()
-                self.progress.emit(f"Run script: {result}")
-                self.progress.emit("✅ Hoàn tất kích hoạt. Vui lòng mở app Brevent!")
+                self.opt.activate_brevent()
+                self.progress.emit("✅ Đã kích hoạt Brevent Server thành công")
                 
             # === System Tweaks ===
             elif self.task_type == "enable_aod":

@@ -144,13 +144,11 @@ class ADBManager:
                 timeout=30
             ).strip()
         except subprocess.CalledProcessError as e:
-            LogManager.log('ADB Error', f'Command failed', 'error')
+            # Just return the output/error; silence the redundant automatic log
             return e.output.strip()
         except subprocess.TimeoutExpired:
-            LogManager.log('ADB Timeout', 'Command timed out after 30s', 'error')
             return 'Error: Timeout after 30s'
         except Exception as e:
-            LogManager.log('ADB Exception', str(e), 'error')
             return f"Error: {e}"
 
     def shell(self, command, *args, **kwargs):

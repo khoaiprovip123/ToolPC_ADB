@@ -46,18 +46,18 @@ class ThemeManager:
     # Light Mode (Modern Sea Blue & White)
     LIGHT = {
         "COLOR_BG_GRADIENT": "transparent",
-        "COLOR_BG_MAIN": "rgba(224, 247, 250, 0.10)",  # Restored Glass Transparency
-        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.35)", # Translucent glass
-        "COLOR_GLASS_HOVER": "rgba(255, 255, 255, 0.50)",
-        "COLOR_GLASS_CARD": "rgba(255, 255, 255, 0.45)",  # Much clearer cards
-        "COLOR_TEXT_PRIMARY": "#003366",                  # Deep Blue text
-        "COLOR_TEXT_SECONDARY": "#455A64",                # Blue-Grey secondary
-        "COLOR_DATA": "#1C1C1E",
-        "COLOR_BG_SECONDARY": "rgba(179, 229, 252, 0.2)", # Light Sea Blue separator
-        "COLOR_SHADOW": "rgba(0, 0, 0, 0.05)",
-        "COLOR_BORDER": "rgba(0, 151, 167, 0.12)",        # Tealish Border
-        "COLOR_BORDER_LIGHT": "rgba(0, 151, 167, 0.05)",
-        "COLOR_DIALOG_BG": "rgba(240, 252, 255, 0.75)",    # Premium glass for pop-ups
+        "COLOR_BG_MAIN": "rgba(245, 250, 255, 0.20)",  # Bright Glass for Base
+        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.95)", # Solid White for inner components
+        "COLOR_GLASS_HOVER": "rgba(245, 248, 255, 1.0)",
+        "COLOR_GLASS_CARD": "#ffffff",                   # Solid White Card
+        "COLOR_TEXT_PRIMARY": "#1a1a1a",                 # Darker text for white bg
+        "COLOR_TEXT_SECONDARY": "#5f6368",               # Material Grey secondary
+        "COLOR_DATA": "#202124",
+        "COLOR_BG_SECONDARY": "#f1f3f4",                 # Light grey background
+        "COLOR_SHADOW": "rgba(0, 0, 0, 0.1)",
+        "COLOR_BORDER": "#dadce0",                      # Standard Google/Xiaomi border
+        "COLOR_BORDER_LIGHT": "#f1f3f4",
+        "COLOR_DIALOG_BG": "#ffffff",                    # Solid White for Dialogs
     }
     
     # Dark Mode (Improved)
@@ -247,7 +247,7 @@ class ThemeManager:
             cls.COLOR_ACCENT = "#0A84FF" # iOS Dark Blue
             cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #0A84FF, stop:1 #007AFF)"
             
-        else: # Light
+        else: # Light (FORCED BY USER REQUEST)
             cls._current_theme = "light"
             cls.COLOR_ACCENT = "#007AFF"
             cls.COLOR_ACCENT_GRADIENT = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #007AFF, stop:1 #0A84FF)"
@@ -344,43 +344,23 @@ class ThemeManager:
                 border-radius: 6px;
                 font-size: 12px;
             }}
-            /* Dialog Styling - Critical Fix for Dark Mode */
-            QMessageBox, QDialog {{
-                background-color: {theme['COLOR_DIALOG_BG']}; 
+            /* Specific Fix for Message Box Labels */
+            QMessageBox QLabel, QDialog QLabel {{
                 color: {theme['COLOR_TEXT_PRIMARY']};
-            }}
-            QMessageBox QLabel {{
-                color: {theme['COLOR_TEXT_PRIMARY']};
-                background: transparent;
-                min-width: 250px; /* Ensure wide enough for text */
-                font-size: 13px;
-            }}
-            QMessageBox QPushButton {{
-                background-color: {theme['COLOR_BG_SECONDARY']};
-                color: {theme['COLOR_TEXT_PRIMARY']};
-                border: 1px solid {theme['COLOR_BORDER']};
-                border-radius: 4px;
-                padding: 6px 15px;
-                min-width: 80px;
-            }}
-            QMessageBox QPushButton:hover {{
-                background-color: {ThemeManager.COLOR_ACCENT};
-                color: white;
-                border: 1px solid {ThemeManager.COLOR_ACCENT};
+                font-size: 14px;
+                background-color: transparent;
             }}
             
-            /* Enforce background for all widgets inside dialog to match main bg */
+            /* Enforce white background for all widgets inside dialog */
             QDialog QWidget {{
                 background-color: transparent;
                 color: {theme['COLOR_TEXT_PRIMARY']};
             }}
-
-            /* Specific Fix for Message Box Labels */
-            QMessageBox QLabel {{
-                color: {theme['COLOR_TEXT_PRIMARY']};
-                font-size: 14px;
-                background-color: transparent;
-                min-width: 240px;
+            
+            QDialog {{
+                background-color: #ffffff; /* FORCE WHITE */
+                border: 1px solid #dadce0;
+                border-radius: 12px;
             }}
             
             QMessageBox QLabel#qt_msgbox_informativelabel {{

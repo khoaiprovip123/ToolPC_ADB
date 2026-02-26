@@ -103,7 +103,7 @@ class ModernCard(QFrame):
         btn.clicked.connect(self.on_click)
         btn.setFixedSize(100, 36)
         
-        btn_style = "background: white; color: black;" if gradient_colors else f"background: {ThemeManager.COLOR_ACCENT}; color: white;"
+        btn_style = "background: #1a1a1a; color: white;" if gradient_colors and gradient_colors[0] == "#ffffff" else ("background: white; color: black;" if gradient_colors else f"background: {ThemeManager.COLOR_ACCENT}; color: white;")
         btn.setStyleSheet(f"""
             QPushButton {{
                 {btn_style}
@@ -240,9 +240,10 @@ class XiaomiHubWidget(QWidget):
         # Service Tiles (Consolidated Indexing)
         self.add_tile("Gỡ Rác & Tối Ưu (Debloater)", "Quét và gỡ bỏ ứng dụng rác, app thừa.", "🗑️", 1, ["#FF9A9E", "#FECFEF"])
         self.add_tile("Tối Ưu & Tinh Chỉnh (AIO)", "120Hz, Tắt OTA, Việt Hóa, Tối ưu ART Chuyên sâu.", "✨", 2, ["#a18cd1", "#fbc2eb"])
-        self.add_tile("Quản Lý ROM & Apps", "Tải ROM HyperOS, App Gốc.", "☁️", 3, ["#e0c3fc", "#8ec5fc"])
-        self.add_tile("Công Cụ Fastboot", "Flash ROM, Unlock, Format.", "🛠️", 4, ["#43e97b", "#38f9d7"])
-        self.add_tile("Kho Ứng Dụng (Store)", "Tải APK/XAPK từ kho online.", "🛍️", 5, ["#ff9a9e", "#fecfef"]) 
+        self.add_tile("Fix Thông Báo 🔔", "Sửa lỗi chậm thông báo Zalo, Messenger, Facebook.", "🔔", 3, ["#fdfbfb", "#ebedee"]) # Bright White/Silver
+        self.add_tile("Quản Lý ROM & Apps", "Tải ROM HyperOS, App Gốc.", "☁️", 4, ["#e0c3fc", "#8ec5fc"])
+        self.add_tile("Công Cụ Fastboot", "Flash ROM, Unlock, Format.", "🛠️", 5, ["#43e97b", "#38f9d7"])
+        self.add_tile("Kho Ứng Dụng (Store)", "Tải APK/XAPK từ kho online.", "🛍️", 6, ["#ff9999", "#ffcc99"]) 
 
         layout.addWidget(grid_container)
         layout.addStretch()
@@ -263,6 +264,13 @@ class XiaomiBaseWidget(QWidget):
         self.adb = adb_manager
         self.opt_worker = None
         self.worker = None
+
+    def run_task(self, task_type, name="Tác vụ", **kwargs):
+        if self.opt_worker and self.opt_worker.isRunning(): return
+        self.opt_worker = OptimizationWorker(self.adb, task_type, **kwargs)
+        self.opt_worker.progress.connect(lambda m: LogManager.log(name, m, "info" if "✅" not in m and "❌" not in m else ("success" if "✅" in m else "error")))
+        if task_type == "check_status": self.opt_worker.result_ready.connect(self.show_status_dialog)
+        self.opt_worker.start()
         
     def show_error(self, title, message):
         LogManager.log(title, message, "error")
@@ -691,6 +699,10 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
         grid_v.addWidget(ModernCard("Siêu Hình Nền", "Mở khóa Super Wallpaper.", "🪐", self.run_unlock_super_wallpaper, ["#f093fb", "#f5576c"]), 3, 1)
         grid_v.addWidget(ModernCard("Ẩn Nhãn Icon", "Chế độ No Word ẩn tên icon.", "📝", self.run_remove_app_label, ["#a18cd1", "#fbc2eb"]), 4, 0)
         grid_v.addWidget(ModernCard("Force Dark Mode", "Ép chế độ tối cho toàn bộ app.", "🌙", self.run_force_dark_mode, ["#434343", "#000000"]), 4, 1)
+        # Fix Thông Báo moved to Tab 2 in Sidebar
+        # In XiaomiToolsPage, self.parent() is the QStackedWidget
+        grid_v.addWidget(ModernCard("Fix Thông Báo", "Sửa lỗi chậm tin nhắn (Bản NC v3).", "🔔", lambda: self.parent().setCurrentIndex(2) if self.parent() else None, ["#ffffff", "#f1f3f4"]), 5, 0)
+        grid_v.addWidget(ModernCard("Chuyển MIUI Apps", "Đổi Dialer/SMS sang MIUI.", "📲", self.run_switch_miui_apps, ["#11998e", "#38ef7d"]), 5, 1)
         c_layout.addLayout(grid_v)
 
         # --- SECTION 2: PERFORMANCE & BATTERY ---
@@ -698,7 +710,7 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
         grid_p = QGridLayout()
         grid_p.setSpacing(20)
         grid_p.addWidget(ModernCard("Tối Ưu ART VM", "Biên dịch lại app để mở nhanh.", "💎", self.run_art_tuning, ["#43e97b", "#38f9d7"]), 0, 0)
-        grid_p.addWidget(ModernCard("Fix Trễ Thông Báo", "Không giới hạn pin cho FB/Zalo.", "🔔", self.run_fix_social_notifications, ["#ff9a9e", "#fecfef"]), 0, 1)
+        grid_p.addWidget(ModernCard("Fix Thông Báo (Chọn lọc)", "Fix trễ thông báo và tự động bật app.", "🔔", self.run_social_fix_dialog, ["#ff9a9e", "#fecfef"]), 0, 1)
         grid_p.addWidget(ModernCard("Game Turbo", "Tối ưu GPU/CPU khi chơi game.", "🎮", lambda: self.run_task("game_perf_tune", name="Game Turbo"), ["#f12711", "#f5af19"]), 1, 0)
         grid_p.addWidget(ModernCard("Sạc Nhanh Cấp Tốc", "Mở khóa giới hạn sạc.", "⚡", lambda: self.run_task("fast_charge", name="Sạc Nhanh"), ["#FDC830", "#F37335"]), 1, 1)
         grid_p.addWidget(ModernCard("Giới Hạn App Nền", "Kiểm soát app chạy ngầm.", "🛑", self.ask_bg_limit, ["#bdc3c7", "#2c3e50"]), 2, 0)
@@ -732,20 +744,110 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
         lbl.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {ThemeManager.COLOR_TEXT_PRIMARY}; border-bottom: 2px solid {ThemeManager.COLOR_ACCENT}50; padding-bottom: 5px; margin-top: 10px;")
         layout.addWidget(lbl)
 
-    def run_task(self, task_type, name="Tác vụ", **kwargs):
-        if self.opt_worker and self.opt_worker.isRunning(): return
-        self.opt_worker = OptimizationWorker(self.adb, task_type)
-        for k, v in kwargs.items(): setattr(self.opt_worker, k, v)
-        self.opt_worker.progress.connect(lambda m: LogManager.log(name, m, "info"))
-        self.opt_worker.finished.connect(lambda: LogManager.log(name, f"Xử lý '{name}' thành công!", "success"))
-        if task_type == "check_status": self.opt_worker.result_ready.connect(self.show_status_dialog)
-        self.opt_worker.start()
+        layout.addWidget(lbl)
 
     def run_animations(self): self.run_task("animations", name="Animations")
     def run_smart_blur(self): self.run_task("smart_blur", name="Smart Blur")
     def run_expert_optimization(self): self.run_task("expert_optimize", name="Expert Opt")
-    def run_fix_social_notifications(self): self.run_task("fix_social_notifications", name="Fix Social")
-    def run_hyperos_stacked_recent(self): self.run_task("stacked_recent", name="Stacked Recent")
+    def run_social_fix_dialog(self):
+        # Redirect to the new dedicated tab (Index 2 in Sidebar)
+        if hasattr(self.parent(), 'setCurrentIndex'):
+            self.parent().setCurrentIndex(2)
+        elif hasattr(self.parent(), 'switch_page'):
+            self.parent().switch_page(3) # Fallback for old Hub wrapper
+        else:
+            LogManager.log("Fix", "Vui lòng sử dụng Tab Fix Thông Báo ở thanh bên.", "info")
+
+    def run_hyperos_stacked_recent(self):
+        """Luồng xử lý Stacked Recents theo phiên bản OS"""
+        from src.core.optimization_manager import OptimizationManager
+        opt = OptimizationManager(self.adb)
+        
+        # Detect OS version
+        os_ver = opt.detect_hyperos_version()
+        
+        if os_ver <= 1:
+            # MIUI / HyperOS 1: Không hỗ trợ
+            LogManager.log("Stacked Recent", "❌ MIUI / HyperOS 1 không hỗ trợ tính năng Xếp chồng", "error")
+            return
+        
+        if os_ver == 2:
+            # HyperOS 2: Hiện dialog 2 lựa chọn
+            dlg = QMessageBox(self)
+            dlg.setWindowTitle("Đa Nhiệm Xếp Chồng")
+            dlg.setText("<b>HyperOS 2</b> — Chọn phương thức kích hoạt:")
+            dlg.setInformativeText(
+                "① Tải Launcher mới (khuyên dùng)\n"
+                "② Can thiệp sâu ADB (không cần cập nhật)"
+            )
+            
+            # Apply styling for white background and readable text
+            dlg.setStyleSheet(f"""
+                QMessageBox {{
+                    background-color: white;
+                }}
+                QLabel {{
+                    color: #333;
+                    background: transparent;
+                }}
+                QPushButton {{
+                    padding: 6px 14px;
+                    border-radius: 6px;
+                    font-weight: bold;
+                }}
+            """)
+            
+            btn_update = dlg.addButton("📥 Tải Launcher", QMessageBox.ActionRole)
+            btn_adb = dlg.addButton("⚡ Can thiệp ADB", QMessageBox.ActionRole)
+            dlg.addButton("Hủy", QMessageBox.RejectRole)
+            dlg.exec()
+            
+            clicked = dlg.clickedButton()
+            if clicked == btn_update:
+                self._open_launcher_download()
+                return
+            elif clicked == btn_adb:
+                self.run_task("stacked_recent", name="Stacked Recent")
+                return
+            else:
+                return
+        
+        # HyperOS 3+: Can thiệp sâu trực tiếp
+        self.run_task("stacked_recent", name="Stacked Recent")
+
+    def _open_launcher_download(self):
+        """Mở link tải Launcher APK mới"""
+        import webbrowser
+        webbrowser.open("https://hyperosupdates.com/apps/com.miui.home/601051991")
+    def run_switch_miui_apps(self):
+        """Hiện dialog hướng dẫn & xác nhận chuyển MIUI Apps"""
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle("Chuyển sang MIUI Apps")
+        dlg.setText("<b>Lưu ý quan trọng:</b>")
+        dlg.setInformativeText(
+            "Để trình gọi điện & tin nhắn hoạt động, anh cần cài đặt 3 APK này trước khi thực thi:\n\n"
+            "1. <a href='https://hyperosupdates.com/apps/com.android.contacts/'>MIUI Contacts & Dialer</a>\n"
+            "2. <a href='https://hyperosupdates.com/apps/com.android.mms/'>MIUI Messages</a>\n"
+            "3. <a href='https://hyperosupdates.com/apps/com.android.incallui/'>MIUI InCallUI (Ghi âm cuộc gọi)</a>\n\n"
+            "Sau khi cài xong APK, bấm 'Thực thi' để gỡ Google Apps và kích hoạt MIUI Apps."
+        )
+        
+        dlg.setStyleSheet("""
+            QMessageBox { background-color: white; }
+            QLabel { color: #333; }
+            QPushButton { padding: 6px 14px; border-radius: 6px; font-weight: bold; }
+        """)
+        
+        btn_exec = dlg.addButton("⚡ Thực thi ADB", QMessageBox.AcceptRole)
+        dlg.addButton("Hủy", QMessageBox.RejectRole)
+        
+        # Make links clickable
+        dlg.setTextFormat(Qt.RichText)
+        dlg.exec()
+        
+        if dlg.clickedButton() == btn_exec:
+            self.run_task("miui_apps", name="MIUI Apps")
+
     def run_remove_app_label(self): self.run_task("remove_app_label", name="No Label")
     def run_force_blur_level(self): self.run_task("force_blur_level", name="Force Blur")
     def run_unlock_super_wallpaper(self): self.run_task("unlock_super_wallpaper", name="Super Wallpaper")
@@ -768,7 +870,7 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
     def ask_resolution(self):
         from PySide6.QtWidgets import QInputDialog
         text, ok = QInputDialog.getText(self, "Độ phân giải", "Nhập độ phân giải (VD: 1080x2400):")
-        if ok and text: self.run_task("wm_size", name="Resolution", size_value=text)
+        if ok and text: self.run_task("wm_size", name="Resolution", size=text)
 
     def run_force_dark_mode(self):
         if ConfirmationDialog(self, title="Dark Mode", message="Ép chế độ tối?", warning_mode=True).exec_() == QDialog.Accepted:
@@ -778,12 +880,12 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
         from PySide6.QtWidgets import QInputDialog
         items = ["Tốc độ (Speed)", "Cân bằng (Profile)", "Pin (Quicken)"]
         item, ok = QInputDialog.getItem(self, "ART Tuning", "Chọn chế độ:", items, 0, False)
-        if ok: self.run_task("compile_apps", name="ART", compile_mode=("speed" if "Speed" in item else ("speed-profile" if "Profile" in item else "quicken")))
+        if ok: self.run_task("compile_apps", name="ART", mode=("speed" if "Speed" in item else ("speed-profile" if "Profile" in item else "quicken")))
 
     def ask_bg_limit(self):
         from PySide6.QtWidgets import QInputDialog
         text, ok = QInputDialog.getText(self, "Giới hạn nền", "Nhập số lượng (VD: 2):")
-        if ok: self.run_task("bg_limit", name="BG Limit", limit_value=text)
+        if ok: self.run_task("bg_limit", name="BG Limit", limit=text)
 
     def run_set_vietnamese(self):
         if ConfirmationDialog(self, title="Việt Hóa", message="Cài tiếng Việt?", warning_mode=True).exec_() == QDialog.Accepted:
@@ -804,6 +906,228 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
     def run_enable_call_recording(self):
         if ConfirmationDialog(self, title="Ghi âm", message="Kích hoạt ghi âm gốc?").exec_() == QDialog.Accepted:
             self.run_task("enable_call_recording", name="Recording")
+
+class NotificationAppItem(QFrame):
+    """Modern list item for App selection"""
+    def __init__(self, pkg, name, icon_char, checked=False, parent=None):
+        super().__init__(parent)
+        self.pkg = pkg
+        self.setFixedHeight(60)
+        self.setCursor(Qt.PointingHandCursor)
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(25, 5, 20, 5) # Tăng lề trái mạnh (25) để tránh bị clipping
+        layout.setSpacing(15)
+        
+        self.cb = QCheckBox()
+        self.cb.setChecked(checked)
+        self.cb.setFixedSize(32, 32) # Rộng hơn một chút
+        # Thêm margin-left cho indicator và bỏ padding gây lỗi clipping
+        self.cb.setStyleSheet(ThemeManager.get_checkbox_style().replace("padding: 4px;", "padding: 0px; margin-left: 5px;"))
+        
+        self.icon_lbl = QLabel(icon_char)
+        self.icon_lbl.setFixedSize(40, 40)
+        self.icon_lbl.setAlignment(Qt.AlignCenter)
+        self.icon_lbl.setStyleSheet(f"font-size: 22px; background: {ThemeManager.COLOR_ACCENT}10; border-radius: 8px;")
+        
+        info = QVBoxLayout()
+        info.setSpacing(2)
+        self.name_lbl = QLabel(name)
+        self.name_lbl.setStyleSheet("font-weight: 700; font-size: 14px; color: #1a1a1a;")
+        self.pkg_lbl = QLabel(pkg)
+        self.pkg_lbl.setStyleSheet("font-size: 11px; color: #5f6368;")
+        info.addWidget(self.name_lbl)
+        info.addWidget(self.pkg_lbl)
+        
+        layout.addWidget(self.cb)
+        layout.addWidget(self.icon_lbl)
+        layout.addLayout(info)
+        layout.addStretch()
+        
+        self.update_style()
+
+    def update_style(self):
+        checked = self.cb.isChecked()
+        bg = "#f1f3f4" if checked else "transparent"
+        border = f"1px solid {ThemeManager.COLOR_ACCENT}50" if checked else "1px solid transparent"
+        self.setStyleSheet(f"""
+            NotificationAppItem {{
+                background-color: {bg};
+                border: {border};
+                border-radius: 12px;
+            }}
+            NotificationAppItem:hover {{
+                background-color: #f1f3f4;
+            }}
+        """)
+
+    def mousePressEvent(self, event):
+        self.cb.setChecked(not self.cb.isChecked())
+        self.update_style()
+        super().mousePressEvent(event)
+
+class XiaomiNotificationFixWidget(XiaomiBaseWidget):
+    """DEDICATED PAGE: Intensive Notification Fixer V3.0"""
+    def __init__(self, adb):
+        super().__init__(adb)
+        self._all_apps = []
+        self.app_items = []
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        
+        # Header Section
+        header = QHBoxLayout()
+        title_v = QVBoxLayout()
+        title = QLabel("🔔 Fix Thông Báo Chuyên Sâu v3.0")
+        title.setStyleSheet("font-size: 22px; font-weight: 800; color: #1a1a1a;")
+        desc = QLabel("Khắc phục triệt để tình trạng chậm tin nhắn (Zalo, Messenger...) bằng cách tối ưu Pin và Quyền tự chạy.")
+        desc.setStyleSheet("color: #5f6368; font-size: 13px;")
+        title_v.addWidget(title)
+        title_v.addWidget(desc)
+        header.addLayout(title_v)
+        header.addStretch()
+        
+        self.btn_refresh = QPushButton("↻ Làm mới danh sách")
+        self.btn_refresh.setStyleSheet(ThemeManager.get_button_style("normal"))
+        self.btn_refresh.clicked.connect(self.load_apps)
+        header.addWidget(self.btn_refresh)
+        layout.addLayout(header)
+        
+        # --- Top Section: Options ---
+        opt_panel = QFrame()
+        opt_panel.setStyleSheet("background: #f8f9fa; border: 1px solid #dadce0; border-radius: 16px;")
+        opt_layout = QHBoxLayout(opt_panel)
+        opt_layout.setContentsMargins(20, 15, 20, 15)
+        
+        self.chk_notify = QCheckBox("Bật thông báo ứng dụng")
+        self.chk_battery = QCheckBox("Pin không hạn chế")
+        self.chk_autostart = QCheckBox("Tự động chạy & Launch")
+        for chk in [self.chk_notify, self.chk_battery, self.chk_autostart]:
+            chk.setChecked(True)
+            chk.setStyleSheet(ThemeManager.get_checkbox_style())
+            opt_layout.addWidget(chk)
+            
+        layout.addWidget(opt_panel)
+        
+        # --- Middle Section: App List ---
+        list_group = QGroupBox("Danh sách ứng dụng người dùng")
+        list_group.setStyleSheet(ThemeManager.get_group_box_style())
+        list_layout = QVBoxLayout(list_group)
+        
+        search_box = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Tìm nhanh ứng dụng (ví dụ: zalo, telegram)...")
+        self.search_input.setStyleSheet(ThemeManager.get_input_style() + "height: 40px; border-radius: 20px;")
+        self.search_input.textChanged.connect(self.filter_apps)
+        search_box.addWidget(self.search_input)
+        
+        self.btn_select_all = QPushButton("Chọn tất cả")
+        self.btn_select_all.setCheckable(True)
+        self.btn_select_all.setStyleSheet(ThemeManager.get_button_style("normal"))
+        self.btn_select_all.clicked.connect(self.toggle_all_selection)
+        search_box.addWidget(self.btn_select_all)
+        list_layout.addLayout(search_box)
+        
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setStyleSheet("QScrollArea { border: 1px solid #dadce0; border-radius: 12px; background: #ffffff; }")
+        
+        self.scroll_content = QWidget()
+        self.scroll_v = QVBoxLayout(self.scroll_content)
+        self.scroll_v.setContentsMargins(10, 10, 10, 10)
+        self.scroll_v.setSpacing(5)
+        self.scroll_v.addStretch()
+        
+        self.scroll.setWidget(self.scroll_content)
+        list_layout.addWidget(self.scroll)
+        layout.addWidget(list_group)
+        
+        # --- Bottom Section: Action ---
+        self.btn_apply = QPushButton("🚀 Bắt đầu tối ưu ngay (Apply Fix)")
+        self.btn_apply.setFixedHeight(55)
+        self.btn_apply.setStyleSheet(ThemeManager.get_button_style("primary") + "font-size: 16px; border-radius: 16px;")
+        self.btn_apply.clicked.connect(self.run_fix)
+        layout.addWidget(self.btn_apply)
+
+    def load_apps(self):
+        if not self.adb.is_online(): return
+        self.btn_refresh.setEnabled(False)
+        self.btn_apply.setEnabled(False)
+        self.search_input.setPlaceholderText("⏳ Đang quét danh sách app từ máy...")
+        
+        # Clear current
+        for i in reversed(range(self.scroll_v.count())):
+            item = self.scroll_v.itemAt(i)
+            if item.widget(): item.widget().setParent(None)
+        self.app_items = []
+        
+        try:
+            output = self.adb.shell("pm list packages -3")
+            pkgs = [line.replace("package:", "").strip() for line in output.splitlines() if line.startswith("package:")]
+            pkgs.sort()
+            
+            for pkg in pkgs:
+                name = pkg.split('.')[-1].title()
+                icon = "📦"
+                checked = False
+                
+                # Logic phân loại icon (Không tự động chọn để tránh nhầm lẫn)
+                if "zalo" in pkg: icon, name = "💬", "Zalo"
+                elif "orca" in pkg: icon, name = "🔵", "Messenger"
+                elif "katana" in pkg: icon, name = "🟦", "Facebook"
+                elif "telegram" in pkg: icon, name = "✈️", "Telegram"
+                elif "whatsapp" in pkg: icon, name = "🟢", "WhatsApp"
+                elif "viber" in pkg: icon, name = "🟣", "Viber"
+                elif "revanced" in pkg: icon, name = "⚙️", "MicroG"
+                elif "youtube" in pkg: icon, name = "📺", "YouTube"
+                
+                item = NotificationAppItem(pkg, name, icon, checked=False)
+                self.app_items.append(item)
+                self.scroll_v.insertWidget(self.scroll_v.count()-1, item)
+                
+            self.search_input.setPlaceholderText("🔍 Tìm nhanh ứng dụng...")
+        except Exception as e:
+            LogManager.log("Fix", f"Lỗi nạp app: {e}", "error")
+        finally:
+            self.btn_refresh.setEnabled(True)
+            self.btn_apply.setEnabled(True)
+
+    def filter_apps(self, text):
+        text = text.lower()
+        for item in self.app_items:
+            item.setVisible(text in item.pkg.lower() or text in item.name_lbl.text().lower())
+
+    def toggle_all_selection(self, checked):
+        for item in self.app_items:
+            if item.isVisible():
+                item.cb.setChecked(checked)
+                item.update_style()
+        self.btn_select_all.setText("Bỏ chọn tất cả" if checked else "Chọn tất cả")
+
+    def run_fix(self):
+        selected = [item.pkg for item in self.app_items if item.cb.isChecked()]
+        if not selected:
+            LogManager.log("Fix", "Vui lòng chọn ít nhất 1 ứng dụng.", "warning")
+            return
+            
+        opts = {
+            'notify': self.chk_notify.isChecked(),
+            'battery': self.chk_battery.isChecked(),
+            'autostart': self.chk_autostart.isChecked()
+        }
+        
+        self.run_task("fix_social_notifications", 
+                     name="Fix Social", 
+                     packages=selected, 
+                     options=opts)
+    
+    def refresh_state(self):
+        if not self.app_items:
+            self.load_apps()
 
 class XiaomiOptimizerWidget(XiaomiBaseWidget):
     """Main Wrapper for Xiaomi Turbo Suite"""
@@ -846,13 +1170,14 @@ class XiaomiOptimizerWidget(XiaomiBaseWidget):
         self.stack.addWidget(self.hub)
         self.stack.addWidget(XiaomiDebloaterWidget(self.adb))
         self.stack.addWidget(XiaomiAIOOptimizerWidget(self.adb))
-        self.stack.addWidget(OTADownloaderWidget(self.adb))
-        self.stack.addWidget(FastbootToolboxWidget(self.adb))
-        self.stack.addWidget(HyperOSAppsWidget(self.adb))
+        self.stack.addWidget(XiaomiNotificationFixWidget(self.adb)) # Index 3
+        self.stack.addWidget(OTADownloaderWidget(self.adb))        # Index 4
+        self.stack.addWidget(FastbootToolboxWidget(self.adb))        # Index 5
+        self.stack.addWidget(HyperOSAppsWidget(self.adb))           # Index 6
 
     def switch_page(self, index):
         self.stack.setCurrentIndex(index)
-        titles = ["Xiaomi Turbo Hub", "Gỡ Rác & Debloat", "Tối Ưu & Tinh Chỉnh (AIO)", "Tải ROM & Check OTA", "Fastboot Toolkit", "Kho Ứng Dụng"]
+        titles = ["Xiaomi Turbo Hub", "Gỡ Rác & Debloat", "Tối Ưu & Tinh Chỉnh (AIO)", "Fix Thông Báo 🔔", "Tải ROM & Check OTA", "Fastboot Toolkit", "Kho Ứng Dụng"]
         self.page_title.setText(f"|  {titles[index]}")
         self.nav_bar.setVisible(index != 0)
         curr = self.stack.widget(index)

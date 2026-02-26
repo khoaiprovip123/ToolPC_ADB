@@ -13,7 +13,7 @@ from src.ui.theme_manager import ThemeManager
 
 # Import sub-widgets
 from src.ui.widgets.xiaomi_optimizer import (
-    XiaomiDebloaterWidget, XiaomiAIOOptimizerWidget
+    XiaomiDebloaterWidget, XiaomiAIOOptimizerWidget, XiaomiNotificationFixWidget
 )
 from src.ui.widgets.ota_downloader import OTADownloaderWidget, HyperOSAppsWidget
 from src.ui.widgets.fastboot_toolbox import FastbootToolboxWidget
@@ -72,6 +72,7 @@ class XiaomiToolsPage(QWidget):
         tools = [
             (XiaomiDebloaterWidget, "Gỡ Ứng Dụng", "🗑️"),
             (XiaomiAIOOptimizerWidget, "Tối Ưu & Tinh Chỉnh (AIO)", "✨"),
+            (XiaomiNotificationFixWidget, "Fix Thông Báo 🔔", "🔔"),
             (OTADownloaderWidget, "Tải ROM & OTA", "☁️"),
             (HyperOSAppsWidget, "Kho App HyperOS", "🛍️"),
             (FastbootToolboxWidget, "Công Cụ Fastboot", "🛠️"),

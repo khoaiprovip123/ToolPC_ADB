@@ -143,6 +143,7 @@ class BackupOptionsDialog(SoftDialog):
 # ===========================
 class ModernAppRow(QFrame):
     action_triggered = Signal(str, object) 
+    toggled = Signal(bool, object) # Signal when checkbox changes
 
     def __init__(self, app: AppInfo, parent=None):
         super().__init__(parent)
@@ -168,8 +169,16 @@ class ModernAppRow(QFrame):
         
     def setup_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(20, 12, 20, 12)
-        layout.setSpacing(16)
+        layout.setContentsMargins(30, 12, 20, 12) # Increased left margin to 30
+        layout.setSpacing(12)
+        
+        # 0. Selection Checkbox
+        self.checkbox = QCheckBox()
+        self.checkbox.setFixedSize(32, 32) # Increased from 24 to 32 to prevent clipping
+        self.checkbox.setCursor(Qt.PointingHandCursor)
+        self.checkbox.setStyleSheet(ThemeManager.get_checkbox_style() + "QCheckBox { padding: 0px; }")
+        self.checkbox.toggled.connect(lambda checked: self.toggled.emit(checked, self.app))
+        layout.addWidget(self.checkbox)
         
         # 1. Icon
         icon_lbl = QLabel(self.app.name[0].upper() if self.app.name else "?")
@@ -273,6 +282,13 @@ class ModernAppRow(QFrame):
         """)
         return btn
 
+    def set_checked(self, checked):
+        """External control of the checkbox"""
+        self.checkbox.blockSignals(True)
+        self.checkbox.setChecked(checked)
+        self.checkbox.blockSignals(False)
+
+
 class AppManagerWidget(QWidget):
     def __init__(self, adb_manager):
         super().__init__()
@@ -286,6 +302,9 @@ class AppManagerWidget(QWidget):
         
         # Optimized: Batch processor cho rendering
         self.batch_processor = BatchProcessor(batch_size=30)
+        
+        # Selection management
+        self.selected_packages = set()
         
         self.setup_ui()
         QTimer.singleShot(500, self.refresh_data)
@@ -393,6 +412,43 @@ class AppManagerWidget(QWidget):
         pill_layout.addWidget(self.lbl_stats)
         main.addLayout(pill_layout)
         
+        # Batch Action Bar
+        self.batch_bar = QFrame()
+        self.batch_bar.setFixedHeight(50)
+        self.batch_bar.setStyleSheet(f"""
+            QFrame {{
+                background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                border-radius: 12px;
+            }}
+        """)
+        batch_layout = QHBoxLayout(self.batch_bar)
+        batch_layout.setContentsMargins(30, 0, 20, 0) # Sync with rows
+        
+        self.chk_all = QCheckBox("Chọn tất cả")
+        self.chk_all.setStyleSheet(ThemeManager.get_checkbox_style())
+        self.chk_all.clicked.connect(self.toggle_all)
+        batch_layout.addWidget(self.chk_all)
+        
+        batch_layout.addStretch()
+        
+        self.btn_batch_uninstall = QPushButton("🗑️ Gỡ hàng loạt (0)")
+        self.btn_batch_uninstall.setFixedSize(140, 34)
+        self.btn_batch_uninstall.setCursor(Qt.PointingHandCursor)
+        self.btn_batch_uninstall.setEnabled(False)
+        self.btn_batch_uninstall.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {ThemeManager.COLOR_PURPLE};
+                color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 11px;
+            }}
+            QPushButton:disabled {{ background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }}
+            QPushButton:hover {{ opacity: 0.9; }}
+        """)
+        self.btn_batch_uninstall.clicked.connect(self.handle_batch_uninstall)
+        batch_layout.addWidget(self.btn_batch_uninstall)
+        
+        main.addWidget(self.batch_bar)
+        
         # List
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -411,6 +467,10 @@ class AppManagerWidget(QWidget):
         if not self.adb.is_online():
             self.lbl_stats.setText("Mất kết nối")
             return
+        
+        # Clear selections on refresh
+        self.selected_packages.clear()
+        self.update_batch_bar()
         
         # Stop and cleanup old scanner if exists
         if hasattr(self, 'scanner') and self.scanner:
@@ -474,7 +534,11 @@ class AppManagerWidget(QWidget):
             if row is None:
                 row = ModernAppRow(app)
                 row.action_triggered.connect(self.handle_row_action)
+                row.toggled.connect(self.handle_row_toggled)
                 widget_cache.put(cache_key, row)
+            
+            # Update checkbox state from current selections
+            row.set_checked(app.package in self.selected_packages)
             
             self.list_layout.addWidget(row)
         
@@ -527,10 +591,75 @@ class AppManagerWidget(QWidget):
                 return
 
         print(f"DEBUG: About to call execute_action")
-        self.execute_action(app, action)
+        self.execute_action([app], action)
 
-    def execute_action(self, app: AppInfo, action):
-        print(f"DEBUG: execute_action {action} on {app.package}")
+    def handle_row_toggled(self, checked, app: AppInfo):
+        """Update selected packages set and sync UI"""
+        if checked:
+            self.selected_packages.add(app.package)
+        else:
+            self.selected_packages.discard(app.package)
+        self.update_batch_bar()
+
+    def update_batch_bar(self):
+        """Update batch button text and state"""
+        count = len(self.selected_packages)
+        self.btn_batch_uninstall.setText(f"🗑️ Gỡ hàng loạt ({count})")
+        self.btn_batch_uninstall.setEnabled(count > 0)
+        # Update chk_all state if needed - semi-manual sync
+        
+    def toggle_all(self, checked):
+        """Select or deselect all CURRENTLY VISIBLE apps"""
+        # We only select what's currently in the filtered list for better UX
+        # 1. Get packages from visible widgets
+        visible_packages = []
+        for i in range(self.list_layout.count()):
+            widget = self.list_layout.itemAt(i).widget()
+            if isinstance(widget, ModernAppRow):
+                pkg = widget.app.package
+                visible_packages.append(pkg)
+                widget.set_checked(checked)
+                
+        # 2. Update set
+        if checked:
+            for pkg in visible_packages:
+                self.selected_packages.add(pkg)
+        else:
+            for pkg in visible_packages:
+                self.selected_packages.discard(pkg)
+                
+        self.update_batch_bar()
+
+    def handle_batch_uninstall(self):
+        """Confirm and execute batch action"""
+        if not self.selected_packages: return
+        
+        count = len(self.selected_packages)
+        dlg = ConfirmationDialog(
+            self,
+            title=f"Gỡ {count} ứng dụng?",
+            message=f"Bạn có chắc chắn muốn gỡ bỏ {count} ứng dụng đã chọn?",
+            details=f"Danh sách package:\n" + "\n".join(list(self.selected_packages)[:10]) + ("\n..." if count > 10 else ""),
+            confirm_text="Gỡ hàng loạt",
+            cancel_text="Hủy",
+            warning_mode=True
+        )
+        
+        if dlg.exec_() != QDialog.Accepted:
+            return
+            
+        # Find AppInfo objects for selected packages
+        apps_to_proc = [a for a in self.apps_all if a.package in self.selected_packages]
+        if not apps_to_proc: return
+        
+        self.execute_action(apps_to_proc, "disable") # Use disable mode for smart cascade
+
+    def execute_action(self, apps_to_proc: List[AppInfo], action):
+        count = len(apps_to_proc)
+        app_name = apps_to_proc[0].name if count == 1 else f"{count} ứng dụng"
+        
+        print(f"DEBUG: execute_action {action} on {count} apps")
+
         # Progress Feedback
         pd = QProgressDialog(f"Đang {action} ứng dụng...", None, 0, 0, self)
         pd.setWindowTitle("Vui lòng đợi")
@@ -542,7 +671,7 @@ class AppManagerWidget(QWidget):
         # Guard: wait for old worker before creating new
         if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
             self.worker.wait(3000)
-        self.worker = SmartAppActionThread(self.adb, [app], action)
+        self.worker = SmartAppActionThread(self.adb, apps_to_proc, action)
         
         def on_finished(success, msg):
             print(f"DEBUG: worker finished. Success={success}, Msg={msg}")
@@ -550,42 +679,31 @@ class AppManagerWidget(QWidget):
             
             # Show Result Feedback
             if success:
+                # Clear selection after success
+                self.selected_packages.clear()
+                self.update_batch_bar()
+                self.chk_all.setChecked(False)
+
                 # Parse the method used from worker message
                 action_desc = "xử lý"  # Default fallback
                 
                 if "Uninstall" in msg or "uninstalled" in msg.lower():
                     action_desc = "gỡ bỏ"
-                    app_status = "đã được gỡ khỏi thiết bị"
                 elif "Disable" in msg or "disabled" in msg.lower():
                     action_desc = "tắt"
-                    app_status = "đã được tắt"
-                elif "Hide" in msg or "hidden" in msg.lower():
-                    action_desc = "ẩn"
-                    app_status = "đã được ẩn"
-                elif "Clear" in msg or "cleared" in msg.lower():
-                    action_desc = "xóa dữ liệu"
-                    app_status = "dữ liệu đã được xóa"
-                elif "Force Stop" in msg:
-                    action_desc = "dừng"
-                    app_status = "đã được dừng"
-                else:
-                    app_status = "đã được xử lý"
                 
-                # Notify User via Center with clear message
-                LogManager.log("App Manager", f"✓ {app.name} {app_status} thành công!", "success")
+                # Notify User via Center
+                res_msg = f"✓ Đã {action_desc} {app_name} thành công!"
+                LogManager.log("App Manager", res_msg, "success")
                 
-                # Update State
-                if action == "disable": app.is_enabled = False
-                elif action == "enable": app.is_enabled = True
-                elif action == "uninstall" and app in self.apps_all: self.apps_all.remove(app)
-                
-                self.filter_apps()
+                # Full refresh is safer for batch actions to sync state
+                self.refresh_data()
             else:
-                # Only show error if truly failed (no success at all)
-                LogManager.log("App Manager", f"✗ Không thể xử lý {app.name}: {msg}", "error")
+                LogManager.log("App Manager", f"✗ Lỗi khi xử lý {app_name}: {msg}", "error")
 
         self.worker.finished.connect(on_finished)
         self.worker.start()
+
 
         
     def on_install_apk_clicked(self):

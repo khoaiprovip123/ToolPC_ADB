@@ -782,10 +782,10 @@ class MainWindow(QMainWindow):
             'info': 'info', 'success': 'success'
         }
         notif_type = level_map.get(level.lower(), 'info')
-        full_message = f"{title}: {message}" if title else message
 
         if hasattr(self, 'notif_center'):
-            self.notif_center.add_notification(notif_type, full_message)
+            # Pass everything separately to keep cards clean
+            self.notif_center.add_notification(notif_type, message, title)
 
         # B1: Tăng badge nếu notification panel đang đóng
         if hasattr(self, 'notif_btn') and hasattr(self, 'notif_center'):

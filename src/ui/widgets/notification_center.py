@@ -38,8 +38,8 @@ class NotificationCenter(QFrame):
         self.is_open = False
         self.setup_ui()
         
-        # Connect LogManager singleton
-        LogManager.get_instance().log_signal.connect(self.add_notification)
+        # LogManager connection removed - now handled centrally by MainWindow dispatcher
+        # to avoid duplication and allow better control over badges/UI.
         
         # Poll timer for status
         self.poll_timer = QTimer(self)
@@ -596,10 +596,15 @@ class NotificationCenter(QFrame):
     # create_empty_state() và create_notification_card()
     # đã được chuyển sang src/ui/widgets/notification_card.py (C1)
 
-    def add_notification(self, title='System', message='', notif_type='info'):
+    def add_notification(self, notif_type='info', message='', title='System'):
         """Add a new notification to the panel"""
+        # Tránh hiện thông báo kỹ thuật mức debug/verbose
+        if notif_type.lower() in ['debug', 'verbose']:
+            return
+            
         # Hide empty state
-        self.empty_state.hide()
+        if hasattr(self, 'empty_state'):
+            self.empty_state.hide()
         
         # C1: Dùng module-level helper từ notification_card.py
         card = create_notification_card(self, notif_type, message, title)
