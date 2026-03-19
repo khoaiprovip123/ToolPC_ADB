@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.5.5.5] - 2026-03-19
+### Changed
+- **Release Packaging**: Đồng bộ version 2.5.5.5 giữa app, installer và cấu hình mặc định.
+- **Inno Setup Output**: Cập nhật tên file cài đặt theo version mới (XiaomiADBCommander_Setup_v2.5.5.5.exe).
+
 ## [2.5.5.4] - 2026-02-25
 ### Added
 - **Log Rotation**: Triển khai `RotatingFileHandler` cho `LogManager` (5 files × 5MB), chống phình log.
