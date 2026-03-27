@@ -26,7 +26,7 @@
 
 ### Phase 2: Architecture Quality
 - [x] **[P2]** Chuẩn hóa `ADBManager.shell()` — đã xóa *args/**kwargs để fail-fast
-- [ ] **[P2]** Chuẩn hóa `ADBManager` trả `ADBResult (ok, stdout, stderr, code)` thay vì plain string
+- [x] **[P2]** Thêm `ADBResult(ok, stdout, stderr, code)` + `execute_result()` / `shell_result()` — backward-compatible, không phá vỡ 161 callers cũ
 - [ ] **[P3]** Chốt `config.yaml` là config runtime trung tâm (hoặc dùng `QSettings` hoàn toàn — tránh 2 nguồn)
 - [ ] **[P3]** Tách text UI ra resource map `{vi, en}` để hỗ trợ i18n sau này
 - [ ] **[P3]** Bổ sung test suite cơ bản: parser/version/update + mock ADB
@@ -42,7 +42,8 @@
 ## 📝 Sprint hiện tại
 1. **Dọn dẹp và tổ chức lại tài liệu** — ✅ Hoàn thành (2026-03-27)
 2. **Fix Phase 1 & 2 (P1 + P2 issues)** — ✅ Hoàn thành (2026-03-27)
-3. **Fix Phase 2 còn lại (ADBResult, P3 items)** — (To Do)
+3. **ADBResult & Phase 2 Architecture** — ✅ Hoàn thành (2026-03-27)
+4. **P3 items (config, i18n, test suite)** — (To Do)
 
 ---
 

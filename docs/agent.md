@@ -97,14 +97,20 @@ QMessageBox.information(self, "Tiêu đề", "Nội dung")
 
 ---
 
-## ⚡ ADBManager API Standard (Chuẩn trả về)
+## ⚡ ADBManager API Standard
 
-`ADBManager` nên trả object có cấu trúc (không trả plain string):
 ```python
-# Chuẩn đề xuất
-class ADBResult:
-    ok: bool
-    stdout: str
-    stderr: str
-    code: int
+# ✅ Mới — dùng cho code mới cần phân biệt success/failure
+result = adb.shell_result("pm list packages")
+if result.ok:
+    process(result.stdout)
+else:
+    LogManager.log("ADB", f"Lỗi: {result.stderr}", "warning")
+
+# ✅ Legacy — vẫn hợp lệ cho code cũ và các tác vụ đơn giản
+return self.adb.shell("reboot -p")
+
+# ADBResult fields: .ok (bool), .stdout (str), .stderr (str), .code (int)
+# ADBResult hỗ trợ bool context: if result: ...
+# ADBResult hỗ trợ str context: str(result) trả stdout nếu ok, stderr nếu lời
 ```
