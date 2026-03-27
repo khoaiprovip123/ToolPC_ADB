@@ -521,18 +521,18 @@ class GeneralTweaksWidget(QWidget):
         for pkg in targets:
             try:
                  # 1. Battery Optimization (Unlimited / Ignore)
-                 self.adb.shell(f"dumpsys deviceidle whitelist +{pkg}", log_error=False)
+                 self.adb.shell(f"dumpsys deviceidle whitelist +{pkg}")
                  
                  # 2. Allow Background Run (Standard)
-                 self.adb.shell(f"cmd appops set {pkg} RUN_IN_BACKGROUND allow", log_error=False)
-                 self.adb.shell(f"cmd appops set {pkg} RUN_ANY_IN_BACKGROUND allow", log_error=False)
+                 self.adb.shell(f"cmd appops set {pkg} RUN_IN_BACKGROUND allow")
+                 self.adb.shell(f"cmd appops set {pkg} RUN_ANY_IN_BACKGROUND allow")
                  
                  # 3. Autostart (Xiaomi Specific - OpCode 10008)
-                 self.adb.shell(f"cmd appops set {pkg} 10008 allow", log_error=False)
-                 self.adb.shell(f"cmd appops set {pkg} START_FOREGROUND allow", log_error=False)
+                 self.adb.shell(f"cmd appops set {pkg} 10008 allow")
+                 self.adb.shell(f"cmd appops set {pkg} START_FOREGROUND allow")
                  
                  # 4. Remove from App Standby
-                 self.adb.shell(f"am set-inactive {pkg} false", log_error=False)
+                 self.adb.shell(f"am set-inactive {pkg} false")
             except Exception as _e:
 
                 pass  # TODO: consider LogManager.log

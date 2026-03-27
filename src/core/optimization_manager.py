@@ -128,15 +128,15 @@ class OptimizationManager:
     def switch_to_miui_apps(self, callback=None):
         """Chuyển đổi từ Google Dialer/SMS sang MIUI Dialer/SMS."""
         # 1. Gỡ bỏ Google Apps
-        self.adb.shell("pm uninstall -k --user 0 com.google.android.dialer", log_error=False)
-        self.adb.shell("pm uninstall -k --user 0 com.google.android.contacts", log_error=False)
-        self.adb.shell("pm uninstall -k --user 0 com.google.android.apps.messaging", log_error=False)
-        self.adb.shell("pm uninstall -k --user 0 com.android.phone.cust.overlay.miui", log_error=False)
+        self.adb.shell("pm uninstall -k --user 0 com.google.android.dialer")
+        self.adb.shell("pm uninstall -k --user 0 com.google.android.contacts")
+        self.adb.shell("pm uninstall -k --user 0 com.google.android.apps.messaging")
+        self.adb.shell("pm uninstall -k --user 0 com.android.phone.cust.overlay.miui")
         
         # 2. Kích hoạt MIUI Apps
-        self.adb.shell("pm install-existing com.android.contacts", log_error=False)
-        self.adb.shell("pm install-existing com.android.incallui", log_error=False)
-        self.adb.shell("pm install-existing com.android.mms", log_error=False)
+        self.adb.shell("pm install-existing com.android.contacts")
+        self.adb.shell("pm install-existing com.android.incallui")
+        self.adb.shell("pm install-existing com.android.mms")
         
         # 3. Mở cài đặt Ứng dụng mặc định
         self.adb.shell("am start -a android.settings.MANAGE_DEFAULT_APPS_SETTINGS")

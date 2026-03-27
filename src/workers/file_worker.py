@@ -185,7 +185,7 @@ class FileWorker(QThread):
         
         # FIX: Handle spaces in path for the command itself
         cmd = f"ls -l \"{path}\""
-        output = self.adb.shell(cmd, log_error=False)
+        output = self.adb.shell(cmd)
         
         entries = []
         

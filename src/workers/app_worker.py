@@ -278,7 +278,7 @@ class SmartAppActionThread(QThread):
                     for cmd, label, success_keywords in methods:
                         try:
                             print(f"DEBUG: Trying {label}: {cmd}")
-                            res = self.adb.shell(cmd, check=False, log_error=False)  # Don't log errors for cascade attempts
+                            res = self.adb.shell(cmd)  # cascade attempt
                             print(f"DEBUG: {label} response: {res[:150]}")
                             
                             # Check for success - look for any success keyword in response
