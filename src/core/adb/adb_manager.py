@@ -545,22 +545,27 @@ class ADBManager:
 
     # Cleaner Methods
     def clean_app_cache(self):
-        return self.shell("pm trim-caches")
+        return self.shell("pm trim-caches 999G")
         
     def clean_obsolete_dex(self):
-        return self.shell("cmd package prune-dex-opt")
+        # Try both common commands for pruning dex cache
+        self.shell("pm prune-dex-opt 2>/dev/null")
+        return self.shell("cmd package prune-dex-opt 2>/dev/null")
         
     def clean_messenger_data(self):
          """Clean Telegram/Nekogram downloaded media cache"""
-         paths = " ".join([
-             "/sdcard/Telegram/Telegram\\ Video/*",
-             "/sdcard/Telegram/Telegram\\ Images/*",
-             "/sdcard/Telegram/Telegram\\ Audio/*",
-             "/sdcard/Telegram/Telegram\\ Documents/*",
+         paths = [
+             "/sdcard/Telegram/Telegram Video/*",
+             "/sdcard/Telegram/Telegram Images/*",
+             "/sdcard/Telegram/Telegram Audio/*",
+             "/sdcard/Telegram/Telegram Documents/*",
              "/sdcard/Android/data/org.telegram.messenger/cache/*",
              "/sdcard/Android/data/nekox.nekogram/cache/*",
-         ])
-         return self.shell(f"rm -rf {paths}")
+         ]
+         # Join with ';' so if one path doesn't exist, it still continues. 
+         # Redirect stderr to /dev/null to avoid 'not found' errors in result string.
+         cmd = " ; ".join([f"rm -rf \"{p}\" 2>/dev/null" for p in paths])
+         return self.shell(cmd)
 
     def fix_connection(self):
         """Kill-server and Start-server to fix connection issues"""
