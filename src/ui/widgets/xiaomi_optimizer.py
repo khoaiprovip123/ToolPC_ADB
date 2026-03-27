@@ -736,34 +736,44 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(0)
 
-        # ─── STYLED TAB WIDGET ───
+        # ─── STYLED TAB WIDGET (Pill Style / Segmented Control) ───
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
         theme = ThemeManager.get_theme()
+        accent = ThemeManager.COLOR_ACCENT
+        
+        # Style này giúp Tab trông giống như các nút bấm nổi bật (Segmented Control)
         self.tabs.setStyleSheet(f"""
             QTabWidget::pane {{
                 border: 1px solid {theme['COLOR_BORDER']};
+                border-radius: 16px;
+                background: {theme['COLOR_GLASS_WHITE']};
+                margin-top: 10px;
+            }}
+            QTabBar {{
+                background: {theme['COLOR_BG_SECONDARY']};
                 border-radius: 12px;
-                background: transparent;
-                margin-top: -1px;
+                padding: 4px;
             }}
             QTabBar::tab {{
                 background: transparent;
                 color: {theme['COLOR_TEXT_SECONDARY']};
-                padding: 10px 28px;
-                font-size: 13px;
-                font-weight: 600;
+                padding: 10px 20px;
+                font-size: 14px;
+                font-weight: 700;
                 border: none;
-                border-bottom: 2px solid transparent;
-                min-width: 130px;
+                border-radius: 10px;
+                min-width: 120px;
+                margin: 2px;
             }}
             QTabBar::tab:selected {{
-                color: {ThemeManager.COLOR_ACCENT};
-                border-bottom: 2px solid {ThemeManager.COLOR_ACCENT};
+                background: {theme['COLOR_GLASS_CARD']};
+                color: {accent};
+                border: 1px solid {theme['COLOR_BORDER_LIGHT']};
             }}
             QTabBar::tab:hover:!selected {{
+                background: {accent}15;
                 color: {theme['COLOR_TEXT_PRIMARY']};
-                background: {ThemeManager.COLOR_ACCENT}10;
             }}
         """)
 
