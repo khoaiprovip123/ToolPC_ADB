@@ -18,41 +18,29 @@
 ## 🚀 Roadmap
 
 ### Phase 1: Stabilization (Ưu tiên cao)
-- [x] **[P1]** Fix lệch mutex giữa runtime (`XiaomiADBCommanderMutex_v4`) và installer (`XiaomiADBCommanderMutex`) → đồng bộ 1 tên duy nhất
-- [x] **[P1]** Thay `terminate()` bằng `requestInterruption()` + `wait(timeout)` trong luồng đóng app (`main_window.py:751, 755`)
-- [x] **[P2]** Bổ sung log warning cho silent failures trong startup update check (`main_window.py:858, 867, 889`)
-- [x] **[P2]** Sửa typo `'sideloade'` → `'sideload'` trong `adb_manager.py:80`
-- [x] **[P2]** Làm rõ interface `ADBManager.shell()` — remove `*args, **kwargs` không dùng
+- [x] **[P1]** Fix lệch mutex giữa runtime (`XiaomiADBCommanderMutex_v4`) và installer (`XiaomiADBCommanderMutex`)
+- [x] **[P1]** Thay `terminate()` bằng `requestInterruption()` trong luồng đóng app
+- [x] **[P1]** Sửa lỗi `TypeError` khi gọi `shell(log_error=True)` trên toàn hệ thống
+- [x] **[P1]** Loại bỏ 800+ dòng Dead Code dư thừa
 
-### Phase 2: Architecture Quality
-- [x] **[P2]** Chuẩn hóa `ADBManager.shell()` — đã xóa *args/**kwargs để fail-fast
-- [x] **[P2]** Thêm `ADBResult(ok, stdout, stderr, code)` + `execute_result()` / `shell_result()` — backward-compatible, không phá vỡ 161 callers cũ
-- [ ] **[P3]** Chốt `config.yaml` là config runtime trung tâm (hoặc dùng `QSettings` hoàn toàn — tránh 2 nguồn)
+### Phase 2: Architecture & Engine
+- [x] **[P2]** Thêm `ADBResult` struct hoàn chỉnh cho `execute_result()` / `shell_result()`
+- [x] **[P2]** Sửa lỗi dọn rác (App Cache: `999G`, Telegram: quoted paths, Dex: fallback)
+- [x] **[P2]** Đồng bộ `ThemeManager` cho toàn bộ widget (Fix Dark Mode)
+
+### Phase 3: UX & Feature Expansion
+- [x] **[P3]** **AIO Optimizer 3.0**: Chuyển sang layout 3-Tab ngang (Hiển Thị / Hiệu Năng / Hệ Thống)
+- [x] **[P3]** **Sidebar 2.0**: Phân nhóm công cụ thông minh (⚡ Hiệu năng / 📢 Ứng dụng / 🌐 Hệ thống / 🛠️ Hỗ trợ)
+- [x] **[P3]** **Debloater Pro**: Filter an toàn, Chọn nhanh (Safe-only), Progress Monitoring
+- [ ] **[P3]** Chốt `config.yaml` là config runtime trung tâm
 - [ ] **[P3]** Tách text UI ra resource map `{vi, en}` để hỗ trợ i18n sau này
-- [ ] **[P3]** Bổ sung test suite cơ bản: parser/version/update + mock ADB
-
-### Phase 3: Feature Expansion
-- [ ] ☁️ Cloud Sync hoàn chỉnh (Google Drive / Dropbox)
-- [ ] 🔌 Plugin System — đăng ký plugin từ thư mục ngoài
-- [ ] 📋 Logcat Viewer nâng cao (filter regex, export)
-- [ ] 🌐 Real-time OTA Downloader với mirror list
 
 ---
 
 ## 📝 Sprint hiện tại
-1. **Dọn dẹp và tổ chức lại tài liệu** — ✅ Hoàn thành (2026-03-27)
-2. **Fix Phase 1 & 2 (P1 + P2 issues)** — ✅ Hoàn thành (2026-03-27)
-3. **ADBResult & Phase 2 Architecture** — ✅ Hoàn thành (2026-03-27)
-4. **P3 items (config, i18n, test suite)** — (To Do)
-
----
-
-## 💡 Backlog / Ý tưởng
-- Màn hình Mirroring nâng cao (touch annotation)
-- Hỗ trợ Samsung OneUI debloat list
-- CLI mode (chạy không cần GUI)
-- Smoke test script tự động chạy trước mỗi release
-
+1. **Xiaomi Tools Suite 2.0 (Refactor & UI)** — ✅ Hoàn thành (2026-03-27)
+2. **Cleaner & ADB Engine Fixes** — ✅ Hoàn thành (2026-03-27)
+3. **P3 items (config, i18n, test suite)** — (To Do)
 ---
 
 ## 📚 Tài liệu tham chiếu

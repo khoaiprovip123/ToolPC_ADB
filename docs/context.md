@@ -27,11 +27,11 @@ GitHub: `https://github.com/khoaiprovip123/ToolPC_ADB`
 - **APK Analyzer:** Parse thông tin APK (tên gói, version, SDK, permissions)
 - **File Manager:** Browse, push/pull, image preview, context menu
 - **Xiaomi Suite:**
-  - Debloater — gỡ 100+ MIUI bloatware theo nhóm
-  - AIO Optimizer — tối ưu hiệu năng, animation, blur, dark mode
+  - Debloater — gỡ 100+ MIUI bloatware theo nhóm (An Toàn/Cảnh Báo/Nguy Hiểm)
+  - AIO Optimizer — 3-Tab Control (Hiển Thị, Hiệu Năng, Hệ Thống) cho HyperOS/MIUI
   - Expert Tweaks — ép xung, fix RAM, tối ưu cảm ứng HyperOS
-  - Fix Notification — cho Zalo, Messenger, Telegram...
-  - Cleaner, Battery Health, OTA Downloader, App Store
+  - Fix Notification — cho Zalo, Messenger, Telegram... (Presets tích hợp)
+  - Cleaner (Fix trim-caches 999G), Battery Health (Auto-refresh), OTA Downloader, App Store
 - **Dev Tools:** Script Engine, Advanced Commands, Wireless Debug, DNS, Shizuku, Permissions
 - **Auto-Update:** Kiểm tra release từ GitHub Releases (background)
 

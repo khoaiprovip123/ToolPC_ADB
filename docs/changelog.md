@@ -4,35 +4,36 @@ Tất cả các thay đổi đáng chú ý được ghi chép tại đây theo c
 
 ---
 
-## [Unreleased]
-### Added
-- Bộ template quản lý tài liệu dự án: `docs/context.md`, `docs/plan.md`, `docs/agent.md`, `docs/changelog.md`
-- Di chuyển `USER_GUIDE.md` → `docs/user_guide.md`
-- Di chuyển `BUILD.md` → `docs/build.md`
+## [Unreleased] — Xiaomi Tools Suite 2.0 Refactor 🚀
 
-### UI Enhancements (Phase 3)
-- **Sidebar Group Labels**: Phân nhóm 9 công cụ thành 3 nhóm (⚡ Hiệu Năng / 📢 Ứng Dụng / 🌐 ROM & Hệ Thống) trong `XiaomiToolsPage`
-- **Debloater Filter Combo**: Lọc app theo mức an toàn (Tất Cả / An Toàn / Cảnh Báo / Nguy Hiểm)
-- **Debloater Quick-Select Buttons**: Nút "✅ Chọn An Toàn" chỉ tích những app `safety=safe`, kèm "Chọn Tất Cả" / "Bỏ Chọn"
-- **Debloater Progress Bar**: Thanh tiến trình 4px hiện trong lúc đang gỡ, tự ẩn khi xong
-- **NotificationFix Preset Buttons**: Nút chọn nhanh "Zalo + Messenger", "Tất cả MXH", "Email & Calendar"
-- **Battery Auto-Refresh**: `QTimer` 5 giây sẵn sàng trong `BatteryHealthWidget` (kích hoạt khi cần)
-- **Lazy Device Reset**: `XiaomiToolsPage.reset()` chỉ reset widget đang active, các widget khác reset khi navigate đến
+### 🎨 UI & UX Modernization (Phase 3)
+- **AIO Optimizer 3-Tab Layout**: Tái cấu trúc danh sách card cuộn dài thành 3 Tab ngang chuyên nghiệp:
+  - **Hiển Thị**: Tần số quét, Animation, Blur, FPS, CC mới, Dark Mode...
+  - **Hiệu Năng**: ART VM, Game Turbo, Sạc nhanh, Fix thông báo, Chuyên sâu.
+  - **Hệ Thống**: Skip Setup, Nav Bar, Region Fix, MIUI Apps, Dọn rác...
+- **Segmented Control (Pill-Style)**: Nâng cấp thanh Tab sang kiểu bo tròn hiện đại, tạo chiều sâu và dễ quan sát hơn.
+- **Sidebar Grouping**: Phân nhóm 9 công cụ thành 4 danh mục (⚡ HIỆU NĂNG / 📢 ỨNG DỤNG / 🌐 HỆ THỐNG / 🛠️ HỖ TRỢ).
+- **Dark Mode Sweep**: Tích hợp `ThemeManager` toàn diện cho `NotificationFix` và `Cleaner`, loại bỏ hoàn toàn màu nền trắng hardcode.
+- **Debloater Enhancements**: Dropdown lọc theo mức độ an toàn, nút "Chọn An Toàn" 1-click, và thanh tiến trình (progress bar).
+- **Battery Health**: Thêm tính năng Auto-refresh (5 giây) khi đang sạc để theo dõi thời gian thực.
 
-### Fixed
-- **[P1] Mutex lệch:** Đồng bộ `AppMutex=XiaomiADBCommanderMutex_v4` trong `installer.iss` với runtime `main.py`
-- **[P1] Worker Shutdown:** Thay `terminate()` bằng `requestInterruption()+wait(3000ms)` trong `closeEvent` để tránh resource leak
-- **[P1] `shell(log_error=False)` → TypeError:** Xóa tham số không tồn tại khỏi tất cả lần gọi trong `optimization_worker.py`
-- **[P1] Dead Code 800 dòng:** Xóa `XiaomiHubWidget` và `XiaomiOptimizerWidget` cũ khỏi `xiaomi_optimizer.py` (59KB → ~43KB)
-- **[P1] scroll.setWidget() gọi 2 lần:** Fix widget leak în `XiaomiExpertTweaksWidget`
-- **[P1] AttributeError Fastboot:** Xóa `run_write_cid()` / `run_flash_token()` tham chiếu attrs chưa khởi tạo
-- **[P1] error_occurred signal:** Connect signal trong `run_task()` để SecurityException không bị nuốt im lặng
-- **[P2] Sideload typo:** Sửa `'sideloade'` → `'sideload'` trong `adb_manager.py`
-- **[P2] Shell() kwargs:** Xóa `*args, **kwargs` thừa khỏi `ADBManager.shell()`
-- **[P2] Silent failures:** Thay `except: pass` bằng `except Exception as _pkg_err` + log, và `LogManager.log(warning)` trong OTA fetch
-- **[P2] Theme Hardcode:** Màu `#1a1a1a` / `#5f6368` → `ThemeManager.COLOR_TEXT_PRIMARY/SECONDARY` trong `NotificationAppItem`
-- **[P2] Cleaner Race Condition:** Worker guard đặt trước `worker.start()` thay vì sau
-- **[P2] DebloatWorker Interruption:** Đổi `_is_running` flag → Qt-native `isInterruptionRequested()`
+### 🧹 Cleaner Engine Fixes
+- **App Cache**: Sửa lỗi "no size specified" bằng `pm trim-caches 999G` (dọn sạch dung lượng tối đa).
+- **Messenger Data (Telegram/Nekogram)**: 
+  - Fix lỗi đường dẫn có khoảng trắng bằng Quoted paths.
+  - Sử dụng chuỗi lệnh `;` để dọn dẹp độc lập, không bị dừng nếu một ứng dụng không tồn tại.
+  - Redirect lỗi `2>/dev/null` để UI sạch sẽ, không báo lỗi giả khi thư mục trống.
+- **Dex Pruning**: Thêm fallback commands (`pm` & `cmd package`) đảm bảo tương thích mọi phiên bản Android.
+
+### 🐞 Bug Fixes & Stability (Phase 1 & 2)
+- **Log Error Fix**: Xóa tham số `log_error` không hợp lệ khỏi `ADBManager.shell()` trên toàn bộ codebase (Sửa lỗi crash `TypeError`).
+- **Technical Debt**: Loại bỏ hơn 800 dòng code dư thừa (`XiaomiHubWidget`, `XiaomiOptimizerWidget`).
+- **Layout Integrity**: 
+  - Sửa lỗi bảng chọn app bị biến mất trong `NotificationFixWidget`.
+  - Fix lỗi gọi `scroll.setWidget()` trùng lặp gây rò rỉ bộ nhớ.
+- **Worker Safety**: Chuyển `DebloatWorker` sang `isInterruptionRequested()` (Qt-native) và đặt Guard trước khi `start()` trong `Cleaner`.
+- **Error Visibility**: Connect `error_occurred` signal để hiển thị thông báo lỗi SecurityException cho người dùng.
+- **Performance**: Triển khai "Lazy Reset" giúp chuyển đổi thiết bị nhanh hơn, không bị treo UI.
 
 ---
 
