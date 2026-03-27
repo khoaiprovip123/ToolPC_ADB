@@ -18,13 +18,14 @@
 ## 🚀 Roadmap
 
 ### Phase 1: Stabilization (Ưu tiên cao)
-- [ ] **[P1]** Fix lệch mutex giữa runtime (`XiaomiADBCommanderMutex_v4`) và installer (`XiaomiADBCommanderMutex`) → đồng bộ 1 tên duy nhất
-- [ ] **[P1]** Thay `terminate()` bằng `requestInterruption()` + `wait(timeout)` trong luồng đóng app (`main_window.py:751, 755`)
-- [ ] **[P2]** Bổ sung log warning cho silent failures trong startup update check (`main_window.py:858, 867, 889`)
-- [ ] **[P2]** Sửa typo `'sideloade'` → `'sideload'` trong `adb_manager.py:80`
-- [ ] **[P2]** Làm rõ interface `ADBManager.shell()` — remove `*args, **kwargs` không dùng hoặc thêm hỗ trợ thực sự
+- [x] **[P1]** Fix lệch mutex giữa runtime (`XiaomiADBCommanderMutex_v4`) và installer (`XiaomiADBCommanderMutex`) → đồng bộ 1 tên duy nhất
+- [x] **[P1]** Thay `terminate()` bằng `requestInterruption()` + `wait(timeout)` trong luồng đóng app (`main_window.py:751, 755`)
+- [x] **[P2]** Bổ sung log warning cho silent failures trong startup update check (`main_window.py:858, 867, 889`)
+- [x] **[P2]** Sửa typo `'sideloade'` → `'sideload'` trong `adb_manager.py:80`
+- [x] **[P2]** Làm rõ interface `ADBManager.shell()` — remove `*args, **kwargs` không dùng
 
 ### Phase 2: Architecture Quality
+- [x] **[P2]** Chuẩn hóa `ADBManager.shell()` — đã xóa *args/**kwargs để fail-fast
 - [ ] **[P2]** Chuẩn hóa `ADBManager` trả `ADBResult (ok, stdout, stderr, code)` thay vì plain string
 - [ ] **[P3]** Chốt `config.yaml` là config runtime trung tâm (hoặc dùng `QSettings` hoàn toàn — tránh 2 nguồn)
 - [ ] **[P3]** Tách text UI ra resource map `{vi, en}` để hỗ trợ i18n sau này
@@ -40,7 +41,8 @@
 
 ## 📝 Sprint hiện tại
 1. **Dọn dẹp và tổ chức lại tài liệu** — ✅ Hoàn thành (2026-03-27)
-2. **Fix P1 issues** — (To Do)
+2. **Fix Phase 1 & 2 (P1 + P2 issues)** — ✅ Hoàn thành (2026-03-27)
+3. **Fix Phase 2 còn lại (ADBResult, P3 items)** — (To Do)
 
 ---
 

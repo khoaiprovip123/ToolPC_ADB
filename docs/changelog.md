@@ -10,6 +10,13 @@ Tất cả các thay đổi đáng chú ý được ghi chép tại đây theo c
 - Di chuyển `USER_GUIDE.md` → `docs/user_guide.md`
 - Di chuyển `BUILD.md` → `docs/build.md`
 
+### Fixed
+- **[P1] Mutex lệch:** Đồng bộ `AppMutex=XiaomiADBCommanderMutex_v4` trong `installer.iss` với runtime `main.py`
+- **[P1] Worker Shutdown:** Thay `terminate()` bằng `requestInterruption()+wait(3000ms)` trong `closeEvent` để tránh resource leak
+- **[P2] Sideload typo:** Sửa `'sideloade'` → `'sideload'` trong `adb_manager.py` để nhận diện đúng thiết bị mode sideload
+- **[P2] Shell() kwargs:** Xóa `*args, **kwargs` thừa khỏi `ADBManager.shell()` để fail-fast khi caller truyền param sai
+- **[P2] Silent failures:** Thay `lambda err: None` và `pass` bằng `LogManager.log(warning)` trong startup update check
+
 ---
 
 ## [2.5.5.5] - 2026-03-19
