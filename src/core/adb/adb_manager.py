@@ -8,6 +8,7 @@ from enum import Enum, auto
 import sys
 from src.core.log_manager import LogManager
 
+
 class DeviceStatus(Enum):
     ONLINE = auto()
     OFFLINE = auto()
@@ -17,6 +18,31 @@ class DeviceStatus(Enum):
     SIDELOAD = auto()
     UNKNOWN = auto()
 
+
+class ADBResult:
+    """Structured result from ADB command execution.
+    
+    Preferred over raw string for new code. Legacy string methods (shell/execute)
+    still work for backward compatibility.
+    
+    Usage:
+        result = adb.execute_result("devices")
+        if result.ok:
+            print(result.stdout)
+        else:
+            print(f"Error (code {result.code}): {result.stderr}")
+    """
+    def __init__(self, ok: bool, stdout: str = "", stderr: str = "", code: int = 0):
+        self.ok = ok
+        self.stdout = stdout
+        self.stderr = stderr
+        self.code = code
+
+    def __bool__(self):
+        return self.ok
+
+    def __str__(self):
+        return self.stdout if self.ok else self.stderr
 
 class ADBManager:
     def __init__(self):
@@ -152,11 +178,51 @@ class ADBManager:
             return f"Error: {e}"
 
     def shell(self, command):
-        """Execute ADB Shell command"""
+        """Execute ADB Shell command (legacy — returns plain string)."""
         if not self.current_device:
             return "Error: No device connected"
         return self.execute(f"-s {self.current_device} shell {command}")
+
+    def execute_result(self, command) -> 'ADBResult':
+        """Execute ADB command and return structured ADBResult.
         
+        Preferred for new code. Provides ok/stdout/stderr/code fields.
+        Legacy execute() still available for backward compatibility.
+        """
+        if isinstance(command, list):
+            cmd_list = [self.adb_path] + [str(arg) for arg in command]
+        else:
+            args = shlex.split(command)
+            cmd_list = [self.adb_path] + args
+
+        try:
+            proc = subprocess.run(
+                cmd_list,
+                capture_output=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=30,
+                creationflags=0x08000000 if os.name == 'nt' else 0,
+            )
+            stdout = proc.stdout.strip()
+            stderr = proc.stderr.strip()
+            ok = proc.returncode == 0
+            return ADBResult(ok=ok, stdout=stdout, stderr=stderr, code=proc.returncode)
+        except subprocess.TimeoutExpired:
+            return ADBResult(ok=False, stderr="Error: Timeout after 30s", code=-1)
+        except Exception as e:
+            return ADBResult(ok=False, stderr=f"Error: {e}", code=-1)
+
+    def shell_result(self, command) -> 'ADBResult':
+        """Execute ADB Shell command and return structured ADBResult.
+        
+        Preferred for new code that needs to distinguish success/failure.
+        Legacy shell() still available for backward compatibility.
+        """
+        if not self.current_device:
+            return ADBResult(ok=False, stderr="Error: No device connected", code=-1)
+        return self.execute_result(f"-s {self.current_device} shell {command}")
+
     def run_adb(self, args):
         """Run raw adb command with args list"""
         return self.execute(args)
