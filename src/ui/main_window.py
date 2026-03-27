@@ -18,6 +18,7 @@ import os
 # Import Core
 from src.core.adb.adb_manager import ADBManager, DeviceStatus
 from src.core.update_manager import UpdateChecker
+from src.core.log_manager import LogManager
 
 # Import Theme
 from src.ui.theme_manager import ThemeManager
@@ -746,14 +747,14 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'device_timer'):
             self.device_timer.stop()
             
-        # Stop workers if running
+        # Stop workers if running — use requestInterruption for graceful shutdown
         if hasattr(self, '_refresh_worker') and self._refresh_worker.isRunning():
-            self._refresh_worker.terminate()
-            self._refresh_worker.wait()
+            self._refresh_worker.requestInterruption()
+            self._refresh_worker.wait(3000)  # Wait up to 3s for graceful exit
             
         if hasattr(self, '_check_worker') and self._check_worker.isRunning():
-            self._check_worker.terminate()
-            self._check_worker.wait()
+            self._check_worker.requestInterruption()
+            self._check_worker.wait(3000)  # Wait up to 3s for graceful exit
 
         if hasattr(self, 'dashboard'):
             self.dashboard.stop_updates()
@@ -855,7 +856,9 @@ class MainWindow(QMainWindow):
             self.update_checker = UpdateChecker(include_prerelease)
             self.update_checker.update_found.connect(self.on_startup_update_found)
             # No handler for no_update - silent on startup
-            self.update_checker.error_occurred.connect(lambda err: None)  # Silent error on startup
+            self.update_checker.error_occurred.connect(
+                lambda err: LogManager.log("Update", f"Kiểm tra cập nhật lỗi: {err}", "warning")
+            )
             self.update_checker.start()
             
             # Update last check time
@@ -863,8 +866,7 @@ class MainWindow(QMainWindow):
             current_time = QDateTime.currentDateTime().toString(Qt.ISODate)
             self.settings.setValue("last_update_check", current_time)
         except Exception as _e:
-
-            pass  # TODO: consider LogManager.log  # Silent fail on startup
+            LogManager.log("Update", f"Lỗi khởi tạo update checker: {_e}", "warning")
     
     def on_startup_update_found(self, update_info: dict):
         """Handle update found on startup"""
@@ -885,8 +887,7 @@ class MainWindow(QMainWindow):
                 # Save skip version
                 self.settings.setValue("skip_version", update_info['version'])
         except Exception as _e:
-
-            pass  # TODO: consider LogManager.log  # Fail silently on startup
+            LogManager.log("Update", f"Lỗi hiển thị update dialog: {_e}", "warning")
     
     def start_update_download(self, update_info: dict):
         """Start downloading update"""

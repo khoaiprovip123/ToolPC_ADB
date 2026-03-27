@@ -77,7 +77,7 @@ class ADBManager:
                         status = DeviceStatus.OFFLINE
                     elif state_str == 'unauthorized':
                         status = DeviceStatus.UNAUTHORIZED
-                    elif state_str == 'sideloade':
+                    elif state_str == 'sideload':
                         status = DeviceStatus.SIDELOAD
                     elif state_str == 'recovery':
                         status = DeviceStatus.RECOVERY
@@ -151,7 +151,7 @@ class ADBManager:
         except Exception as e:
             return f"Error: {e}"
 
-    def shell(self, command, *args, **kwargs):
+    def shell(self, command):
         """Execute ADB Shell command"""
         if not self.current_device:
             return "Error: No device connected"
