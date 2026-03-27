@@ -333,12 +333,5 @@ class FastbootToolboxWidget(QWidget):
             res = self.adb.fastboot_unlock_frp()
             self.log_output.appendPlainText(res)
 
-    def run_write_cid(self):
-        cid = self.cid_input.text().strip()
-        if not cid: return
-        self.fastboot_action(f"oem writecid {cid}", f"Bạn có chắc muốn đổi CID thành '{cid}'?")
-
-    def run_flash_token(self):
-        path = self.token_path.text().strip()
-        if not path: return
-        self.run_command(f"flash unlocktoken \"{path}\"")
+    # run_write_cid() and run_flash_token() removed — their UI inputs (cid_input, token_path)
+    # were never added to setup_ui(). Re-add them together if needed in the future.

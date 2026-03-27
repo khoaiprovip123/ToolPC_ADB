@@ -51,8 +51,7 @@ class ROMSearchWorker(QThread):
                                     "link": rom.get('download', '')
                                 })
             except Exception as _e:
-
-                pass  # TODO: consider LogManager.log # Fail silently and use fallback
+                LogManager.log("OTA", f"API fetch failed, dùng fallback: {_e}", "warning")
             
             # 2. If no results (Newer device like 'lisa' or API fail), add Web Fallback
             if not results:

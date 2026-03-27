@@ -197,6 +197,11 @@ class BatteryHealthWidget(QWidget):
     def __init__(self, adb_manager):
         super().__init__()
         self.adb = adb_manager
+        self._auto_refresh = False
+        from PySide6.QtCore import QTimer
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setInterval(5000)  # 5 seconds
+        self._refresh_timer.timeout.connect(self.refresh_data)
         self.setup_ui()
         
     def setup_ui(self):

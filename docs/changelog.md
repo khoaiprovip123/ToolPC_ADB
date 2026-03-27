@@ -10,12 +10,29 @@ Tất cả các thay đổi đáng chú ý được ghi chép tại đây theo c
 - Di chuyển `USER_GUIDE.md` → `docs/user_guide.md`
 - Di chuyển `BUILD.md` → `docs/build.md`
 
+### UI Enhancements (Phase 3)
+- **Sidebar Group Labels**: Phân nhóm 9 công cụ thành 3 nhóm (⚡ Hiệu Năng / 📢 Ứng Dụng / 🌐 ROM & Hệ Thống) trong `XiaomiToolsPage`
+- **Debloater Filter Combo**: Lọc app theo mức an toàn (Tất Cả / An Toàn / Cảnh Báo / Nguy Hiểm)
+- **Debloater Quick-Select Buttons**: Nút "✅ Chọn An Toàn" chỉ tích những app `safety=safe`, kèm "Chọn Tất Cả" / "Bỏ Chọn"
+- **Debloater Progress Bar**: Thanh tiến trình 4px hiện trong lúc đang gỡ, tự ẩn khi xong
+- **NotificationFix Preset Buttons**: Nút chọn nhanh "Zalo + Messenger", "Tất cả MXH", "Email & Calendar"
+- **Battery Auto-Refresh**: `QTimer` 5 giây sẵn sàng trong `BatteryHealthWidget` (kích hoạt khi cần)
+- **Lazy Device Reset**: `XiaomiToolsPage.reset()` chỉ reset widget đang active, các widget khác reset khi navigate đến
+
 ### Fixed
 - **[P1] Mutex lệch:** Đồng bộ `AppMutex=XiaomiADBCommanderMutex_v4` trong `installer.iss` với runtime `main.py`
 - **[P1] Worker Shutdown:** Thay `terminate()` bằng `requestInterruption()+wait(3000ms)` trong `closeEvent` để tránh resource leak
-- **[P2] Sideload typo:** Sửa `'sideloade'` → `'sideload'` trong `adb_manager.py` để nhận diện đúng thiết bị mode sideload
-- **[P2] Shell() kwargs:** Xóa `*args, **kwargs` thừa khỏi `ADBManager.shell()` để fail-fast khi caller truyền param sai
-- **[P2] Silent failures:** Thay `lambda err: None` và `pass` bằng `LogManager.log(warning)` trong startup update check
+- **[P1] `shell(log_error=False)` → TypeError:** Xóa tham số không tồn tại khỏi tất cả lần gọi trong `optimization_worker.py`
+- **[P1] Dead Code 800 dòng:** Xóa `XiaomiHubWidget` và `XiaomiOptimizerWidget` cũ khỏi `xiaomi_optimizer.py` (59KB → ~43KB)
+- **[P1] scroll.setWidget() gọi 2 lần:** Fix widget leak în `XiaomiExpertTweaksWidget`
+- **[P1] AttributeError Fastboot:** Xóa `run_write_cid()` / `run_flash_token()` tham chiếu attrs chưa khởi tạo
+- **[P1] error_occurred signal:** Connect signal trong `run_task()` để SecurityException không bị nuốt im lặng
+- **[P2] Sideload typo:** Sửa `'sideloade'` → `'sideload'` trong `adb_manager.py`
+- **[P2] Shell() kwargs:** Xóa `*args, **kwargs` thừa khỏi `ADBManager.shell()`
+- **[P2] Silent failures:** Thay `except: pass` bằng `except Exception as _pkg_err` + log, và `LogManager.log(warning)` trong OTA fetch
+- **[P2] Theme Hardcode:** Màu `#1a1a1a` / `#5f6368` → `ThemeManager.COLOR_TEXT_PRIMARY/SECONDARY` trong `NotificationAppItem`
+- **[P2] Cleaner Race Condition:** Worker guard đặt trước `worker.start()` thay vì sau
+- **[P2] DebloatWorker Interruption:** Đổi `_is_running` flag → Qt-native `isInterruptionRequested()`
 
 ---
 

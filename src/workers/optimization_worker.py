@@ -175,41 +175,39 @@ class OptimizationWorker(QThread):
                     try:
                         # 1. Bật thông báo ứng dụng
                         if options.get('notify'):
-                            # Ensure app notification is enabled at system level
-                            self.adb.shell(f"cmd notification set_blocked {pkg} false", log_error=False)
+                            self.adb.shell(f"cmd notification set_blocked {pkg} false")
                         
                         # 2. Pin không hạn chế (MIUI PowerKeeper Deep Fix)
                         if options.get('battery'):
                             # Method 1: Doze Whitelist (Android Standard)
-                            self.adb.shell(f"dumpsys deviceidle whitelist +{pkg}", log_error=False)
+                            self.adb.shell(f"dumpsys deviceidle whitelist +{pkg}")
                             
                             # Method 2: MIUI PowerKeeper (Target Service & Targeted Broadcast)
                             # state 0 = No restrictions
-                            self.adb.shell(f"am start-foreground-service -n com.miui.powerkeeper/.service.PowerKeeperService -a com.miui.powerkeeper.configure_app_battery_saver --es package_name {pkg} --ei state 0", log_error=False)
+                            self.adb.shell(f"am start-foreground-service -n com.miui.powerkeeper/.service.PowerKeeperService -a com.miui.powerkeeper.configure_app_battery_saver --es package_name {pkg} --ei state 0")
                             # Targeted Broadcast is more reliable on HyperOS
-                            self.adb.shell(f"am broadcast -a com.miui.powerkeeper.configure_app_battery_saver --es package_name {pkg} --ei state 0 com.miui.powerkeeper", log_error=False)
+                            self.adb.shell(f"am broadcast -a com.miui.powerkeeper.configure_app_battery_saver --es package_name {pkg} --ei state 0 com.miui.powerkeeper")
                             
                             # Method 3: AppOps (Run & Background Permissions)
-                            self.adb.shell(f"cmd appops set {pkg} RUN_IN_BACKGROUND allow", log_error=False)
-                            self.adb.shell(f"cmd appops set {pkg} RUN_ANY_IN_BACKGROUND allow", log_error=False)
-                            self.adb.shell(f"cmd appops set {pkg} BOOT_COMPLETED allow", log_error=False)
+                            self.adb.shell(f"cmd appops set {pkg} RUN_IN_BACKGROUND allow")
+                            self.adb.shell(f"cmd appops set {pkg} RUN_ANY_IN_BACKGROUND allow")
+                            self.adb.shell(f"cmd appops set {pkg} BOOT_COMPLETED allow")
                             
                             # Method 4: Adaptive Priority & App Standby (Standard Android fallback)
-                            self.adb.shell(f"cmd power set-adaptive-priority {pkg} 0", log_error=False)
-                            self.adb.shell(f"cmd usage-stats set-state {pkg} exempted", log_error=False) # Rất quan trọng cho HyperOS
-                            self.adb.shell(f"cmd usage-stats set-state {pkg} active", log_error=False)
+                            self.adb.shell(f"cmd power set-adaptive-priority {pkg} 0")
+                            self.adb.shell(f"cmd usage-stats set-state {pkg} exempted")  # Quan trọng cho HyperOS
+                            self.adb.shell(f"cmd usage-stats set-state {pkg} active")
                         
                         # 3. Tự động chạy (Autostart & Launch)
                         if options.get('autostart'):
-                            # MIUI Autostart AppOps
-                            self.adb.shell(f"cmd appops set {pkg} 10008 allow", log_error=False)
-                            self.adb.shell(f"am set-inactive {pkg} false", log_error=False)
-                            # Wake up the app
-                            self.adb.shell(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", log_error=False)
+                            self.adb.shell(f"cmd appops set {pkg} 10008 allow")
+                            self.adb.shell(f"am set-inactive {pkg} false")
+                            self.adb.shell(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1")
                         
                         count += 1
                         self.progress.emit(f"   ↳ Đã fix xong: {pkg}")
-                    except: pass
+                    except Exception as _pkg_err:
+                        self.progress.emit(f"   ↳ ⚠ Bỏ qua {pkg}: {_pkg_err}")
                 
                 self.progress.emit(f"✅ Đã xử lý xong {count} ứng dụng!")
 

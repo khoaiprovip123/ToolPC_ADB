@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QCheckBox, QHeaderView, QMessageBox,
     QTabWidget, QTextEdit, QGroupBox, QProgressBar, QScrollArea, QFrame,
     QGraphicsDropShadowEffect, QGridLayout, QLineEdit, QProgressDialog,
-    QListWidget, QListWidgetItem, QStackedWidget, QSizePolicy, QDialog
+    QListWidget, QListWidgetItem, QStackedWidget, QSizePolicy, QDialog,
+    QComboBox, QButtonGroup
 )
 from PySide6.QtCore import Qt, QThread, Signal, QSize
 from PySide6.QtGui import QColor, QIcon, QLinearGradient, QGradient
@@ -152,111 +153,7 @@ class ModernCard(QFrame):
         if self.callback:
             self.callback()
 
-class XiaomiHubWidget(QWidget):
-    """
-    Modern Hub for Xiaomi Tools
-    Displays high-level tiles and device status.
-    """
-    switch_page = Signal(int) # Signal to parent (index)
-
-    def __init__(self, adb_manager):
-        super().__init__()
-        self.adb = adb_manager
-        self.setup_ui()
-
-    def setup_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet("background: transparent;")
-        
-        content = QWidget()
-        content.setStyleSheet("background: transparent;")
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(25)
-
-        # 1. Hero Banner
-        self.hero = QFrame()
-        self.hero.setFixedHeight(220)
-        self.hero.setObjectName("HubHero")
-        self.hero.setStyleSheet(f"""
-            #HubHero {{
-                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 {ThemeManager.COLOR_ACCENT}, stop:1 #6A11CB);
-                border-radius: 24px;
-            }}
-            QLabel {{
-                border: none;
-                background: transparent;
-            }}
-        """)
-        
-        hero_layout = QHBoxLayout(self.hero)
-        hero_layout.setContentsMargins(40, 0, 40, 0)
-        
-        text_layout = QVBoxLayout()
-        text_layout.setAlignment(Qt.AlignVCenter)
-        
-        welcome_lbl = QLabel("Xiaomi Turbo Suite")
-        welcome_lbl.setStyleSheet("font-size: 32px; font-weight: 800; color: white;")
-        
-        desc_lbl = QLabel("Tận dụng tối đa sức mạnh thiết bị MIUI/HyperOS của bạn.")
-        desc_lbl.setStyleSheet("font-size: 16px; color: rgba(255,255,255,0.8); margin-top: 8px;")
-        
-        text_layout.addWidget(welcome_lbl)
-        text_layout.addWidget(desc_lbl)
-        hero_layout.addLayout(text_layout)
-        hero_layout.addStretch()
-        
-        # Quick Optimization Button
-        scan_btn = QPushButton(" ⚡  Quét Hệ Thống")
-        scan_btn.setFixedSize(200, 56)
-        scan_btn.setCursor(Qt.PointingHandCursor)
-        scan_btn.setStyleSheet("""
-            QPushButton {
-                background: white;
-                color: #2575FC;
-                border-radius: 24px;
-                font-weight: 800;
-                font-size: 15px;
-            }
-            QPushButton:hover {
-                background: #f8f9fa;
-            }
-        """)
-        hero_layout.addWidget(scan_btn)
-        
-        layout.addWidget(self.hero)
-
-        # 2. Main Services Grid
-        grid_container = QWidget()
-        self.grid = QGridLayout(grid_container)
-        self.grid.setSpacing(20)
-        self.grid.setContentsMargins(0, 0, 0, 0)
-
-        # Service Tiles (Consolidated Indexing)
-        self.add_tile("Gỡ Rác & Tối Ưu (Debloater)", "Quét và gỡ bỏ ứng dụng rác, app thừa.", "🗑️", 1, ["#FF9A9E", "#FECFEF"])
-        self.add_tile("Tối Ưu Hệ Thống", "120Hz, Tắt OTA, Việt Hóa, Tối ưu ART.", "✨", 2, ["#a18cd1", "#fbc2eb"])
-        self.add_tile("Tối Ưu Chuyên Sâu (Expert)", "CPU/GPU Level 6, Fixed Perf, RAM Phantom.", "💀", 3, ["#FF416C", "#FF4B2B"])
-        self.add_tile("Fix Thông Báo 🔔", "Sửa lỗi chậm tin nhắn (Zalo, Messenger...).", "🔔", 4, ["#fdfbfb", "#ebedee"]) 
-        self.add_tile("Quản Lý ROM & Apps", "Tải ROM HyperOS, App Gốc.", "☁️", 5, ["#e0c3fc", "#8ec5fc"])
-        self.add_tile("Công Cụ Fastboot", "Flash ROM, Unlock, Format.", "🛠️", 6, ["#43e97b", "#38f9d7"])
-        self.add_tile("Kho Ứng Dụng (Store)", "Tải APK/XAPK từ kho online.", "🛍️", 7, ["#ff9999", "#ffcc99"]) 
-
-        layout.addWidget(grid_container)
-        layout.addStretch()
-        
-        scroll.setWidget(content)
-        main_layout.addWidget(scroll)
-
-    def add_tile(self, title, desc, icon, index, colors):
-        card = ModernCard(title, desc, icon, lambda: self.switch_page.emit(index), gradient_colors=colors)
-        row = (index - 1) // 2
-        col = (index - 1) % 2
-        self.grid.addWidget(card, row, col)
+# XiaomiHubWidget removed — replaced by XiaomiToolsPage sidebar navigation
 
 class XiaomiBaseWidget(QWidget):
     """Base widget with shared helper methods"""
@@ -292,6 +189,7 @@ class XiaomiBaseWidget(QWidget):
         if self.opt_worker and self.opt_worker.isRunning(): return
         self.opt_worker = OptimizationWorker(self.adb, task_type, **kwargs)
         self.opt_worker.progress.connect(lambda m: LogManager.log(name, m, "info" if "✅" not in m and "❌" not in m else ("success" if "✅" in m else "error")))
+        self.opt_worker.error_occurred.connect(lambda t, m: self.show_error(t, m))  # P1-5: connect security errors
         if task_type == "check_status": self.opt_worker.result_ready.connect(self.show_status_dialog)
         self.opt_worker.start()
         
@@ -553,9 +451,17 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
         header_l.addWidget(btn_refresh)
         header_l.addStretch()
         
+        # Filter combo
+        self.filter_combo = QComboBox()
+        self.filter_combo.addItems(["Tất Cả", "✅ An Toàn", "⚠️ Cảnh Báo", "❌ Nguy Hiểm"])
+        self.filter_combo.setFixedWidth(140)
+        self.filter_combo.setStyleSheet(ThemeManager.get_input_style() + "height: 28px;")
+        self.filter_combo.currentIndexChanged.connect(self._apply_safety_filter)
+        header_l.addWidget(self.filter_combo)
+        
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Tìm kiếm ứng dụng...")
-        self.search_input.setFixedWidth(250)
+        self.search_input.setFixedWidth(220)
         self.search_input.setStyleSheet(ThemeManager.get_input_style())
         self.search_input.textChanged.connect(self.filter_apps)
         header_l.addWidget(self.search_input)
@@ -631,7 +537,7 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
         
         # ─── BOTTOM ACTION BAR ───
         actions_bar = QFrame()
-        actions_bar.setFixedHeight(70)
+        actions_bar.setFixedHeight(80)
         actions_bar.setObjectName("DebloatBar")
         actions_bar.setStyleSheet(f"""
             #DebloatBar {{
@@ -640,60 +546,125 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
             }}
             QLabel {{ background: transparent; border: none; }}
         """)
-        actions_layout = QHBoxLayout(actions_bar)
-        actions_layout.setContentsMargins(24, 0, 24, 0)
+        actions_layout = QVBoxLayout(actions_bar)
+        actions_layout.setContentsMargins(24, 8, 24, 8)
+        actions_layout.setSpacing(6)
+        
+        # Row 1: select buttons + stats + action button
+        row1 = QHBoxLayout()
+        
+        btn_select_safe = QPushButton("✅ Chọn An Toàn")
+        btn_select_safe.setFixedHeight(30)
+        btn_select_safe.setCursor(Qt.PointingHandCursor)
+        btn_select_safe.setStyleSheet(f"""
+            QPushButton {{ background: rgba(46,204,113,0.15); color: #2ecc71;
+                border: 1px solid rgba(46,204,113,0.3); border-radius: 8px;
+                font-size: 11px; font-weight: 700; padding: 0 10px; }}
+            QPushButton:hover {{ background: rgba(46,204,113,0.25); }}
+        """)
+        btn_select_safe.clicked.connect(self._select_safe_only)
+        row1.addWidget(btn_select_safe)
+        
+        btn_select_all = QPushButton("Chọn Tất Cả")
+        btn_select_all.setFixedHeight(30)
+        btn_select_all.setCursor(Qt.PointingHandCursor)
+        btn_select_all.setStyleSheet(f"""
+            QPushButton {{ background: transparent; color: {ThemeManager.COLOR_TEXT_SECONDARY};
+                border: 1px solid rgba(128,128,128,0.3); border-radius: 8px;
+                font-size: 11px; padding: 0 10px; }}
+            QPushButton:hover {{ color: {ThemeManager.COLOR_ACCENT}; border-color: {ThemeManager.COLOR_ACCENT}50; }}
+        """)
+        btn_select_all.clicked.connect(lambda: self._set_all_checked(True))
+        row1.addWidget(btn_select_all)
+        
+        btn_deselect = QPushButton("Bỏ Chọn")
+        btn_deselect.setFixedHeight(30)
+        btn_deselect.setCursor(Qt.PointingHandCursor)
+        btn_deselect.setStyleSheet(btn_select_all.styleSheet())
+        btn_deselect.clicked.connect(lambda: self._set_all_checked(False))
+        row1.addWidget(btn_deselect)
+        
+        row1.addStretch()
         
         self.stats_lbl = QLabel("0 ứng dụng được chọn")
         self.stats_lbl.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 13px; font-weight: 600;")
-        actions_layout.addWidget(self.stats_lbl)
-        actions_layout.addStretch()
+        row1.addWidget(self.stats_lbl)
         
         self.btn_clean = QPushButton("🗑️ Gỡ bỏ ngay")
         self.btn_clean.setCursor(Qt.PointingHandCursor)
-        self.btn_clean.setFixedSize(170, 44)
+        self.btn_clean.setFixedSize(150, 36)
         self.btn_clean.setStyleSheet(f"""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #e74c3c, stop:1 #c0392b);
-                color: white; font-weight: 700; border-radius: 22px;
-                border: none; font-size: 14px;
+                color: white; font-weight: 700; border-radius: 18px;
+                border: none; font-size: 13px;
             }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff6b6b, stop:1 #e74c3c);
-            }}
-            QPushButton:disabled {{
-                background: rgba(255,255,255,0.08);
-                color: rgba(255,255,255,0.25);
-            }}
+            QPushButton:hover {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff6b6b, stop:1 #e74c3c); }}
+            QPushButton:disabled {{ background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.25); }}
         """)
         self.btn_clean.clicked.connect(self.start_debloat)
-        actions_layout.addWidget(self.btn_clean)
+        row1.addWidget(self.btn_clean)
+        
+        actions_layout.addLayout(row1)
+        
+        # Row 2: Progress bar (hidden by default)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedHeight(4)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{ background: rgba(255,255,255,0.08); border-radius: 2px; border: none; }}
+            QProgressBar::chunk {{ background: {ThemeManager.COLOR_ACCENT}; border-radius: 2px; }}
+        """)
+        self.progress_bar.hide()
+        actions_layout.addWidget(self.progress_bar)
+        
         layout.addWidget(actions_bar)
 
     def _on_card_toggled(self, checked, package):
-        """Update counter when checkbox toggled"""
         count = sum(1 for c in self.app_cards.values() if c.isChecked())
         self.stats_lbl.setText(f"{count} ứng dụng được chọn")
-        if count > 0:
-            self.stats_lbl.setStyleSheet("color: #e74c3c; font-size: 13px; font-weight: 700;")
-        else:
-            self.stats_lbl.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 13px; font-weight: 600;")
+        clr = "#e74c3c" if count > 0 else ThemeManager.COLOR_TEXT_SECONDARY
+        weight = "700" if count > 0 else "600"
+        self.stats_lbl.setStyleSheet(f"color: {clr}; font-size: 13px; font-weight: {weight};")
 
     def _set_all_checked(self, checked):
         for card in self.app_cards.values():
-            if card.cb.isEnabled():
+            if card.cb.isEnabled() and card.isVisible():
                 card.setChecked(checked)
+
+    def _select_safe_only(self):
+        """Chọn chỉ các app có safety='safe'"""
+        for card in self.app_cards.values():
+            if card.cb.isEnabled():
+                card.setChecked(card.safety == "safe")
 
     def _toggle_category(self, category):
         cards = self._category_cards.get(category, [])
-        # Toggle: if any unchecked → check all, else uncheck all
-        any_unchecked = any(not c.isChecked() and c.cb.isEnabled() for c in cards)
+        any_unchecked = any(not c.isChecked() and c.cb.isEnabled() for c in cards if c.isVisible())
         for c in cards:
-            if c.cb.isEnabled():
+            if c.cb.isEnabled() and c.isVisible():
                 c.setChecked(any_unchecked)
 
+    def _apply_safety_filter(self, index):
+        """Filter cards by safety level"""
+        safety_map = {0: None, 1: "safe", 2: "warning", 3: "danger"}
+        target = safety_map.get(index)
+        for card in self.app_cards.values():
+            if target is None:
+                card.setVisible(True)
+            else:
+                card.setVisible(card.safety == target)
+        # Re-apply text search on top
+        self.filter_apps(self.search_input.text())
+
     def filter_apps(self, text):
-        for name, card in self.app_cards.items():
-            card.setVisible(text.lower() in name.lower() or text.lower() in card.package_name.lower())
+        txt = text.lower()
+        safety_map = {0: None, 1: "safe", 2: "warning", 3: "danger"}
+        target_safety = safety_map.get(self.filter_combo.currentIndex())
+        for pkg, card in self.app_cards.items():
+            text_match = not txt or txt in pkg.lower() or txt in card.app_name.lower()
+            safety_match = target_safety is None or card.safety == target_safety
+            card.setVisible(text_match and safety_match)
             
     def start_debloat(self):
         if self._processing:
@@ -709,6 +680,9 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
         self._processed_results = {}
         self.btn_clean.setEnabled(False)
         self.btn_clean.setText("⏳ Đang xử lý...")
+        self.progress_bar.setMaximum(len(selected))
+        self.progress_bar.setValue(0)
+        self.progress_bar.show()
         
         self.opt_worker = DebloatWorker(self.adb, selected)
         self.opt_worker.progress.connect(self._on_debloat_progress)
@@ -716,9 +690,7 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
         self.opt_worker.start()
     
     def _on_debloat_progress(self, message):
-        """Track per-package results from progress messages"""
         LogManager.log("Debloater", message, "info")
-        # Parse which package and success/fail
         for pkg, card in self.app_cards.items():
             if pkg in message:
                 if "✅" in message or "👌" in message or "⚠️" in message:
@@ -726,27 +698,28 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
                 elif "❌" in message or "🔒" in message:
                     self._processed_results[pkg] = False
                 break
-        # Update counter
+        # Update progress bar
+        total_selected = sum(1 for c in self.app_cards.values() if c.isChecked() or c.package_name in self._processed_results)
         done = len(self._processed_results)
-        total = sum(1 for c in self.app_cards.values() if c.isChecked() or c.package_name in self._processed_results)
-        self.stats_lbl.setText(f"Đang xử lý: {done}/{total}")
+        if total_selected > 0:
+            self.progress_bar.setMaximum(total_selected)
+            self.progress_bar.setValue(done)
+        self.stats_lbl.setText(f"Đang xử lý: {done}/{total_selected}")
     
     def _on_debloat_finished(self):
-        """Mark processed cards, reset button"""
         self._processing = False
         self.btn_clean.setEnabled(True)
         self.btn_clean.setText("🗑️ Gỡ bỏ ngay")
+        self.progress_bar.hide()
+        self.progress_bar.setValue(0)
         
-        # Mark each processed card
         success_count = 0
         fail_count = 0
         for pkg, success in self._processed_results.items():
             if pkg in self.app_cards:
                 self.app_cards[pkg].mark_processed(success)
-                if success:
-                    success_count += 1
-                else:
-                    fail_count += 1
+                if success: success_count += 1
+                else: fail_count += 1
         
         self.stats_lbl.setText(f"✓ Hoàn tất: {success_count} thành công, {fail_count} lỗi")
         self.stats_lbl.setStyleSheet("color: #2ecc71; font-size: 13px; font-weight: 700;")
@@ -927,10 +900,6 @@ class XiaomiExpertTweaksWidget(XiaomiBaseWidget):
         grid_u.addWidget(ModernCard("Tắt Cập Nhật OTA", "Chặn thông báo cập nhật ROM.", "🚫", self.run_disable_ota, ["#2c3e50", "#000000"]), 0, 1)
         c_layout.addLayout(grid_u)
 
-        c_layout.addStretch()
-        scroll.setWidget(content)
-        layout.addWidget(scroll)
-
         btn_verify = QPushButton("🔍 Kiểm tra trạng thái hệ thống")
         btn_verify.setFixedHeight(45)
         btn_verify.setStyleSheet(f"QPushButton {{ background-color: {ThemeManager.COLOR_ACCENT}15; color: {ThemeManager.COLOR_ACCENT}; border: 1px solid {ThemeManager.COLOR_ACCENT}; border-radius: 12px; margin-top:20px; font-weight:bold; }}")
@@ -967,9 +936,9 @@ class NotificationAppItem(QFrame):
         info = QVBoxLayout()
         info.setSpacing(2)
         self.name_lbl = QLabel(name)
-        self.name_lbl.setStyleSheet("font-weight: 700; font-size: 14px; color: #1a1a1a;")
+        self.name_lbl.setStyleSheet(f"font-weight: 700; font-size: 14px; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
         self.pkg_lbl = QLabel(pkg)
-        self.pkg_lbl.setStyleSheet("font-size: 11px; color: #5f6368;")
+        self.pkg_lbl.setStyleSheet(f"font-size: 11px; color: {ThemeManager.COLOR_TEXT_SECONDARY};")
         info.addWidget(self.name_lbl)
         info.addWidget(self.pkg_lbl)
         
@@ -982,7 +951,8 @@ class NotificationAppItem(QFrame):
 
     def update_style(self):
         checked = self.cb.isChecked()
-        bg = "#f1f3f4" if checked else "transparent"
+        theme = ThemeManager.get_theme()
+        bg = theme['COLOR_GLASS_WHITE'] if checked else "transparent"
         border = f"1px solid {ThemeManager.COLOR_ACCENT}50" if checked else "1px solid transparent"
         self.setStyleSheet(f"""
             NotificationAppItem {{
@@ -1017,9 +987,9 @@ class XiaomiNotificationFixWidget(XiaomiBaseWidget):
         header = QHBoxLayout()
         title_v = QVBoxLayout()
         title = QLabel("🔔 Fix Thông Báo Chuyên Sâu v3.0")
-        title.setStyleSheet("font-size: 22px; font-weight: 800; color: #1a1a1a;")
+        title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
         desc = QLabel("Khắc phục triệt để tình trạng chậm tin nhắn (Zalo, Messenger...) bằng cách tối ưu Pin và Quyền tự chạy.")
-        desc.setStyleSheet("color: #5f6368; font-size: 13px;")
+        desc.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 13px;")
         title_v.addWidget(title)
         title_v.addWidget(desc)
         header.addLayout(title_v)
@@ -1045,9 +1015,39 @@ class XiaomiNotificationFixWidget(XiaomiBaseWidget):
             chk.setStyleSheet(ThemeManager.get_checkbox_style())
             opt_layout.addWidget(chk)
             
-        layout.addWidget(opt_panel)
+        # --- Preset Buttons ---
+        preset_panel = QFrame()
+        preset_panel.setStyleSheet(f"background: transparent;")
+        preset_row = QHBoxLayout(preset_panel)
+        preset_row.setContentsMargins(0, 0, 0, 0)
+        preset_row.setSpacing(8)
         
-        # --- Middle Section: App List ---
+        lbl_preset = QLabel("⚡ Chọn nhanh:")
+        lbl_preset.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-weight: 600; font-size: 12px;")
+        preset_row.addWidget(lbl_preset)
+        
+        PRESETS = [
+            ("Zalo + Messenger", ["com.zing.zalo", "com.facebook.orca"]),
+            ("Tất cả mạng xã hội", ["com.zing.zalo", "com.facebook.orca", "org.telegram.messenger", "com.viber.voip", "com.whatsapp"]),
+            ("Email & Calendar", ["com.google.android.gm", "com.microsoft.outlook", "com.google.android.calendar"]),
+        ]
+        for preset_name, preset_pkgs in PRESETS:
+            btn_p = QPushButton(preset_name)
+            btn_p.setCursor(Qt.PointingHandCursor)
+            btn_p.setFixedHeight(28)
+            btn_p.setStyleSheet(f"""
+                QPushButton {{ background: {ThemeManager.COLOR_ACCENT}15; color: {ThemeManager.COLOR_ACCENT};
+                    border: 1px solid {ThemeManager.COLOR_ACCENT}40; border-radius: 14px;
+                    font-size: 11px; font-weight: 600; padding: 0 12px; }}
+                QPushButton:hover {{ background: {ThemeManager.COLOR_ACCENT}25; }}
+            """)
+            pkgs_copy = preset_pkgs[:]
+            btn_p.clicked.connect(lambda _, pkgs=pkgs_copy: self._select_by_packages(pkgs))
+            preset_row.addWidget(btn_p)
+        preset_row.addStretch()
+        layout.addWidget(preset_panel)
+        
+        # --- Top Section: Options ---
         list_group = QGroupBox("Danh sách ứng dụng người dùng")
         list_group.setStyleSheet(ThemeManager.get_group_box_style())
         list_layout = QVBoxLayout(list_group)
@@ -1135,6 +1135,12 @@ class XiaomiNotificationFixWidget(XiaomiBaseWidget):
         for item in self.app_items:
             item.setVisible(text in item.pkg.lower() or text in item.name_lbl.text().lower())
 
+    def _select_by_packages(self, pkg_list):
+        """Select items matching pkg_list (preset). Uncheck others."""
+        for item in self.app_items:
+            item.cb.setChecked(item.pkg in pkg_list)
+            item.update_style()
+
     def toggle_all_selection(self, checked):
         for item in self.app_items:
             if item.isVisible():
@@ -1163,57 +1169,17 @@ class XiaomiNotificationFixWidget(XiaomiBaseWidget):
         if not self.app_items:
             self.load_apps()
 
-class XiaomiOptimizerWidget(XiaomiBaseWidget):
-    """Main Wrapper for Xiaomi Turbo Suite"""
-    def __init__(self, adb_manager):
-        super().__init__(adb_manager)
-        self.setup_ui()
-        
-    def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        
-        self.nav_bar = QFrame()
-        self.nav_bar.setFixedHeight(50)
-        self.nav_bar.setObjectName("OptimizerNavBar")
-        self.nav_bar.setStyleSheet(f"background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']}; border-bottom: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};")
-        
-        nav_layout = QHBoxLayout(self.nav_bar)
-        nav_layout.setContentsMargins(15, 5, 15, 5)
-        
-        btn_back = QPushButton("⬅ Quay lại Hub")
-        btn_back.clicked.connect(lambda: self.switch_page(0))
-        btn_back.setStyleSheet("QPushButton { background: transparent; border: 1px solid #ccc; border-radius: 12px; padding: 6px 16px; font-weight: bold; }")
-        nav_layout.addWidget(btn_back)
-        
-        self.page_title = QLabel("Xiaomi Turbo Suite")
-        self.page_title.setStyleSheet(f"font-size: 16px; font-weight: 800; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
-        nav_layout.addWidget(self.page_title)
-        nav_layout.addStretch()
-        layout.addWidget(self.nav_bar)
-        
-        self.stack = QStackedWidget()
-        layout.addWidget(self.stack)
-        self.init_pages()
-        self.switch_page(0)
+    def reset(self):
+        """Reset widget when device changes — clear app list"""
+        self.app_items = []
+        # Clear the scroll layout
+        if hasattr(self, 'scroll_layout'):
+            for i in reversed(range(self.scroll_layout.count())):
+                item = self.scroll_layout.itemAt(i)
+                if item and item.widget():
+                    item.widget().setParent(None)
+        if hasattr(self, 'search_input'):
+            self.search_input.clear()
 
-    def init_pages(self):
-        self.hub = XiaomiHubWidget(self.adb)
-        self.hub.switch_page.connect(self.switch_page)
-        self.stack.addWidget(self.hub)
-        self.stack.addWidget(XiaomiDebloaterWidget(self.adb))        # Index 1
-        self.stack.addWidget(XiaomiAIOOptimizerWidget(self.adb))     # Index 2
-        self.stack.addWidget(XiaomiExpertTweaksWidget(self.adb))      # Index 3
-        self.stack.addWidget(XiaomiNotificationFixWidget(self.adb))   # Index 4
-        self.stack.addWidget(OTADownloaderWidget(self.adb))           # Index 5
-        self.stack.addWidget(FastbootToolboxWidget(self.adb))          # Index 6
-        self.stack.addWidget(HyperOSAppsWidget(self.adb))             # Index 7
-
-    def switch_page(self, index):
-        self.stack.setCurrentIndex(index)
-        titles = ["Xiaomi Turbo Hub", "Gỡ Rác & Debloat", "Tối Ưu Hệ Thống", "Tối Ưu Chuyên Sâu", "Fix Thông Báo 🔔", "Tải ROM & Check OTA", "Fastboot Toolkit", "Kho Ứng Dụng"]
-        self.page_title.setText(f"|  {titles[index]}")
-        self.nav_bar.setVisible(index != 0)
-        curr = self.stack.widget(index)
-        if hasattr(curr, 'refresh_state'): curr.refresh_state()
+# XiaomiOptimizerWidget (Hub version) removed — replaced by XiaomiToolsPage sidebar.
+# Use XiaomiToolsPage from src/ui/pages/xiaomi_tools_page.py instead.

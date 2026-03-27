@@ -296,9 +296,9 @@ class CleanerWidget(QWidget):
                 card.show_result(True)
                 LogManager.log("Dọn Rác", f"✓ Đã dọn {display_name} thành công!", "success")
             
-        worker.finished.connect(on_done)
-        worker.start()
-        # Guard: wait for old worker if still running
+        # Guard: wait for old worker if still running (before start to avoid race condition)
         if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
             self.worker.wait(3000)
+        worker.finished.connect(on_done)
         self.worker = worker
+        worker.start()

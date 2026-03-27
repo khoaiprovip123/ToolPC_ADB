@@ -69,12 +69,15 @@ class XiaomiToolsPage(QWidget):
         self.stack.setStyleSheet(f"background: transparent; border: none;")
         main_layout.addWidget(self.stack, stretch=1)
         
-        # Define Tools
+        # Define Tools with group separators
         tools = [
+            (None, "⚡ HIỆU NĂNG", None),           # Group header
             (XiaomiDebloaterWidget, "Gỡ Ứng Dụng", "🗑️"),
             (XiaomiAIOOptimizerWidget, "Tối Ưu Hệ Thống", "✨"),
             (XiaomiExpertTweaksWidget, "Tối Ưu Chuyên Sâu", "💀"),
-            (XiaomiNotificationFixWidget, "Fix Thông Báo 🔔", "🔔"),
+            (None, "📢 ỨNG DỤNG", None),            # Group header
+            (XiaomiNotificationFixWidget, "Fix Thông Báo", "🔔"),
+            (None, "🌐 ROM & HỆ THỐNG", None),      # Group header
             (OTADownloaderWidget, "Tải ROM & OTA", "☁️"),
             (HyperOSAppsWidget, "Kho App HyperOS", "🛍️"),
             (FastbootToolboxWidget, "Công Cụ Fastboot", "🛠️"),
@@ -82,10 +85,20 @@ class XiaomiToolsPage(QWidget):
             (BatteryHealthWidget, "Pin & Sức Khỏe", "🔋"),
         ]
         
-        # Populate
+        # Populate — skip group headers (widget_class is None)
         for widget_class, title, icon in tools:
+            if widget_class is None:
+                # Add group separator label
+                sep = QLabel(title)
+                sep.setStyleSheet(f"""
+                    color: {ThemeManager.COLOR_TEXT_SECONDARY};
+                    font-size: 10px; font-weight: 800;
+                    letter-spacing: 0.8px; padding: 14px 10px 4px 10px;
+                """)
+                sidebar_layout.addWidget(sep)
+                continue
+            
             widget = widget_class(self.adb)
-            # Link back to parent page for navigation
             if hasattr(widget, 'set_parent_page'):
                 widget.set_parent_page(self)
             
@@ -94,7 +107,7 @@ class XiaomiToolsPage(QWidget):
             
             # Add to nav
             item = QListWidgetItem(f"{icon}  {title}")
-            item.setSizeHint(QSize(0, 48))
+            item.setSizeHint(QSize(0, 44))
             self.nav_list.addItem(item)
             
         # Select first
@@ -154,13 +167,14 @@ class XiaomiToolsPage(QWidget):
             self.stack.setCurrentIndex(index)
     
     def reset(self):
-        """Reset all child widgets"""
-        # Trigger refresh on current tab or all?
-        # For performance, maybe just current. But simpler to iterate.
+        """Reset only the active widget for performance; others reset lazily when navigated to"""
+        current = self.stack.currentWidget()
+        if current:
+            if hasattr(current, 'reset'):
+                current.reset()
+            elif hasattr(current, 'refresh_state'):
+                current.refresh_state()
+        # Mark all other widgets dirty so they refresh on next visit
         for widget in self.widgets:
-            if hasattr(widget, 'reset'):
-                widget.reset()
-            elif hasattr(widget, 'refresh_state'):
-                widget.refresh_state()
-            elif hasattr(widget, 'check_device') and hasattr(widget, 'status_label'):
-                widget.check_device(widget.status_label)
+            if widget is not current and hasattr(widget, '_needs_refresh'):
+                widget._needs_refresh = True
