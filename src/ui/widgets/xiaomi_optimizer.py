@@ -733,68 +733,106 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(0)
+
+        # ─── STYLED TAB WIDGET ───
+        self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        theme = ThemeManager.get_theme()
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: 1px solid {theme['COLOR_BORDER']};
+                border-radius: 12px;
+                background: transparent;
+                margin-top: -1px;
+            }}
+            QTabBar::tab {{
+                background: transparent;
+                color: {theme['COLOR_TEXT_SECONDARY']};
+                padding: 10px 28px;
+                font-size: 13px;
+                font-weight: 600;
+                border: none;
+                border-bottom: 2px solid transparent;
+                min-width: 130px;
+            }}
+            QTabBar::tab:selected {{
+                color: {ThemeManager.COLOR_ACCENT};
+                border-bottom: 2px solid {ThemeManager.COLOR_ACCENT};
+            }}
+            QTabBar::tab:hover:!selected {{
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                background: {ThemeManager.COLOR_ACCENT}10;
+            }}
+        """)
+
+        # ─── TAB 1: HIỂN THỊ & GIAO DIỆN ───
+        tab1 = self._make_tab_scroll()
+        g1 = QGridLayout()
+        g1.setSpacing(16)
+        g1.addWidget(ModernCard("Chỉnh Tần Số Quét",  "Tùy chỉnh 60/90/120/144Hz hoặc Auto.",     "⚡", self.run_force_refresh_rate,       ["#f83600","#f9d423"]), 0, 0)
+        g1.addWidget(ModernCard("Tối Ưu Animation",   "Giảm thời gian chuyển cảnh (0.5x).",        "🐇", self.run_animations,                ["#4facfe","#00f2fe"]), 0, 1)
+        g1.addWidget(ModernCard("Hiện FPS / Hz",      "Hiển thị thông số trên màn hình.",           "📈", self.run_show_fps,                   ["#fc4a1a","#f7b733"]), 1, 0)
+        g1.addWidget(ModernCard("Hiệu Ứng Blur",      "Bật blur CC/Folder trên HyperOS.",           "💧", self.run_smart_blur,                 ["#89f7fe","#66a6ff"]), 1, 1)
+        g1.addWidget(ModernCard("Đa Nhiệm iOS Style", "Xếp chồng Giao diện đa nhiệm.",             "📚", self.run_hyperos_stacked_recent,     ["#a18cd1","#fbc2eb"]), 2, 0)
+        g1.addWidget(ModernCard("Control Center Mới", "Kích hoạt CC giao diện mới.",               "🎛️", lambda: self.run_task("new_cc", name="CC"), ["#e1eec3","#f05053"]), 2, 1)
+        g1.addWidget(ModernCard("Độ Phân Giải (WM)",  "Thay đổi kích thước và DPI.",               "📐", self.ask_resolution,                 ["#1d976c","#93f9b9"]), 3, 0)
+        g1.addWidget(ModernCard("Siêu Hình Nền",      "Mở khóa Super Wallpaper.",                  "🪐", self.run_unlock_super_wallpaper,     ["#f093fb","#f5576c"]), 3, 1)
+        g1.addWidget(ModernCard("Ẩn Nhãn Icon",       "Chế độ No Word, ẩn tên icon.",              "📝", self.run_remove_app_label,           ["#a18cd1","#fbc2eb"]), 4, 0)
+        g1.addWidget(ModernCard("Force Dark Mode",    "Ép chế độ tối toàn bộ app.",                "🌙", self.run_force_dark_mode,            ["#434343","#000000"]), 4, 1)
+        tab1.addLayout(g1)
+        tab1.addStretch()
+        self.tabs.addTab(self._wrap_scroll(tab1), "🎨  Hiển Thị")
+
+        # ─── TAB 2: HIỆU NĂNG & PIN ───
+        tab2 = self._make_tab_scroll()
+        g2 = QGridLayout()
+        g2.setSpacing(16)
+        g2.addWidget(ModernCard("Tối Ưu ART VM",       "Biên dịch lại app để mở nhanh.",           "💎", self.run_art_tuning,                                ["#43e97b","#38f9d7"]), 0, 0)
+        g2.addWidget(ModernCard("Fix Thông Báo",       "Sửa trễ thông báo, tự khởi động app.",     "🔔", lambda: self.switch_to_tab("Thông Báo"),           ["#ff9a9e","#fecfef"]), 0, 1)
+        g2.addWidget(ModernCard("Game Turbo",           "Tối ưu GPU/CPU khi chơi game.",            "🎮", lambda: self.run_task("game_perf_tune", name="Game"),["#f12711","#f5af19"]), 1, 0)
+        g2.addWidget(ModernCard("Sạc Nhanh",           "Mở khóa giới hạn sạc.",                    "⚡", lambda: self.run_task("fast_charge", name="Sạc"),   ["#FDC830","#F37335"]), 1, 1)
+        g2.addWidget(ModernCard("Giới Hạn App Nền",   "Kiểm soát app chạy ngầm.",                  "🛑", self.ask_bg_limit,                                  ["#bdc3c7","#2c3e50"]), 2, 0)
+        g2.addWidget(ModernCard("Tối Ưu Chuyên Sâu",  "Expert kernel tweaks cho HyperOS.",         "🔬", lambda: self.switch_to_tab("Chuyên Sâu"),           ["#f093fb","#f5576c"]), 2, 1)
+        tab2.addLayout(g2)
+        tab2.addStretch()
+        self.tabs.addTab(self._wrap_scroll(tab2), "🚀  Hiệu Năng")
+
+        # ─── TAB 3: HỆ THỐNG & TIỆN ÍCH ───
+        tab3 = self._make_tab_scroll()
+        g3 = QGridLayout()
+        g3.setSpacing(16)
+        g3.addWidget(ModernCard("Bỏ Qua Setup",       "Vào thẳng màn hình chính sau Reset.",       "⏭️", self.run_skip_setup,                                ["#11998e","#38ef7d"]), 0, 0)
+        g3.addWidget(ModernCard("Ẩn/Hiện Nav Bar",    "Cử chỉ vuốt full màn hình.",               "📱", self.run_hide_nav_bar,                              ["#00c6ff","#0072ff"]), 0, 1)
+        g3.addWidget(ModernCard("Fix Region EU/VN",   "Sửa lỗi vùng và định dạng giờ.",           "🌍", self.run_fix_eu_vn,                                 ["#11998e","#38ef7d"]), 1, 0)
+        g3.addWidget(ModernCard("Chuyển MIUI Apps",   "Đổi Dialer/SMS/Messenger sang MIUI.",      "📲", self.run_switch_miui_apps,                          ["#11998e","#38ef7d"]), 1, 1)
+        g3.addWidget(ModernCard("Dọn Rác Hệ Thống",  "Xóa cache và file rác nhanh.",              "🧹", lambda: self.switch_to_tab("Dọn Rác"),              ["#a1c4fd","#c2e9fb"]), 2, 0)
+        g3.addWidget(ModernCard("Kiểm Tra Hệ Thống", "Xem trạng thái tối ưu hiện tại.",           "🔍", self.run_verify_status,                             ["#667eea","#764ba2"]), 2, 1)
+        tab3.addLayout(g3)
+        tab3.addStretch()
+        self.tabs.addTab(self._wrap_scroll(tab3), "🛠️  Hệ Thống")
+
+        layout.addWidget(self.tabs)
+
+    def _make_tab_scroll(self):
+        """Tạo VBoxLayout bên trong ScrollArea cho mỗi tab"""
+        vbox = QVBoxLayout()
+        vbox.setContentsMargins(12, 16, 12, 16)
+        vbox.setSpacing(16)
+        return vbox
+
+    def _wrap_scroll(self, vbox_layout):
+        """Bọc VBoxLayout vào ScrollArea"""
+        container = QWidget()
+        container.setStyleSheet("background: transparent;")
+        container.setLayout(vbox_layout)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet("background: transparent;")
-        
-        content = QWidget()
-        c_layout = QVBoxLayout(content)
-        c_layout.setContentsMargins(10, 10, 10, 10)
-        c_layout.setSpacing(30)
-        
-        # --- SECTION 1: VISUAL & DISPLAY ---
-        self.add_section_header(c_layout, "🎨 Hiển Thị & Giao Diện")
-        grid_v = QGridLayout()
-        grid_v.setSpacing(20)
-        grid_v.addWidget(ModernCard("Chỉnh Tần Số Quét", "Tùy chỉnh 60Hz/90Hz/120Hz/144Hz hoặc Auto.", "⚡", self.run_force_refresh_rate, ["#f83600", "#f9d423"]), 0, 0)
-        grid_v.addWidget(ModernCard("Tối Ưu Animation", "Giảm thời gian chuyển cảnh hệ thống (0.5x).", "🐇", self.run_animations, ["#4facfe", "#00f2fe"]), 0, 1)
-        grid_v.addWidget(ModernCard("Hiện FPS / Hz", "Hiển thị thông số mượt mà trên màn hình.", "📈", self.run_show_fps, ["#fc4a1a", "#f7b733"]), 1, 0)
-        grid_v.addWidget(ModernCard("Hiệu Ứng Blur", "Bật hiệu ứng mờ CC/Folder.", "💧", self.run_smart_blur, ["#89f7fe", "#66a6ff"]), 1, 1)
-        grid_v.addWidget(ModernCard("Đa Nhiệm Xếp Chồng", "Giao diện đa nhiệm kiểu iOS.", "📚", self.run_hyperos_stacked_recent, ["#a18cd1", "#fbc2eb"]), 2, 0)
-        grid_v.addWidget(ModernCard("Control Center Mới", "Kích hoạt CC giao diện mới.", "🎛️", lambda: self.run_task("new_cc", name="Control Center"), ["#e1eec3", "#f05053"]), 2, 1)
-        grid_v.addWidget(ModernCard("Độ Phân Giải (WM)", "Thay đổi kích thước và DPI.", "📐", self.ask_resolution, ["#1d976c", "#93f9b9"]), 3, 0)
-        grid_v.addWidget(ModernCard("Siêu Hình Nền", "Mở khóa Super Wallpaper.", "🪐", self.run_unlock_super_wallpaper, ["#f093fb", "#f5576c"]), 3, 1)
-        grid_v.addWidget(ModernCard("Ẩn Nhãn Icon", "Chế độ No Word ẩn tên icon.", "📝", self.run_remove_app_label, ["#a18cd1", "#fbc2eb"]), 4, 0)
-        grid_v.addWidget(ModernCard("Force Dark Mode", "Ép chế độ tối cho toàn bộ app.", "🌙", self.run_force_dark_mode, ["#434343", "#000000"]), 4, 1)
-        
-        # Fix Thông Báo - Clean redirection using the new helper
-        grid_v.addWidget(ModernCard("Fix Thông Báo", "Sửa lỗi chậm tin nhắn (Bản NC v3).", "🔔", lambda: self.switch_to_tab("Thông Báo"), ["#ffffff", "#f1f3f4"]), 5, 0)
-        grid_v.addWidget(ModernCard("Chuyển MIUI Apps", "Đổi Dialer/SMS sang MIUI.", "📲", self.run_switch_miui_apps, ["#11998e", "#38ef7d"]), 5, 1)
-        c_layout.addLayout(grid_v)
-
-        # --- SECTION 2: PERFORMANCE & BATTERY ---
-        self.add_section_header(c_layout, "🚀 Hiệu Năng & Pin")
-        grid_p = QGridLayout()
-        grid_p.setSpacing(20)
-        grid_p.addWidget(ModernCard("Tối Ưu ART VM", "Biên dịch lại app để mở nhanh.", "💎", self.run_art_tuning, ["#43e97b", "#38f9d7"]), 0, 0)
-        grid_p.addWidget(ModernCard("Fix Thông Báo (Chọn lọc)", "Fix trễ thông báo và tự động bật app.", "🔔", lambda: self.switch_to_tab("Thông Báo"), ["#ff9a9e", "#fecfef"]), 0, 1)
-        grid_p.addWidget(ModernCard("Game Turbo", "Tối ưu GPU/CPU khi chơi game.", "🎮", lambda: self.run_task("game_perf_tune", name="Game Turbo"), ["#f12711", "#f5af19"]), 1, 0)
-        grid_p.addWidget(ModernCard("Sạc Nhanh Cấp Tốc", "Mở khóa giới hạn sạc.", "⚡", lambda: self.run_task("fast_charge", name="Sạc Nhanh"), ["#FDC830", "#F37335"]), 1, 1)
-        grid_p.addWidget(ModernCard("Giới Hạn App Nền (Basic)", "Kiểm soát app chạy ngầm cơ bản.", "🛑", self.ask_bg_limit, ["#bdc3c7", "#2c3e50"]), 2, 0)
-        grid_p.addWidget(ModernCard("Tối Ưu Chuyên Sâu", "Tối ưu kernel cho HyperOS.", "⚡", lambda: self.switch_to_tab("Chuyên Sâu"), ["#f093fb", "#f5576c"]), 2, 1)
-        c_layout.addLayout(grid_p)
-
-        # --- SECTION 3: SYSTEM & UTILITIES ---
-        self.add_section_header(c_layout, "🛠️ Hệ Thống & Tiện Ích")
-        grid_s = QGridLayout()
-        grid_s.setSpacing(20)
-        grid_s.addWidget(ModernCard("Bỏ Qua Setup", "Vào thẳng màn hình chính sau Reset.", "⏭️", self.run_skip_setup, ["#11998e", "#38ef7d"]), 0, 0)
-        grid_s.addWidget(ModernCard("Ẩn Thanh Điều Hướng", "Cử chỉ vuốt full màn hình.", "📱", self.run_hide_nav_bar, ["#00c6ff", "#0072ff"]), 0, 1)
-        grid_s.addWidget(ModernCard("Fix Region EU/VN", "Sửa lỗi vùng và định dạng.", "🌍", self.run_fix_eu_vn, ["#11998e", "#38ef7d"]), 1, 0)
-        grid_s.addWidget(ModernCard("Dọn Rác (Cleaner)", "Xóa rác và cache hệ thống.", "🧹", lambda: self.switch_to_tab("Dọn Rác"), ["#a1c4fd", "#c2e9fb"]), 1, 1)
-        c_layout.addLayout(grid_s)
-        
-        btn_verify = QPushButton("🔍 Kiểm tra trạng thái hệ thống")
-        btn_verify.setFixedHeight(45)
-        btn_verify.setStyleSheet(f"QPushButton {{ background-color: {ThemeManager.COLOR_ACCENT}15; color: {ThemeManager.COLOR_ACCENT}; border: 1px solid {ThemeManager.COLOR_ACCENT}; border-radius: 12px; margin-top:10px; font-weight:bold; }}")
-        btn_verify.clicked.connect(self.run_verify_status)
-        c_layout.addWidget(btn_verify)
-
-        c_layout.addStretch()
-        scroll.setWidget(content)
-        layout.addWidget(scroll)
+        scroll.setStyleSheet("background: transparent; border: none;")
+        scroll.setWidget(container)
+        return scroll
 
     def run_animations(self): self.run_task("animations", name="Animations")
     def run_smart_blur(self): self.run_task("smart_blur", name="Smart Blur")
@@ -961,7 +999,7 @@ class NotificationAppItem(QFrame):
                 border-radius: 12px;
             }}
             NotificationAppItem:hover {{
-                background-color: #f1f3f4;
+                background-color: {ThemeManager.COLOR_BG_SECONDARY};
             }}
         """)
 
