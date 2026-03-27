@@ -77,11 +77,13 @@ python src/main.py
 
 ## 📖 Documentation
 
-- [User Guide](docs/USER_GUIDE.md)
+- [User Guide](docs/user_guide.md)
+- [Build Instructions](docs/build.md)
+- [Changelog](docs/changelog.md)
+- [Project Context & Architecture](docs/context.md)
+- [Roadmap & Issues](docs/plan.md)
+- [ADB Manager Spec](docs/adb_manager_spec.md)
 - [Awesome ADB Guide](docs/reference/AWESOME_ADB_GUIDE.md) :books:
-- [API Documentation](docs/API.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Contributing](docs/CONTRIBUTING.md)
 
 ## 🛠️ Development
 

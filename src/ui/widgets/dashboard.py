@@ -1035,6 +1035,17 @@ class DashboardWidget(QWidget):
         except Exception as e:
             print(f"Error updating Dashboard: {e}")
             
+    def hideEvent(self, event):
+        """Dừng cập nhật background khi người dùng chuyển tab"""
+        self.stop_updates()
+        super().hideEvent(event)
+
+    def showEvent(self, event):
+        """Tiếp tục cập nhật khi quay lại tab nếu thiết bị đang kết nối"""
+        if self.adb.is_online():
+            self.start_updates()
+        super().showEvent(event)
+
     def closeEvent(self, event):
         self.stop_updates()
         super().closeEvent(event)

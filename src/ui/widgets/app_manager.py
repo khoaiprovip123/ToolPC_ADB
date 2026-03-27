@@ -739,4 +739,22 @@ class AppManagerWidget(QWidget):
         else:
             LogManager.log("App Manager", f"✗ Cài đặt APK thất bại: {msg}", "error")
 
+    def hideEvent(self, event):
+        """Dọn dẹp Worker khi chuyển tab"""
+        if hasattr(self, 'search_timer'):
+            self.search_timer.stop()
+        if hasattr(self, 'scanner') and self.scanner:
+            try:
+                self.scanner.stop()
+                self.scanner.wait(1000)
+            except Exception:
+                pass
+        super().hideEvent(event)
+
+    def showEvent(self, event):
+        """Tải lại nếu chưa có dữ liệu"""
+        if self.adb.is_online() and not self.apps_all:
+            self.refresh_data()
+        super().showEvent(event)
+
     def reset(self): self.refresh_data()

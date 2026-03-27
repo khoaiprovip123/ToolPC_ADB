@@ -317,6 +317,53 @@ class OptimizationManager:
             self.adb.shell(f"setprop {k} {v}")
         return "Đã áp dụng Performance Props (Root/Shell)"
 
+    def apply_expert_performance_tweak(self):
+        """
+        Apply Expert Performance Service Calls (bypass Read-Only props)
+        Reference: service call miui.mqsas.IMQSNative 21
+        """
+        commands = [
+            # CPU Level 6
+            'service call miui.mqsas.IMQSNative 21 i32 1 s16 "setprop" i32 1 s16 "persist.sys.computility.cpulevel 6" s16 "/storage/emulated/0/log.txt" i32 600',
+            # GPU Level 6
+            'service call miui.mqsas.IMQSNative 21 i32 1 s16 "setprop" i32 1 s16 "persist.sys.computility.gpulevel 6" s16 "/storage/emulated/0/log.txt" i32 600',
+            # Visual Release 3
+            'service call miui.mqsas.IMQSNative 21 i32 1 s16 "setprop" i32 1 s16 "persist.sys.advanced_visual_release 3" s16 "/storage/emulated/0/log.txt" i32 600',
+            # Background Blur
+            'service call miui.mqsas.IMQSNative 21 i32 1 s16 "setprop" i32 1 s16 "persist.sys.background_blur_supported true" s16 "/storage/emulated/0/log.txt" i32 600'
+        ]
+        results = []
+        for cmd in commands:
+            results.append(self.adb.shell(cmd))
+        return "✅ Đã áp dụng các lệnh tối ưu chuyên sâu (Expert Tweaks)!"
+
+    def set_hyperos_performance_mode(self, enable: bool):
+        """Enable Fixed Performance Mode (HyperOS/Latest Android)"""
+        val = "true" if enable else "false"
+        self.adb.shell(f"cmd power set-fixed-performance-mode-enabled {val}")
+        return f"Đã {'bật' if enable else 'tắt'} Chế độ Hiệu suất Cố định"
+
+    def set_phantom_process_limit(self, limit=512):
+        """Adjust Phantom Process Limit for better RAM management"""
+        self.adb.shell(f"device_config put activity_manager max_phantom_processes {limit}")
+        return f"Đã set giới hạn tiến trình Phantom: {limit}"
+
+    def optimize_touch_response(self):
+        """Improve touchscreen latency and response"""
+        self.adb.shell("settings put secure long_press_timeout 250")
+        self.adb.shell("settings put secure multi_press_timeout 250")
+        self.adb.shell("settings put secure tap_duration_threshold 0.0")
+        self.adb.shell("settings put secure touch_blocking_period 0.0")
+        return "✅ Đã tối ưu hóa phản hồi cảm ứng & độ trễ"
+
+    def disable_system_logging(self, disable=True):
+        """Reduce background logging to save CPU"""
+        val = "0" if disable else "1"
+        self.adb.shell(f"settings put global activity_starts_logging_enabled {val}")
+        self.adb.shell(f"settings put system send_security_reports {val}")
+        self.adb.shell(f"settings put secure send_action_app_error {val}")
+        return f"Đã {'tắt' if disable else 'bật'} Ghi log hệ thống"
+
     # ================== Fastboot Helper ==================
     
     def fastboot_format_data(self):

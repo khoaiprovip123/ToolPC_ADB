@@ -74,9 +74,7 @@ class OptimizationWorker(QThread):
                 self.progress.emit(result)
 
             elif self.task_type == "force_refresh_rate":
-                hz = 0
-                if hasattr(self, 'refresh_rate'):
-                    hz = self.refresh_rate
+                hz = self.kwargs.get('refresh_rate', 0)
                 label = "Mặc định (Auto)" if hz <= 0 else f"{hz}Hz"
                 self.progress.emit(f"⚡ Đang áp dụng tần số quét {label}...")
                 result = self.opt.set_refresh_rate(hz)
@@ -133,6 +131,33 @@ class OptimizationWorker(QThread):
                  self.opt.apply_performance_props()
                  self.opt.compile_apps("speed-profile", timeout=300, callback=None)
                  self.progress.emit("✅ Đã hoàn tất tối ưu hóa Chuyên sâu")
+
+            elif self.task_type == "expert_service_call":
+                 self.progress.emit("⚡ Đang thực thi Expert Service Calls (CPU/GPU/Visual)...")
+                 result = self.opt.apply_expert_performance_tweak()
+                 self.progress.emit(result)
+
+            elif self.task_type == "hyperos_perf_mode":
+                 enable = self.kwargs.get('enable', True)
+                 self.progress.emit(f"🚀 Đang {'bật' if enable else 'tắt'} Chế độ Hiệu suất Cố định...")
+                 result = self.opt.set_hyperos_performance_mode(enable)
+                 self.progress.emit(result)
+
+            elif self.task_type == "phantom_proc_limit":
+                 limit = self.kwargs.get('limit', 512)
+                 self.progress.emit(f"🧠 Đang set giới hạn Phantom Process: {limit}...")
+                 result = self.opt.set_phantom_process_limit(limit)
+                 self.progress.emit(result)
+
+            elif self.task_type == "touch_optimize":
+                 self.progress.emit("👆 Đang tối ưu hóa phản hồi cảm ứng...")
+                 result = self.opt.optimize_touch_response()
+                 self.progress.emit(result)
+
+            elif self.task_type == "system_logging_off":
+                 self.progress.emit("📝 Đang tắt Ghi log hệ thống rác...")
+                 result = self.opt.disable_system_logging(True)
+                 self.progress.emit(result)
 
             elif self.task_type == "art_tuning":
                  self.progress.emit("⚡ Đang tối ưu hóa ART (Full Speed)...")
@@ -271,30 +296,6 @@ class OptimizationWorker(QThread):
             elif self.task_type == "set_language_vn":
                 self.progress.emit("🇻🇳 Đang cài đặt Tiếng Việt & Múi giờ...")
                 result = self.opt.set_language_vietnamese()
-                self.progress.emit(result)
-
-            elif self.task_type == "disable_ota":
-                self.progress.emit("🚫 Đang tắt cập nhật OTA...")
-                result = self.opt.disable_miui_ota()
-                self.progress.emit(result)
-
-            elif self.task_type == "skip_setup":
-                self.progress.emit("⏭️ Đang bỏ qua Setup Wizard...")
-                result = self.opt.skip_setup_wizard()
-                self.progress.emit(result)
-
-            elif self.task_type == "force_refresh_rate":
-                hz = self.kwargs.get('enable', 0)
-                # If 'enable' is boolean from toggle_dialog, we need logic
-                if isinstance(hz, bool):
-                    hz = 120 if hz else 0
-                self.progress.emit(f"🌫️ Đang set tần số quét: {hz}Hz...")
-                result = self.opt.set_refresh_rate(hz)
-                self.progress.emit(result)
-
-            elif self.task_type == "smart_blur":
-                self.progress.emit("💧 Đang kích hoạt Smart Blur...")
-                result = self.opt.apply_smart_blur()
                 self.progress.emit(result)
 
             elif self.task_type == "hide_nav":

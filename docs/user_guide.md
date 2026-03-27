@@ -22,14 +22,28 @@ Chào mừng bạn đến với bộ công cụ quản lý và tối ưu hóa m�
 
 ---
 
-## 🛠 2. Bộ công cụ Xiaomi
-### 🧹 Debloater (Gỡ ứng dụng thừa)
-1.  Vào tab **Optimizer / Debloat**.
-2.  Tích chọn nhóm ứng dụng (Quảng cáo, Rác hệ thống...).
-3.  Nhấn **🗑️ Gỡ bỏ các mục đã chọn**.
+## 🛠 2. Bộ công cụ Xiaomi (Xiaomi Tools)
+*Giao diện mới dạng Sidebar giúp truy cập nhanh các tính năng.*
 
-### ⚡ Tối ưu hóa
-1.  Nhấn **⚡ Quét & Tối Ưu Ngay** để tự động tắt quảng cáo (MSA), Analytics và tăng tốc hiệu ứng.
+### 🧹 Gỡ Ứng Dụng (Debloater)
+1.  Vào mục **Gỡ Ứng Dụng** ở thanh bên trái.
+2.  Tích chọn nhóm ứng dụng (Quảng cáo, Rác hệ thống...) hoặc tìm kiếm ứng dụng cụ thể.
+3.  Nhấn **🗑️ Gỡ bỏ ngay**.
+
+### ✨ Tối Ưu Hệ Thống (AIO)
+1.  Vào mục **Tối Ưu Hệ Thống**.
+2.  Sử dụng các thẻ chức năng: Tần số quét (Hz), Animation, Blur hiệu ứng, Dark Mode...
+3.  Nhấn **Quét Hệ Thống** ở đầu trang để tự động hóa toàn bộ.
+
+### 💀 Tối Ưu Chuyên Sâu (Expert)
+*Chỉ dành cho người dùng có kinh nghiệm.*
+1.  Vào mục **Tối Ưu Chuyên Sâu**.
+2.  Kích hoạt các tính năng: Ép xung CPU/GPU Level 6, Fix RAM Phantom, Tối ưu cảm ứng HyperOS.
+
+### 🔔 Fix Thông Báo
+1.  Vào mục **Fix Thông Báo 🔔**.
+2.  Chọn các ứng dụng bị trễ tin nhắn (Zalo, Messenger, Telegram...).
+3.  Tích chọn các option fix (Auto start, Battery No Limit) và nhấn **🚀 Bắt đầu tối ưu**.
 
 ---
 

@@ -138,24 +138,23 @@ class ThemeManager:
             """Slide widget from bottom"""
             from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QPoint
             
+            from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QPoint
+            
             start_pos = widget.pos()
             end_pos = start_pos
             start_pos_anim = QPoint(start_pos.x(), start_pos.y() + offset)
             
-            # Don't actually move the widget logic geometry, just visual if possible? 
-            # QPropertyAnimation on 'pos' moves the actual widget. 
-            # Safe for initialization.
+            widget.move(start_pos_anim)
             
-            # widget.move(start_pos_anim) # Set start
+            anim = QPropertyAnimation(widget, b"pos")
+            anim.setDuration(duration)
+            anim.setStartValue(start_pos_anim)
+            anim.setEndValue(end_pos)
+            anim.setEasingCurve(QEasingCurve.OutCubic)
+            anim.start()
             
-            # anim = QPropertyAnimation(widget, b"pos")
-            # anim.setDuration(duration)
-            # anim.setStartValue(start_pos_anim)
-            # anim.setEndValue(end_pos)
-            # anim.setEasingCurve(QEasingCurve.OutBack)
-            # anim.start()
-            # widget._slide_anim = anim
-            pass # Skipping complicated geometry anims for now to avoid layout fighting without a container
+            # Keep reference
+            widget._slide_anim = anim
             
     
     # ==================== HELPER METHODS ====================

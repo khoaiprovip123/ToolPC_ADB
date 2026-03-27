@@ -13,7 +13,8 @@ from src.ui.theme_manager import ThemeManager
 
 # Import sub-widgets
 from src.ui.widgets.xiaomi_optimizer import (
-    XiaomiDebloaterWidget, XiaomiAIOOptimizerWidget, XiaomiNotificationFixWidget
+    XiaomiDebloaterWidget, XiaomiAIOOptimizerWidget, XiaomiNotificationFixWidget,
+    XiaomiExpertTweaksWidget
 )
 from src.ui.widgets.ota_downloader import OTADownloaderWidget, HyperOSAppsWidget
 from src.ui.widgets.fastboot_toolbox import FastbootToolboxWidget
@@ -71,7 +72,8 @@ class XiaomiToolsPage(QWidget):
         # Define Tools
         tools = [
             (XiaomiDebloaterWidget, "Gỡ Ứng Dụng", "🗑️"),
-            (XiaomiAIOOptimizerWidget, "Tối Ưu & Tinh Chỉnh (AIO)", "✨"),
+            (XiaomiAIOOptimizerWidget, "Tối Ưu Hệ Thống", "✨"),
+            (XiaomiExpertTweaksWidget, "Tối Ưu Chuyên Sâu", "💀"),
             (XiaomiNotificationFixWidget, "Fix Thông Báo 🔔", "🔔"),
             (OTADownloaderWidget, "Tải ROM & OTA", "☁️"),
             (HyperOSAppsWidget, "Kho App HyperOS", "🛍️"),
@@ -83,6 +85,10 @@ class XiaomiToolsPage(QWidget):
         # Populate
         for widget_class, title, icon in tools:
             widget = widget_class(self.adb)
+            # Link back to parent page for navigation
+            if hasattr(widget, 'set_parent_page'):
+                widget.set_parent_page(self)
+            
             self.widgets.append(widget)
             self.stack.addWidget(widget)
             
@@ -93,6 +99,15 @@ class XiaomiToolsPage(QWidget):
             
         # Select first
         self.nav_list.setCurrentRow(0)
+        
+    def switch_to_tool(self, tool_title_fragment):
+        """Switch to a tool by searching for a fragment of its title"""
+        for i in range(self.nav_list.count()):
+            item = self.nav_list.item(i)
+            if tool_title_fragment.lower() in item.text().lower():
+                self.nav_list.setCurrentRow(i)
+                return True
+        return False
         
     def get_sidebar_style(self):
         theme = ThemeManager.get_theme()
