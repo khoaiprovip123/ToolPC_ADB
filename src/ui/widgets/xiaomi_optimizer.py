@@ -1015,6 +1015,8 @@ class XiaomiNotificationFixWidget(XiaomiBaseWidget):
             chk.setStyleSheet(ThemeManager.get_checkbox_style())
             opt_layout.addWidget(chk)
             
+        layout.addWidget(opt_panel)   # Fix: bị miss sau khi thêm preset panel
+            
         # --- Preset Buttons ---
         preset_panel = QFrame()
         preset_panel.setStyleSheet(f"background: transparent;")
