@@ -175,11 +175,19 @@ class Sidebar(QFrame):
     def apply_theme(self):
         theme = ThemeManager.get_theme()
         self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {theme['COLOR_GLASS_WHITE']};
-                border-right: 1px solid {theme['COLOR_BORDER']};
+            Sidebar {{
+                background-color: {theme['COLOR_BG_MAIN']}E6;
+                border-radius: {ThemeManager.RADIUS_CARD};
+                border: 0.5px solid {theme['COLOR_BORDER']};
             }}
         """)
+        
+        # Add elevation shadow for floating look
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(40)
+        shadow.setColor(QColor(0, 0, 0, 60))
+        shadow.setOffset(0, 10)
+        self.setGraphicsEffect(shadow)
     
     def add_group_label(self, text):
         theme = ThemeManager.get_theme()
@@ -408,8 +416,8 @@ class MainWindow(QMainWindow):
         QApplication.instance().installEventFilter(self)
 
         main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(20, 20, 20, 20) # Floating Margins
+        main_layout.setSpacing(20)
 
         # Sidebar
         self.sidebar = Sidebar()
@@ -417,12 +425,11 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(self.on_nav_clicked)
         main_layout.addWidget(self.sidebar)
 
-        # Content Area
+        # Content Area (Right Side)
         content_area = QWidget()
         content_layout = QVBoxLayout(content_area)
-        # Further reduced margins for 680px height compatibility
-        content_layout.setContentsMargins(10, 5, 10, 5)
-        content_layout.setSpacing(5)
+        content_layout.setContentsMargins(0, 0, 0, 0) # Content area margins handled by main_layout spacing
+        content_layout.setSpacing(20)
 
         # Header
         header = self.create_header()
@@ -459,9 +466,9 @@ class MainWindow(QMainWindow):
 
         # Add shadow
         shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 20))
-        shadow.setOffset(0, 4)
+        shadow.setBlurRadius(30)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        shadow.setOffset(0, 6)
         header.setGraphicsEffect(shadow)
 
         layout = QHBoxLayout(header)

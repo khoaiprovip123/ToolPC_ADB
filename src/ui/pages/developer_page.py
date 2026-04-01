@@ -98,8 +98,10 @@ class DeveloperPage(QWidget):
         theme = ThemeManager.get_theme()
         return f"""
             QFrame {{
-                background-color: {theme['COLOR_BG_SECONDARY']};
-                border-right: 1px solid {theme['COLOR_BORDER']};
+                background-color: {theme['COLOR_BG_SECONDARY']}40;
+                border-right: 0.5px solid {theme['COLOR_BORDER']};
+                border-radius: 20px;
+                margin-right: 15px;
             }}
         """
         
@@ -112,25 +114,26 @@ class DeveloperPage(QWidget):
                 outline: none;
             }}
             QListWidget::item {{
+                height: 48px;
                 background: transparent;
-                border-radius: 12px;
-                padding: 12px 15px;
-                margin-bottom: 4px;
+                border-radius: 14px;
+                padding-left: 15px;
+                margin-bottom: 6px;
                 color: {theme['COLOR_TEXT_SECONDARY']};
                 font-family: {ThemeManager.FONT_FAMILY};
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 500;
                 border: 1px solid transparent;
             }}
             QListWidget::item:hover {{
-                background: {theme['COLOR_GLASS_HOVER']};
+                background: {theme['COLOR_BG_SECONDARY']}80;
                 color: {theme['COLOR_TEXT_PRIMARY']};
             }}
             QListWidget::item:selected {{
-                background-color: {theme['COLOR_GLASS_WHITE']};
-                color: {ThemeManager.COLOR_ACCENT};
+                background: {ThemeManager.COLOR_ACCENT_GRADIENT};
+                color: white;
                 font-weight: 700;
-                border: 1px solid {theme['COLOR_BORDER_LIGHT']};
+                border: none;
             }}
         """
 

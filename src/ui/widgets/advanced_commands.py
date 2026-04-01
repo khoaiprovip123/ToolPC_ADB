@@ -8,11 +8,12 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QTabWidget,
     QPushButton, QLineEdit, QSpinBox, QComboBox, QTextEdit, QCheckBox,
     QGroupBox, QFormLayout, QGridLayout, QFileDialog, QMessageBox,
-    QScrollArea, QListWidget, QProgressBar
+    QScrollArea, QListWidget, QProgressBar, QApplication, QDialog
 )
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor
 from src.ui.theme_manager import ThemeManager
+from src.ui.dialogs.confirmation_dialog import ConfirmationDialog
 
 
 class CommandWorker(QThread):
@@ -101,6 +102,7 @@ class AdvancedCommandsWidget(QWidget):
         super().__init__()
         self.adb = adb_manager
         self.worker = None
+        self.current_btn = None
         self.setup_ui()
         
     def setup_ui(self):
@@ -198,17 +200,44 @@ class AdvancedCommandsWidget(QWidget):
         
     def setup_output_console(self, main_layout):
         """Setup output console at the bottom"""
+        # Output Toolbar
+        toolbar = QHBoxLayout()
+        toolbar.setContentsMargins(5, 0, 5, 0)
+        
+        out_lbl = QLabel("📜 Output Log")
+        out_lbl.setStyleSheet(f"font-weight: bold; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-size: 11px; text-transform: uppercase;")
+        toolbar.addWidget(out_lbl)
+        toolbar.addStretch()
+        
+        btn_clear = QPushButton("🗑️")
+        btn_clear.setToolTip("Xóa log")
+        btn_clear.setFixedSize(24, 24)
+        btn_clear.setStyleSheet(ThemeManager.get_ghost_button_style())
+        btn_clear.clicked.connect(lambda: self.output_console.clear())
+        toolbar.addWidget(btn_clear)
+        
+        btn_copy = QPushButton("📋")
+        btn_copy.setToolTip("Sao chép log")
+        btn_copy.setFixedSize(24, 24)
+        btn_copy.setStyleSheet(ThemeManager.get_ghost_button_style())
+        btn_copy.clicked.connect(self.copy_log)
+        toolbar.addWidget(btn_copy)
+        
+        main_layout.addLayout(toolbar)
+
         # Output console
         self.output_console = QTextEdit()
         self.output_console.setReadOnly(True)
         self.output_console.setMaximumHeight(150)
+        terminal_bg = "#0D1117" if ThemeManager.is_dark() else "#111827"
         self.output_console.setStyleSheet(f"""
-            background-color: #1e1e1e;
-            color: #00ff00;
+            background-color: {terminal_bg};
+            color: #E6EDF3;
             font-family: {ThemeManager.FONT_FAMILY_MONO};
             font-size: 12px;
-            border-radius: 8px;
-            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+            padding: 12px;
         """)
         self.output_console.setPlaceholderText("Output sẽ hiển thị ở đây...")
         main_layout.addWidget(self.output_console)
@@ -642,55 +671,74 @@ class AdvancedCommandsWidget(QWidget):
     def log(self, message):
         """Add message to output console"""
         self.output_console.append(message)
+        self.output_console.moveCursor(self.output_console.textCursor().MoveOperation.End)
         
-    def run_command(self, cmd_type, params):
+    def copy_log(self):
+        """Copy output to clipboard"""
+        QApplication.clipboard().setText(self.output_console.toPlainText())
+
+    def set_loading(self, loading, btn=None):
+        """Toggle loading state UI"""
+        self.tabs.setEnabled(not loading)
+        if btn:
+            btn.setEnabled(not loading)
+            if loading:
+                self._old_text = btn.text()
+                btn.setText("⏳ Đang chạy...")
+            else:
+                btn.setText(self._old_text)
+                
+    def run_command(self, cmd_type, params, btn=None):
         """Run command in background thread"""
         if self.worker and self.worker.isRunning():
-            self.log("⚠ Đang chạy lệnh khác...")
             return
+            
+        self.current_btn = btn
+        self.set_loading(True, btn)
             
         self.worker = CommandWorker(self.adb, cmd_type, params)
         self.worker.finished_signal.connect(self.on_command_finished)
         self.worker.start()
-        self.log(f"⏳ Đang thực thi {cmd_type}...")
+        self.log(f"\n$ {cmd_type} {params if params else ''}")
         
     def on_command_finished(self, success, result):
         """Handle command completion"""
+        self.set_loading(False, self.current_btn)
         if success:
-            self.log(f"✓ {result}")
+            self.log(f'<span style="color:#00FF00;">✓ {result}</span>')
         else:
-            self.log(f"✗ Lỗi: {result}")
+            self.log(f'<span style="color:red;">✗ Lỗi: {result}</span>')
             
     def do_tap(self):
-        self.run_command("tap", {"x": self.tap_x.value(), "y": self.tap_y.value()})
+        self.run_command("tap", {"x": self.tap_x.value(), "y": self.tap_y.value()}, self.sender())
         
     def do_swipe(self):
         self.run_command("swipe", {
             "x1": self.swipe_x1.value(), "y1": self.swipe_y1.value(),
             "x2": self.swipe_x2.value(), "y2": self.swipe_y2.value(),
             "duration": self.swipe_duration.value()
-        })
+        }, self.sender())
         
     def do_text_input(self):
-        self.run_command("text", {"text": self.input_text.text()})
+        self.run_command("text", {"text": self.input_text.text()}, self.sender())
         
     def do_keyevent(self, keycode):
-        self.run_command("keyevent", {"keycode": keycode})
+        self.run_command("keyevent", {"keycode": keycode}, self.sender())
         
     def do_broadcast(self):
         action = self.broadcast_combo.currentData()
-        self.run_command("broadcast", {"action": action})
+        self.run_command("broadcast", {"action": action}, self.sender())
         
     def do_custom_broadcast(self):
         action = self.custom_action.text()
         if action:
-            self.run_command("broadcast", {"action": action})
+            self.run_command("broadcast", {"action": action}, self.sender())
             
     def do_get_setting(self):
         self.run_command("get_setting", {
             "namespace": self.get_namespace.currentText(),
             "key": self.get_key.text()
-        })
+        }, self.sender())
         
     def do_put_setting(self):
         dlg = ConfirmationDialog(
@@ -702,15 +750,15 @@ class AdvancedCommandsWidget(QWidget):
             cancel_text="Hủy",
             warning_mode=True
         )
-        if dlg.exec_() == QDialog.Accepted:
+        if dlg.exec() == QDialog.Accepted:
             self.run_command("put_setting", {
                 "namespace": self.put_namespace.currentText(),
                 "key": self.put_key.text(),
                 "value": self.put_value.text()
-            })
+            }, self.sender())
             
     def do_immersive(self, mode):
-        self.run_command("immersive", {"mode": mode})
+        self.run_command("immersive", {"mode": mode}, self.sender())
         
     def do_selinux(self, enable):
         dlg = ConfirmationDialog(
@@ -722,8 +770,8 @@ class AdvancedCommandsWidget(QWidget):
             cancel_text="Hủy",
             warning_mode=True
         )
-        if dlg.exec_() == QDialog.Accepted:
-            self.run_command("selinux", {"enable": enable})
+        if dlg.exec() == QDialog.Accepted:
+            self.run_command("selinux", {"enable": enable}, self.sender())
             
     def do_verity(self, enable):
         dlg = ConfirmationDialog(
@@ -735,10 +783,15 @@ class AdvancedCommandsWidget(QWidget):
             cancel_text="Hủy",
             warning_mode=True
         )
-        if dlg.exec_() == QDialog.Accepted:
-            cmd = "enable-verity" if enable else "disable-verity"
-            result = self.adb.run_adb([cmd])
-            self.log(result if result else f"✓ {cmd} executed")
+        if dlg.exec() == QDialog.Accepted:
+            btn = self.sender()
+            self.set_loading(True, btn)
+            try:
+                cmd = "enable-verity" if enable else "disable-verity"
+                result = self.adb.run_adb([cmd])
+                self.log(f'<span style="color:#00FF00;">✓ {result if result else cmd + " executed"}</span>')
+            finally:
+                self.set_loading(False, btn)
             
     def browse_sideload_file(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -750,7 +803,7 @@ class AdvancedCommandsWidget(QWidget):
     def do_sideload(self):
         path = self.sideload_path.text()
         if not path:
-            LogManager.log("Lỗi", "Vui lòng chọn file update.zip trước khi sideload.", "error")
+            QMessageBox.critical(self, "Lỗi", "Vui lòng chọn file update.zip trước khi sideload.")
             return
             
         dlg = ConfirmationDialog(
@@ -762,21 +815,27 @@ class AdvancedCommandsWidget(QWidget):
             cancel_text="Hủy",
             warning_mode=True
         )
-        if dlg.exec_() == QDialog.Accepted:
-            result = self.adb.run_adb(["sideload", path])
-            self.log(result if result else "✓ Sideload started")
+        if dlg.exec() == QDialog.Accepted:
+            btn = self.sender()
+            self.set_loading(True, btn)
+            try:
+                self.log(f"\n$ adb sideload {path}")
+                result = self.adb.run_adb(["sideload", path])
+                self.log(f'<span style="color:#00FF00;">{result if result else "✓ Sideload started"}</span>')
+            finally:
+                self.set_loading(False, btn)
             
     def do_monkey(self):
         package = self.monkey_package.text()
         if not package:
-            LogManager.log("Lỗi", "Vui lòng nhập Package Name để chạy Monkey Test.", "error")
+            QMessageBox.warning(self, "Lỗi", "Vui lòng nhập Package Name để chạy Monkey Test.")
             return
             
         self.run_command("monkey", {
             "package": package,
             "events": self.monkey_events.value(),
             "verbose": self.monkey_verbose.isChecked()
-        })
+        }, self.sender())
         
     def reset(self):
         """Reset widget state"""

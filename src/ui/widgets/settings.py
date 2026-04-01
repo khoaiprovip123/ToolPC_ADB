@@ -51,9 +51,9 @@ class SettingsWidget(QWidget):
         tabs_container.setObjectName("PillsContainer")
         tabs_container.setStyleSheet(f"""
             #PillsContainer {{
-                background: rgba(45, 45, 45, 0.8);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 24px;
+                background: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}40;
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                border-radius: 20px;
                 padding: 4px;
             }}
         """)
@@ -81,21 +81,21 @@ class SettingsWidget(QWidget):
                 #PillTab {{
                     background-color: transparent;
                     border: none;
-                    border-radius: 16px;
-                    font-weight: 500;
-                    color: #B4B4B4;
-                    padding: 10px 24px;
-                    font-size: 14px;
+                    border-radius: 14px;
+                    font-weight: 600;
+                    color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']};
+                    padding: 8px 20px;
+                    font-size: 13px;
+                    font-family: {ThemeManager.FONT_FAMILY};
                 }}
                 #PillTab:checked {{
-                    background-color: {ThemeManager.COLOR_ACCENT};
+                    background: {ThemeManager.COLOR_ACCENT_GRADIENT};
                     color: white;
-                    font-weight: 600;
-                    border-radius: 16px;
+                    font-weight: 700;
                 }}
                 #PillTab:hover:!checked {{
-                    background-color: rgba(255, 255, 255, 0.05);
-                    color: #FFFFFF;
+                    background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}80;
+                    color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
                 }}
                 #PillTab:focus {{
                     outline: none;
@@ -144,11 +144,11 @@ class SettingsWidget(QWidget):
         card.setObjectName("SettingsCard")
         card.setStyleSheet(f"""
             #SettingsCard {{
-                background-color: {ThemeManager.get_theme()['COLOR_GLASS_CARD']};
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
                 border-radius: {ThemeManager.RADIUS_CARD};
             }}
-            QLabel {{ border: none; background: transparent; }}
+            QLabel {{ border: none; background: transparent; font-family: {ThemeManager.FONT_FAMILY}; }}
         """)
         
         layout = QVBoxLayout(card)
@@ -488,19 +488,23 @@ class SettingsWidget(QWidget):
 
         
     def get_group_style(self):
+        theme = ThemeManager.get_theme()
         return f"""
             QGroupBox {{
-                background-color: {ThemeManager.COLOR_GLASS_WHITE};
-                border: 1px solid rgba(0,0,0,0.1);
-                border-radius: {ThemeManager.RADIUS_BUTTON};
-                margin-top: 10px;
-                padding: 15px;
-                color: {ThemeManager.COLOR_TEXT_PRIMARY};
-                font-weight: bold;
+                background-color: {theme['COLOR_GLASS_WHITE']};
+                border: 0.5px solid {theme['COLOR_BORDER']};
+                border-radius: {ThemeManager.RADIUS_CARD};
+                margin-top: 15px;
+                padding: 20px;
+                color: {ThemeManager.COLOR_ACCENT};
+                font-family: {ThemeManager.FONT_FAMILY};
+                font-weight: 800;
+                font-size: 11px;
+                text-transform: uppercase;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
+                left: 20px;
                 padding: 0 5px;
             }}
         """

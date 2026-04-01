@@ -94,8 +94,8 @@ class LogcatViewerWidget(QWidget):
         tools_group.setStyleSheet(f"""
             #LogcatToolsPanel {{
                 background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
-                border-radius: {ThemeManager.RADIUS_BUTTON};
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                border-radius: {ThemeManager.RADIUS_CARD};
                 margin-top: 10px;
             }}
             QLabel {{ border: none; background: transparent; }}
@@ -165,12 +165,12 @@ class LogcatViewerWidget(QWidget):
         self.log_view.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {ThemeManager.COLOR_GLASS_CARD};
-                border: 1px solid rgba(0,0,0,0.1);
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
                 border-radius: {ThemeManager.RADIUS_CARD};
-                font-family: 'Consolas', 'Courier New', monospace;
+                font-family: {ThemeManager.FONT_FAMILY_MONO};
                 font-size: 11px;
-                padding: 10px;
-                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+                padding: 15px;
+                color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
             }}
         """)
         layout.addWidget(self.log_view)
@@ -273,18 +273,19 @@ class LogcatViewerWidget(QWidget):
             # Colorize
             color = ThemeManager.COLOR_TEXT_PRIMARY
             
+            # Updated Pastel Colors for Vibe 2.0
             if " E " in text or " F " in text or "/E" in text or "/F" in text: 
-                color = "#FF5252" # Red
+                color = "#FF8080" # Soft Red
             elif " W " in text or "/W" in text: 
-                color = "#FFAB40" # Orange
+                color = "#FFB366" # Soft Orange
             elif " D " in text or "/D" in text: 
-                color = "#448AFF" # Blue
+                color = "#80B3FF" # Soft Blue
             elif " I " in text or "/I" in text: 
-                color = "#69F0AE" # Green
+                color = "#80FFB3" # Soft Green
                 
             if "exception" in text.lower() or "crash" in text.lower() or "fatal" in text.lower():
                 text = f"<b>{text}</b>"
-                color = "#FF1744" # Deep Red
+                color = "#FF4D6D" # Vibrant Soft Red
             
             html_lines.append(f'<span style="color:{color}">{text}</span>')
             

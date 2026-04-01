@@ -20,15 +20,15 @@ def create_empty_state() -> QWidget:
     layout.setSpacing(8)
 
     icon = QLabel("🔔")
-    icon.setStyleSheet("font-size: 48px; color: rgba(0,0,0,0.15);")
+    icon.setStyleSheet(f"font-size: 48px; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}40; background: transparent; border: none;")
     icon.setAlignment(Qt.AlignCenter)
 
     text1 = QLabel("Không có thông báo")
-    text1.setStyleSheet("font-size: 15px; font-weight: 600; color: #888;")
+    text1.setStyleSheet(f"font-size: 16px; font-weight: 800; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-family: {ThemeManager.FONT_FAMILY}; background: transparent; border: none;")
     text1.setAlignment(Qt.AlignCenter)
 
-    text2 = QLabel("Tất cả đều đã xong!")
-    text2.setStyleSheet("font-size: 13px; font-weight: 400; color: #aaa;")
+    text2 = QLabel("Tất cả đều đã xử lý xong!")
+    text2.setStyleSheet(f"font-size: 13px; font-weight: 400; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}80; font-family: {ThemeManager.FONT_FAMILY}; background: transparent; border: none;")
     text2.setAlignment(Qt.AlignCenter)
 
     layout.addWidget(icon)
@@ -56,26 +56,26 @@ def create_notification_card(parent: QWidget, notif_type: str, message: str,
         timestamp = dt.now()
 
     gradients = {
-        'success': ('qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #10b981, stop:1 #34d399)',
-                    QColor(16, 185, 129, 70), '✓', '#10b981'),
-        'error':   ('qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ef4444, stop:1 #f87171)',
-                    QColor(239, 68, 68, 70), '✗', '#ef4444'),
+        'success': (ThemeManager.COLOR_SUCCESS_GRADIENT,
+                    QColor(16, 185, 129, 60), '✓', ThemeManager.COLOR_SUCCESS),
+        'error':   (ThemeManager.COLOR_ERROR_GRADIENT,
+                    QColor(239, 68, 68, 60), '✗', ThemeManager.COLOR_ERROR),
         'warning': ('qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f59e0b, stop:1 #fbbf24)',
-                    QColor(245, 158, 11, 70), '⚠', '#f59e0b'),
-        'info':    ('qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3b82f6, stop:1 #60a5fa)',
-                    QColor(59, 130, 246, 70), 'ℹ', '#3b82f6'),
+                    QColor(245, 158, 11, 50), '⚠', '#f59e0b'),
+        'info':    (ThemeManager.COLOR_ACCENT_GRADIENT,
+                    QColor(59, 130, 246, 50), 'ℹ', ThemeManager.COLOR_ACCENT),
     }
     gradient, shadow_color, icon_text, _border = gradients.get(notif_type, gradients['info'])
 
     card = QFrame()
-    card.setMinimumHeight(80)
-    card.setMaximumHeight(120)
+    card.setMinimumHeight(85)
+    card.setMaximumHeight(130)
     card.setCursor(Qt.PointingHandCursor)
     card.setStyleSheet(f"""
         QFrame {{
             background: {gradient};
-            border-radius: 12px;
-            border: none;
+            border-radius: 18px;
+            border: 0.5px solid rgba(255,255,255,0.2);
         }}
     """)
 
@@ -107,16 +107,17 @@ def create_notification_card(parent: QWidget, notif_type: str, message: str,
 
     # Content
     content_layout = QVBoxLayout()
-    content_layout.setSpacing(4)
+    content_layout.setSpacing(2)
 
     time_str = timestamp.strftime("%H:%M %p")
     header_row = QHBoxLayout()
     header_row.setSpacing(10)
 
     title_label = QLabel(title.upper())
-    title_label.setStyleSheet("""
+    title_label.setStyleSheet(f"""
         font-size: 11px; font-weight: 800; color: rgba(255,255,255,0.95);
         background: transparent; letter-spacing: 0.5px;
+        font-family: {ThemeManager.FONT_FAMILY};
     """)
     header_row.addWidget(title_label)
     header_row.addStretch()
@@ -161,9 +162,10 @@ def create_notification_card(parent: QWidget, notif_type: str, message: str,
     msg_label.setText(elided)
     msg_label.setTextFormat(Qt.RichText)
     msg_label.setOpenExternalLinks(False)
-    msg_label.setStyleSheet("""
+    msg_label.setStyleSheet(f"""
         font-size: 13px; font-weight: 600; color: white;
         background: transparent; line-height: 1.4;
+        font-family: {ThemeManager.FONT_FAMILY};
     """)
 
     if is_truncated:

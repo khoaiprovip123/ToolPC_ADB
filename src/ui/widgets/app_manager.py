@@ -43,9 +43,9 @@ class SoftDialog(QDialog):
         self.container.setObjectName("SoftDialogContainer")
         self.container.setStyleSheet(f"""
             #SoftDialogContainer {{
-                background-color: {ThemeManager.get_theme()['COLOR_BG_MAIN']};
-                border-radius: 20px;
-                border: 1px solid {ThemeManager.COLOR_BORDER_LIGHT};
+                background-color: {ThemeManager.get_theme()['COLOR_DIALOG_BG']};
+                border-radius: 24px;
+                border: 0.5px solid {ThemeManager.COLOR_BORDER};
             }}
             QLabel {{
                 border: none;
@@ -153,12 +153,12 @@ class ModernAppRow(QFrame):
         self.setStyleSheet(f"""
             #ModernAppRow {{
                 background-color: {ThemeManager.COLOR_GLASS_WHITE};
-                border-radius: 18px; /* Softer */
-                border: 1px solid {ThemeManager.COLOR_BORDER_LIGHT};
+                border-radius: 20px;
+                border: 0.5px solid {ThemeManager.COLOR_BORDER_LIGHT};
             }}
             #ModernAppRow:hover {{
-                background-color: {ThemeManager.COLOR_GLASS_HOVER};
-                border: 1px solid {ThemeManager.COLOR_BORDER};
+                background-color: {ThemeManager.COLOR_BG_SECONDARY}40;
+                border: 0.5px solid {ThemeManager.COLOR_ACCENT}40;
             }}
             QLabel {{
                 border: none;
@@ -323,11 +323,15 @@ class AppManagerWidget(QWidget):
             QLineEdit {{
                 background-color: {ThemeManager.COLOR_GLASS_WHITE};
                 border: 1px solid {ThemeManager.COLOR_BORDER};
-                border-radius: 25px; /* Softer */
+                border-radius: 25px; 
                 padding-left: 20px;
-                font-size: 15px;
+                font-size: 14px;
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
-            QLineEdit:focus {{ border: 2px solid {ThemeManager.COLOR_ACCENT}; }}
+            QLineEdit:focus {{ 
+                border: 1px solid {ThemeManager.COLOR_ACCENT}; 
+                background-color: {ThemeManager.COLOR_BG_MAIN};
+            }}
         """)
         self.search_input.textChanged.connect(lambda: self.search_timer.start(500))  # Increased from 300ms to 500ms
         
@@ -438,10 +442,10 @@ class AppManagerWidget(QWidget):
         self.btn_batch_uninstall.setEnabled(False)
         self.btn_batch_uninstall.setStyleSheet(f"""
             QPushButton {{
-                background-color: {ThemeManager.COLOR_PURPLE};
-                color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 11px;
+                background: {ThemeManager.COLOR_ACCENT_GRADIENT};
+                color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 11px;
             }}
-            QPushButton:disabled {{ background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }}
+            QPushButton:disabled {{ background: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; opacity: 0.5; }}
             QPushButton:hover {{ opacity: 0.9; }}
         """)
         self.btn_batch_uninstall.clicked.connect(self.handle_batch_uninstall)

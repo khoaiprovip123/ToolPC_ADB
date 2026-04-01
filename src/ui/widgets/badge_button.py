@@ -17,10 +17,10 @@ class NotifBadgeButton(QWidget):
 
     # Màu badge theo log level (error > warning > info = success = default)
     BADGE_COLORS = {
-        "error":   "#EF4444",  # Đỏ
-        "warning": "#F59E0B",  # Vàng
-        "info":    "#3B82F6",  # Xanh dương
-        "success": "#10B981",  # Xanh lá
+        "error":   "#FF4B2B",  # Modern Red Gradient Start
+        "warning": "#F59E0B",  # Orange
+        "info":    "#007AFF",  # iOS Blue
+        "success": "#34C759",  # iOS Green
     }
 
     def __init__(self, icon_path: str = "", tooltip: str = "", parent=None):
@@ -68,13 +68,17 @@ class NotifBadgeButton(QWidget):
         self.btn.setStyleSheet(ThemeManager.get_icon_button_style())
 
     def _update_badge_style(self):
-        color = self.BADGE_COLORS.get(self._highest_level, "#EF4444")
+        color = self.BADGE_COLORS.get(self._highest_level, "#FF4B2B")
         self.badge.setStyleSheet(f"""
-            background-color: {color};
-            color: white;
-            border-radius: 9px;
-            font-size: 10px;
-            font-weight: 700;
+            QLabel {{
+                background-color: {color};
+                color: white;
+                border-radius: 9px;
+                font-size: 10px;
+                font-weight: 800;
+                border: 0.5px solid rgba(255,255,255,0.4);
+                font-family: 'Outfit', sans-serif;
+            }}
         """)
 
     def increment(self, level: str = "info"):

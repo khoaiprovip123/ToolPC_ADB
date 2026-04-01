@@ -29,9 +29,9 @@ class GlassFrame(QFrame):
         super().__init__(parent)
         self.setStyleSheet(f"""
             GlassFrame {{
-                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}CC; /* 80% Opacity */
-                border-radius: 12px;
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border-radius: {ThemeManager.RADIUS_CARD};
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
             }}
         """)
 
@@ -86,19 +86,20 @@ class BreadcrumbBar(QWidget):
         btn.setProperty("path", path)
         btn.setCursor(Qt.PointingHandCursor)
         btn.clicked.connect(lambda: self.path_clicked.emit(btn.property("path")))
-        btn.setStyleSheet("""
-            QPushButton {
+        btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
                 border: none;
-                border-radius: 4px;
-                padding: 4px 8px;
-                color: #3B82F6; /* Blue-500 */
+                border-radius: 8px;
+                padding: 4px 10px;
+                color: {ThemeManager.COLOR_ACCENT};
                 font-weight: 600;
                 font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #EFF6FF; /* Blue-50 */
-            }
+                font-family: {ThemeManager.FONT_FAMILY};
+            }}
+            QPushButton:hover {{
+                background-color: {ThemeManager.COLOR_ACCENT}20;
+            }}
         """)
         return btn
 
@@ -343,21 +344,22 @@ class FileManagerWidget(QWidget):
                 outline: none;
             }}
             QListWidget::item {{
-                height: 38px;
+                height: 42px;
                 padding-left: 10px;
-                border-radius: 6px;
+                border-radius: 12px;
                 margin-left: 10px; 
                 margin-right: 10px;
-                margin-bottom: 2px;
+                margin-bottom: 4px;
                 color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
             QListWidget::item:hover {{
-                background-color: {ThemeManager.get_theme()['COLOR_GLASS_HOVER']};
+                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}80;
             }}
             QListWidget::item:selected {{
-                background-color: {ThemeManager.COLOR_ACCENT}20; /* 20% opacity */
-                color: {ThemeManager.COLOR_ACCENT};
-                font-weight: 600;
+                background: {ThemeManager.COLOR_ACCENT_GRADIENT};
+                color: white;
+                font-weight: 700;
             }}
         """)
         self.sidebar.itemClicked.connect(self.on_sidebar_click)
@@ -442,11 +444,11 @@ class FileManagerWidget(QWidget):
         self.btn_view_grid.clicked.connect(lambda: self.set_view_mode('grid'))
         
         for btn in [self.btn_view_list, self.btn_view_grid]:
-            btn.setFixedSize(30, 26)
+            btn.setFixedSize(32, 28)
             btn.setStyleSheet(f"""
-                QPushButton {{ border: none; border-radius: 4px; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; }}
-                QPushButton:checked {{ background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']}; color: {ThemeManager.COLOR_ACCENT}; }}
-                QPushButton:hover {{ color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']}; }}
+                QPushButton {{ border: none; border-radius: 10px; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-size: 16px; }}
+                QPushButton:checked {{ background-color: {ThemeManager.COLOR_ACCENT}; color: white; }}
+                QPushButton:hover {{ background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}; }}
             """)
             toggle_layout.addWidget(btn)
             

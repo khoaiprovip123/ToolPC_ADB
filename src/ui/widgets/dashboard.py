@@ -35,17 +35,18 @@ class StatCard(QFrame):
         
         self.setStyleSheet(f"""
             #StatCard {{
-                background-color: {theme['COLOR_GLASS_CARD']};
-                border-radius: 24px;
-                border: 1px solid {theme['COLOR_BORDER_LIGHT']};
+                background-color: {theme['COLOR_GLASS_WHITE']};
+                border-radius: {ThemeManager.RADIUS_CARD};
+                border: 0.5px solid {theme['COLOR_BORDER']};
             }}
             #StatCard:hover {{
-                border: 1px solid {gradient_stops[0]}; /* Border color on hover */
-                background-color: {theme['COLOR_GLASS_HOVER']};
+                border: 0.5px solid {gradient_stops[0]}80; 
+                background-color: {theme['COLOR_BG_MAIN']};
             }}
             QLabel {{
                 background: transparent;
                 border: none;
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
         """)
         
@@ -89,27 +90,22 @@ class StatCard(QFrame):
         else:
             icon_lbl.setText(icon if icon else "📌")
             
-        # Title
+        # Title (Nâng cấp Font)
         title_lbl = QLabel(title)
-        title_lbl.setStyleSheet(f"color: {theme['COLOR_TEXT_SECONDARY']}; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; background: transparent; border: none;")
+        title_lbl.setStyleSheet(f"color: {theme['COLOR_TEXT_SECONDARY']}; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; background: transparent; border: none; opacity: 0.7;")
         
         h_layout.addWidget(icon_bg)
-        h_layout.addSpacing(5) # Space between icon and text if we want side-by-side, but let's do vertical alignment or just keep row
-        
-        # Vertical layout for Title + Value ? No, kept layout similar but cleaner.
-        # Let's put Title next to Icon? Or above Value?
-        # User Image shows Icon | Title .............. Value
-        # New Design: Icon (Left) ...... Right: (Title (Top), Value (Bottom))
+        h_layout.addSpacing(5) 
         
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(2)
+        info_layout.setSpacing(1)
         info_layout.setAlignment(Qt.AlignVCenter)
         
         info_layout.addWidget(title_lbl)
         
-        # Value (Big & Bold)
+        # Value (Siêu đậm cho Bento)
         self.value_lbl = QLabel(value)
-        self.value_lbl.setStyleSheet(f"color: {theme['COLOR_TEXT_PRIMARY']}; font-size: 28px; font-weight: 800; background: transparent; border: none;")
+        self.value_lbl.setStyleSheet(f"color: {theme['COLOR_TEXT_PRIMARY']}; font-size: 26px; font-weight: 800; letter-spacing: -1px; background: transparent; border: none;")
         self.value_lbl.setWordWrap(True)
         info_layout.addWidget(self.value_lbl)
         
@@ -165,17 +161,18 @@ class SpecItem(QFrame):
         self.setMinimumHeight(70) # Allow expansion
         self.setStyleSheet(f"""
             #SpecItem {{
-                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}40; /* Very light bg */
-                border-radius: 12px;
-                border: 1px solid transparent;
+                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}40;
+                border-radius: 18px;
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
             }}
             #SpecItem:hover {{
                 background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}80;
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+                border: 0.5px solid {ThemeManager.COLOR_ACCENT}40;
             }}
             QLabel {{
                 border: none;
                 background: transparent;
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
         """)
         
@@ -343,13 +340,14 @@ class DashboardWidget(QWidget):
         self.hero.setStyleSheet(f"""
             #HeroFrame {{
                 background: {hero_bg};
-                border-radius: 20px;
-                border: 1px solid {border_color};
+                border-radius: {ThemeManager.RADIUS_CARD};
+                border: 0.5px solid {border_color};
             }}
             QLabel {{
                 border: none;
                 background: transparent;
                 color: {text_color};
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
         """)
         # Shadow
@@ -394,7 +392,7 @@ class DashboardWidget(QWidget):
         
         self.time_lbl = QLabel("--:--:--")
         sub_text_color = "rgba(0, 51, 102, 0.5)" if not ThemeManager.is_dark() else "rgba(255, 255, 255, 0.4)"
-        self.time_lbl.setStyleSheet(f"font-size: 16px; color: {sub_text_color}; font-weight: 600; font-family: 'Consolas', monospace;")
+        self.time_lbl.setStyleSheet(f"font-size: 16px; color: {sub_text_color}; font-weight: 700; font-family: {ThemeManager.FONT_FAMILY};")
         
         title_row.addWidget(self.device_name_lbl)
         title_row.addStretch()
@@ -445,17 +443,18 @@ class DashboardWidget(QWidget):
         btn_mirror.setFixedHeight(50)
         btn_mirror.setStyleSheet(f"""
             QPushButton {{
-                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #2980b9, stop:1 #6dd5fa);
+                background: {ThemeManager.COLOR_ACCENT_GRADIENT};
                 color: white;
-                border-radius: 12px;
+                border-radius: 14px;
                 font-weight: 700;
                 font-size: 13px;
                 padding: 0 20px;
-                border: none;
+                border: 0.5px solid rgba(255,255,255,0.2);
                 text-align: left;
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
             QPushButton:hover {{ 
-                 background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #3498db, stop:1 #87e0fd);
+                 opacity: 0.9;
             }}
         """)
         btn_mirror.clicked.connect(self.launch_scrcpy) 
@@ -492,12 +491,13 @@ class DashboardWidget(QWidget):
             QPushButton {{
                 background-color: rgba(255, 255, 255, 0.08);
                 color: rgba(255, 255, 255, 0.75);
-                border-radius: 12px;
+                border-radius: 14px;
                 font-weight: 600;
                 font-size: 12px;
                 padding: 0 15px;
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                border: 0.5px solid rgba(255, 255, 255, 0.12);
                 text-align: left;
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
             QPushButton:hover {{
                 background-color: rgba(255, 255, 255, 0.15);
@@ -644,28 +644,34 @@ class DashboardWidget(QWidget):
                         break
         
     def setup_stats_grid(self):
-        """2x2 Grid of Stat Cards"""
+        """Bento Layout: 3 Columns with various spans"""
         if hasattr(self, 'stats_added'): return
         self.stats_added = True
         
         grid = QGridLayout()
-        grid.setSpacing(20)
+        grid.setSpacing(18)
         
+        # ROW 0: 3 Columns
         # RAM Card (Deep Blue Gradient)
-        self.card_ram = StatCard("RAM", "Đang tải...", self.get_icon_path("ram.png"), ["#00c6ff", "#0072ff"])
+        self.card_ram = StatCard("RAM Use", "Loading...", self.get_icon_path("ram.png"), ["#00c6ff", "#0072ff"])
         grid.addWidget(self.card_ram, 0, 0)
         
         # CPU Card (Rich Purple Gradient)
-        self.card_cpu = StatCard("CPU", "Đang tải...", self.get_icon_path("cpu.png"), ["#8E2DE2", "#4A00E0"])
+        self.card_cpu = StatCard("CPU Load", "Loading...", self.get_icon_path("cpu.png"), ["#8E2DE2", "#4A00E0"])
         grid.addWidget(self.card_cpu, 0, 1)
         
-        # Android (Luscious Green Gradient)
-        self.card_android = StatCard("Android", "Đang tải...", self.get_icon_path("android.png"), ["#11998e", "#38ef7d"])
-        grid.addWidget(self.card_android, 1, 0)
+        # Storage Card (New in Row 0)
+        self.card_storage = StatCard("Storage", "Loading...", self.get_icon_path("files.png"), ["#f9d423", "#ff4e50"])
+        grid.addWidget(self.card_storage, 0, 2)
         
-        # OS Version (Sunset Orange Gradient)
-        self.card_os = StatCard("Hệ điều hành", "Đang tải...", self.get_icon_path("shield.png"), ["#FF416C", "#FF4B2B"])
-        grid.addWidget(self.card_os, 1, 1)
+        # ROW 1: Variation
+        # Android Version (Spans 2 columns)
+        self.card_android = StatCard("Android", "Loading...", self.get_icon_path("android.png"), ["#11998e", "#38ef7d"])
+        grid.addWidget(self.card_android, 1, 0, 1, 2)
+        
+        # OS Version (Last column)
+        self.card_os = StatCard("System OS", "Loading...", self.get_icon_path("shield.png"), ["#FF416C", "#FF4B2B"])
+        grid.addWidget(self.card_os, 1, 2)
         
         self.content_layout.addLayout(grid)
         
@@ -679,8 +685,8 @@ class DashboardWidget(QWidget):
         self.details_card.setStyleSheet(f"""
             QFrame#details_card {{
                 background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
-                border-radius: 20px;
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER_LIGHT']};
+                border-radius: {ThemeManager.RADIUS_CARD};
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
             }}
         """)
         layout = QVBoxLayout(self.details_card)
@@ -997,6 +1003,15 @@ class DashboardWidget(QWidget):
             
             batt = info.get("battery_level", 0)
             self.batt_lbl.setText(f"{batt}%")
+            
+            # Android & OS
+            self.card_android.update_value(f"Phiên bản {info.get('android_version', '--')}")
+            self.card_os.update_value(info.get('os_version', 'Unknown OS'))
+            
+            # New Storage Card
+            storage_total = info.get('storage_total', '0')
+            storage_free = info.get('storage_free', '0')
+            self.card_storage.update_value(f"{storage_free}G / {storage_total}G")
             
             android_ver = info.get("android_version", "--")
             self.android_badge.setText(f" ANDROID {android_ver} ")

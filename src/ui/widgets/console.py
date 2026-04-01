@@ -7,9 +7,9 @@ Style: Glassmorphism
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTextEdit, QLineEdit, QGroupBox, QTreeWidget, QTreeWidgetItem,
-    QFrame, QMessageBox, QSplitter
+    QFrame, QMessageBox, QSplitter, QProgressBar, QApplication
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 from src.ui.theme_manager import ThemeManager
 
 class ConsoleWidget(QWidget):
@@ -22,7 +22,8 @@ class ConsoleWidget(QWidget):
         super().__init__()
         self.adb = adb_manager
         self.history = []
-        self.history_index = 0
+        self.history_index = -1
+        self.auto_scroll = True
         
         self.setup_ui()
         
@@ -38,8 +39,9 @@ class ConsoleWidget(QWidget):
         sidebar_container.setFixedWidth(300)
         sidebar_container.setStyleSheet(f"""
             #sidebar_console {{
-                background-color: {ThemeManager.COLOR_GLASS_WHITE};
-                border-right: 1px solid {ThemeManager.COLOR_BORDER};
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border-radius: {ThemeManager.RADIUS_CARD};
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
             }}
         """)
         sidebar_layout = QVBoxLayout(sidebar_container)
@@ -60,22 +62,24 @@ class ConsoleWidget(QWidget):
                 background: transparent;
                 border: none;
                 font-size: 13px;
-                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+                color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
                 outline: none;
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
             QTreeWidget::item {{
-                padding: 6px;
-                border-radius: 6px;
-                margin-bottom: 2px;
+                height: 36px;
+                padding-left: 10px;
+                border-radius: 10px;
+                margin-bottom: 4px;
                 border: none;
             }}
             QTreeWidget::item:hover {{
-                background-color: {ThemeManager.COLOR_GLASS_HOVER};
+                background-color: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}80;
             }}
             QTreeWidget::item:selected {{
-                background-color: {ThemeManager.COLOR_ACCENT}20;
-                color: {ThemeManager.COLOR_ACCENT};
-                border: 1px solid {ThemeManager.COLOR_ACCENT}50;
+                background: {ThemeManager.COLOR_ACCENT_GRADIENT};
+                color: white;
+                font-weight: 700;
             }}
         """)
         self.cmd_tree.itemDoubleClicked.connect(self.on_quick_command_clicked)
@@ -104,17 +108,57 @@ class ConsoleWidget(QWidget):
         content_layout = QVBoxLayout()
         content_layout.setSpacing(10)
         
+        # --- Console Toolbar ---
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setContentsMargins(5, 0, 5, 0)
+        
+        console_lbl = QLabel("🖥️ ADB Console")
+        console_lbl.setStyleSheet(f"font-weight: bold; color: {ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']}; font-size: 12px; border: none; background: transparent;")
+        toolbar_layout.addWidget(console_lbl)
+        toolbar_layout.addStretch()
+        
+        # Clear Button
+        self.btn_clear = QPushButton("🗑️ Clear")
+        self.btn_clear.setToolTip("Xóa sạch log")
+        self.btn_clear.setCursor(Qt.PointingHandCursor)
+        self.btn_clear.setStyleSheet(ThemeManager.get_ghost_button_style())
+        self.btn_clear.clicked.connect(self.clear_log)
+        toolbar_layout.addWidget(self.btn_clear)
+        
+        # Copy Button
+        self.btn_copy = QPushButton("📋 Copy")
+        self.btn_copy.setToolTip("Sao chép toàn bộ log")
+        self.btn_copy.setCursor(Qt.PointingHandCursor)
+        self.btn_copy.setStyleSheet(ThemeManager.get_ghost_button_style())
+        self.btn_copy.clicked.connect(self.copy_log)
+        toolbar_layout.addWidget(self.btn_copy)
+        
+        # Auto-scroll Toggle
+        self.btn_scroll = QPushButton("⚓ Scroll: ON")
+        self.btn_scroll.setToolTip("Bật/Tắt tự động cuộn")
+        self.btn_scroll.setCheckable(True)
+        self.btn_scroll.setChecked(True)
+        self.btn_scroll.setCursor(Qt.PointingHandCursor)
+        self.btn_scroll.setStyleSheet(ThemeManager.get_ghost_button_style())
+        self.btn_scroll.clicked.connect(self.toggle_autoscroll)
+        toolbar_layout.addWidget(self.btn_scroll)
+        
+        content_layout.addLayout(toolbar_layout)
+
         # Log Output Area
         self.output_area = QTextEdit()
         self.output_area.setReadOnly(True)
+        terminal_bg = "#0D1117" if ThemeManager.is_dark() else "#111827" # Deep Night Blue
         self.output_area.setStyleSheet(f"""
             QTextEdit {{
-                background-color: {ThemeManager.COLOR_GLASS_CARD};
-                color: {ThemeManager.COLOR_TEXT_PRIMARY};
+                background-color: {terminal_bg};
+                color: #E6EDF3;
                 border-radius: {ThemeManager.RADIUS_CARD};
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
-                padding: 10px;
-                font-family: Consolas, monospace;
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                padding: 15px;
+                font-family: {ThemeManager.FONT_FAMILY_MONO};
+                font-size: 13px;
+                selection-background-color: {ThemeManager.COLOR_ACCENT}40;
             }}
         """)
         content_layout.addWidget(self.output_area)
@@ -124,9 +168,9 @@ class ConsoleWidget(QWidget):
         input_container.setObjectName("input_console")
         input_container.setStyleSheet(f"""
             #input_console {{
-                background-color: {ThemeManager.COLOR_GLASS_WHITE};
-                border-radius: 12px;
-                border: 1px solid {ThemeManager.COLOR_BORDER};
+                background-color: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
+                border-radius: 25px; 
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
             }}
         """)
         input_layout = QHBoxLayout(input_container)
@@ -136,15 +180,23 @@ class ConsoleWidget(QWidget):
         self.input_field.setPlaceholderText("Nhập lệnh ADB (VD: shell pm list packages)...")
         self.input_field.setStyleSheet("background: transparent; border: none; padding: 5px;")
         self.input_field.returnPressed.connect(self.execute_command)
+        self.input_field.installEventFilter(self) # For History Navigation
         input_layout.addWidget(self.input_field)
         
-        send_btn = QPushButton("Gửi")
-        send_btn.setCursor(Qt.PointingHandCursor)
-        send_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
-        send_btn.clicked.connect(self.execute_command)
-        input_layout.addWidget(send_btn)
+        self.send_btn = QPushButton("Gửi")
+        self.send_btn.setCursor(Qt.PointingHandCursor)
+        self.send_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
+        self.send_btn.clicked.connect(self.execute_command)
+        input_layout.addWidget(self.send_btn)
         
         content_layout.addWidget(input_container)
+        
+        # Mini Progress Bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setStyleSheet(ThemeManager.get_progress_bar_style("mini"))
+        self.progress_bar.setRange(0, 0) # Indeterminate
+        self.progress_bar.hide()
+        content_layout.addWidget(self.progress_bar)
         
         # Tips Label
         tips_lbl = QLabel("💡 Click đúp vào lệnh bên trái để chạy an toàn.")
@@ -247,35 +299,87 @@ class ConsoleWidget(QWidget):
         cmd_disp = " ".join(cmd_list)
         self.append_log(f"\n$ {cmd_disp}", "#00FF00")
         
+        self.set_loading(True)
         try:
              res = self.adb.execute(cmd_list)
              self.append_log(res)
         except Exception as e:
              self.append_log(f"Error: {str(e)}", "red")
+        finally:
+             self.set_loading(False)
              
     def execute_command(self):
         """Execute command from input field (Legacy/Manual)"""
         cmd = self.input_field.text().strip()
         if not cmd: return
             
-        self.history.append(cmd)
-        self.history_index = len(self.history)
+        # Add to history if not duplicate and not empty
+        if not self.history or self.history[-1] != cmd:
+            self.history.append(cmd)
+        self.history_index = -1
         
         self.append_log(f"\n$ {cmd}", "#00FF00")
         
         # Basic Safety Filter
         if any(x in cmd for x in ["rm -rf", "mkfs"]):
              self.append_log("❌ Lệnh này bị chặn bởi bộ lọc an toàn.", "red")
+             self.input_field.clear()
              return
 
+        self.set_loading(True)
         try:
             # Still use string input for manual typing (ADBManager handles it)
             result = self.adb.execute(cmd)
             self.append_log(result)
         except Exception as e:
             self.append_log(f"Error: {str(e)}", "red")
+        finally:
+            self.set_loading(False)
             
         self.input_field.clear()
+
+    def set_loading(self, loading):
+        """Toggle loading state UI"""
+        self.progress_bar.setVisible(loading)
+        self.send_btn.setEnabled(not loading)
+        if loading:
+            self.send_btn.setText("...")
+        else:
+            self.send_btn.setText("Gửi")
+
+    def eventFilter(self, source, event):
+        """Handle Arrow Keys for History Navigation"""
+        if source == self.input_field and event.type() == QEvent.KeyPress:
+            if event.key() == Qt.Key_Up:
+                if self.history:
+                    if self.history_index == -1:
+                        self.history_index = len(self.history) - 1
+                    elif self.history_index > 0:
+                        self.history_index -= 1
+                    self.input_field.setText(self.history[self.history_index])
+                return True
+            elif event.key() == Qt.Key_Down:
+                if self.history:
+                    if self.history_index != -1 and self.history_index < len(self.history) - 1:
+                        self.history_index += 1
+                        self.input_field.setText(self.history[self.history_index])
+                    else:
+                        self.history_index = -1
+                        self.input_field.clear()
+                return True
+        return super().eventFilter(source, event)
+
+    def clear_log(self):
+        self.output_area.clear()
+        self.append_log("✨ Console cleared.")
+
+    def copy_log(self):
+        QApplication.clipboard().setText(self.output_area.toPlainText())
+        # Notification could be added here if available
+
+    def toggle_autoscroll(self):
+        self.auto_scroll = self.btn_scroll.isChecked()
+        self.btn_scroll.setText(f"⚓ Scroll: {'ON' if self.auto_scroll else 'OFF'}")
 
     def append_log(self, text, color=None):
         # Safety limit
@@ -286,4 +390,6 @@ class ConsoleWidget(QWidget):
              self.output_area.append(f'<span style="color:{color};">{text}</span>')
         else:
              self.output_area.append(text)
-        self.output_area.moveCursor(self.output_area.textCursor().MoveOperation.End)
+             
+        if self.auto_scroll:
+            self.output_area.moveCursor(self.output_area.textCursor().MoveOperation.End)

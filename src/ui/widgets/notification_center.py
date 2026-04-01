@@ -48,48 +48,43 @@ class NotificationCenter(QFrame):
         
     def setup_ui(self):
         # Tech Gradient Style with Blur Background
+        # Tech Gradient Style with Blur Background
+        theme = ThemeManager.get_theme()
         self.setStyleSheet(f"""
             NotificationCenter {{
-                background-color: rgba(255, 255, 255, 0.95);
-                border-left: 1px solid rgba(0, 0, 0, 0.08);
+                background-color: {theme['COLOR_BG_MAIN']}F0;
+                border-left: 0.5px solid {theme['COLOR_BORDER']};
             }}
             QProgressBar {{
-                background-color: rgba(255,255,255,0.3);
-                border-radius: 3px;
+                background-color: {theme['COLOR_BG_SECONDARY']}80;
+                border-radius: 4px;
                 text-align: center;
                 border: none;
-                height: 6px;
+                height: 8px;
                 color: transparent;
             }}
             QProgressBar::chunk {{
-                border-radius: 3px;
+                border-radius: 4px;
+                background: white;
             }}
             /* Simplified Slider - NO MARGINS */
             QSlider::groove:horizontal {{
                 border: none;
-                background: rgba(0,0,0,0.08);
-                height: 20px;
-                border-radius: 10px;
+                background: {theme['COLOR_BG_SECONDARY']};
+                height: 12px;
+                border-radius: 6px;
             }}
             QSlider::sub-page:horizontal {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4facfe, stop:1 #00f2fe);
-                border-radius: 10px;
-            }}
-            QSlider::add-page:horizontal {{
-                background: rgba(0,0,0,0.08);
-                border-radius: 10px;
+                background: {ThemeManager.COLOR_ACCENT_GRADIENT};
+                border-radius: 6px;
             }}
             QSlider::handle:horizontal {{
                 background: white;
-                border: 3px solid #4facfe;
-                width: 20px;
-                height: 20px;
-                border-radius: 10px;
-            }}
-            QSlider::handle:horizontal:hover {{
-                border-color: #00f2fe;
-                background: #fff;
-                border-width: 4px;
+                border: 2px solid {ThemeManager.COLOR_ACCENT};
+                width: 18px;
+                height: 18px;
+                margin: -3px 0;
+                border-radius: 9px;
             }}
         """)
         
@@ -107,7 +102,7 @@ class NotificationCenter(QFrame):
         # --- 1. Header ---
         header = QHBoxLayout()
         self.title = QLabel("Trung tâm Điều khiển")
-        self.title.setStyleSheet(f"font-size: 18px; font-weight: 800; color: {ThemeManager.COLOR_TEXT_PRIMARY};")
+        self.title.setStyleSheet(f"font-size: 20px; font-weight: 800; color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']}; font-family: {ThemeManager.FONT_FAMILY};")
         self.title.setWordWrap(False)  # Không cho xuống dòng
         self.title.setMinimumWidth(200)  # Đủ rộng cho text
         
@@ -267,13 +262,14 @@ class NotificationCenter(QFrame):
         card.setStyleSheet(f"""
             #StatusCard {{
                 background: {gradient_bg};
-                border-radius: 20px;
-                border: none;
+                border-radius: {ThemeManager.RADIUS_CARD};
+                border: 0.5px solid rgba(255,255,255,0.1);
             }}
             QLabel {{
                 border: none;
                 background: transparent;
                 color: white;
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
         """)
         
@@ -342,16 +338,12 @@ class NotificationCenter(QFrame):
         btn.setStyleSheet(f"""
             QPushButton {{
                 background: {gradient};
-                border-radius: 16px;
-                border: none;
+                border-radius: 20px;
+                border: 0.5px solid rgba(255,255,255,0.15);
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
             QPushButton:hover {{
-                margin-top: -2px;
-                margin-bottom: 2px;
-            }}
-            QPushButton:pressed {{
-                margin-top: 1px;
-                margin-bottom: -1px;
+                opacity: 0.95;
             }}
         """)
         grid.addWidget(btn, r, c, 1, 2)
@@ -366,24 +358,18 @@ class NotificationCenter(QFrame):
         
         style = f"""
             QPushButton {{
-                background: rgba(255, 255, 255, 0.6);
-                border: 1px solid rgba(255, 255, 255, 0.8);
+                background: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}80;
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
                 border-radius: 18px;
-                font-size: 28px;
+                font-size: 26px;
             }}
             QPushButton:hover {{
-                background: rgba(255, 255, 255, 0.9);
-                margin-top: -1px;
-                margin-bottom: 1px;
+                background: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']};
             }}
             QPushButton:checked {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #667eea, stop:1 #764ba2);
+                background: {ThemeManager.COLOR_ACCENT_GRADIENT};
                 color: white;
                 border: none;
-            }}
-            QPushButton:pressed {{
-                margin-top: 1px;
-                margin-bottom: -1px;
             }}
         """
         btn.setStyleSheet(style)

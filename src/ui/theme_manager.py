@@ -43,38 +43,38 @@ class ThemeManager:
         "disconnected": "⚪",   # White Circle
     }
     
-    # Light Mode (Modern Sea Blue & White)
+    # Light Mode (Precision Glass - Modern Sea Blue)
     LIGHT = {
         "COLOR_BG_GRADIENT": "transparent",
-        "COLOR_BG_MAIN": "rgba(245, 250, 255, 0.20)",  # Bright Glass for Base
-        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.95)", # Solid White for inner components
-        "COLOR_GLASS_HOVER": "rgba(245, 248, 255, 1.0)",
-        "COLOR_GLASS_CARD": "#ffffff",                   # Solid White Card
-        "COLOR_TEXT_PRIMARY": "#1a1a1a",                 # Darker text for white bg
-        "COLOR_TEXT_SECONDARY": "#5f6368",               # Material Grey secondary
+        "COLOR_BG_MAIN": "rgba(245, 250, 255, 0.15)",  # Mesh gradient base
+        "COLOR_GLASS_WHITE": "rgba(255, 255, 255, 0.90)", 
+        "COLOR_GLASS_HOVER": "rgba(247, 250, 255, 1.0)",
+        "COLOR_GLASS_CARD": "#ffffff",                   
+        "COLOR_TEXT_PRIMARY": "#1c1e21",                 
+        "COLOR_TEXT_SECONDARY": "#65676b",               
         "COLOR_DATA": "#202124",
-        "COLOR_BG_SECONDARY": "#f1f3f4",                 # Light grey background
-        "COLOR_SHADOW": "rgba(0, 0, 0, 0.1)",
-        "COLOR_BORDER": "#dadce0",                      # Standard Google/Xiaomi border
-        "COLOR_BORDER_LIGHT": "#f1f3f4",
-        "COLOR_DIALOG_BG": "#ffffff",                    # Solid White for Dialogs
+        "COLOR_BG_SECONDARY": "#f0f2f5",                 
+        "COLOR_SHADOW": "rgba(0, 0, 0, 0.08)",
+        "COLOR_BORDER": "rgba(0, 0, 0, 0.12)",           # Thinner visual border
+        "COLOR_BORDER_LIGHT": "rgba(0, 0, 0, 0.05)",
+        "COLOR_DIALOG_BG": "#ffffff",                    
     }
     
-    # Dark Mode (Improved)
+    # Dark Mode (Precision Glass - Deep Onyx)
     DARK = {
         "COLOR_BG_GRADIENT": "transparent",
-        "COLOR_BG_MAIN": "rgba(26, 26, 26, 0.01)",
-        "COLOR_GLASS_WHITE": "rgba(45, 45, 45, 0.35)", # Dark glass transparent
-        "COLOR_GLASS_HOVER": "rgba(60, 60, 60, 0.50)",
-        "COLOR_GLASS_CARD": "rgba(40, 40, 40, 0.55)", # MORE Transparent (Previously 0.70)
-        "COLOR_TEXT_PRIMARY": "#e8e8e8",
-        "COLOR_TEXT_SECONDARY": "#a8a8a8",
-        "COLOR_DATA": "#f0f0f0",
-        "COLOR_BG_SECONDARY": "rgba(80, 80, 80, 0.20)",
-        "COLOR_SHADOW": "rgba(0, 0, 0, 0.4)",
-        "COLOR_BORDER": "rgba(100, 100, 100, 0.3)",
-        "COLOR_BORDER_LIGHT": "rgba(100, 100, 100, 0.15)",
-        "COLOR_DIALOG_BG": "rgba(35, 35, 35, 0.94)",       # High Alpha Dark Glass for Dialogs
+        "COLOR_BG_MAIN": "rgba(18, 18, 18, 0.01)",
+        "COLOR_GLASS_WHITE": "rgba(35, 35, 45, 0.35)", 
+        "COLOR_GLASS_HOVER": "rgba(50, 50, 65, 0.50)",
+        "COLOR_GLASS_CARD": "rgba(30, 30, 40, 0.55)", 
+        "COLOR_TEXT_PRIMARY": "#f1f3f4",
+        "COLOR_TEXT_SECONDARY": "#9aa0a6",
+        "COLOR_DATA": "#ffffff",
+        "COLOR_BG_SECONDARY": "rgba(100, 100, 110, 0.15)",
+        "COLOR_SHADOW": "rgba(0, 0, 0, 0.5)",
+        "COLOR_BORDER": "rgba(255, 255, 255, 0.08)",     # Precision 1px border
+        "COLOR_BORDER_LIGHT": "rgba(255, 255, 255, 0.04)",
+        "COLOR_DIALOG_BG": "rgba(28, 28, 35, 0.96)",       
     }
 
 
@@ -91,18 +91,25 @@ class ThemeManager:
     COLOR_TEAL = "#5AC8FA"          # System Teal
     
     # Backgrounds for status alerts
-    COLOR_SUCCESS_BG = "rgba(52, 199, 89, 0.2)"
-    COLOR_WARNING_BG = "rgba(255, 204, 0, 0.2)"
+    COLOR_SUCCESS_BG = "rgba(52, 199, 110, 0.15)"
+    COLOR_WARNING_BG = "rgba(255, 204, 0, 0.15)"
     
-    # ==================== TYPOGRAPHY ====================
-    FONT_FAMILY = "'-apple-system', 'Segoe UI', 'Inter', 'Roboto', sans-serif"
-    FONT_FAMILY_MONO = "'SF Mono', 'JetBrains Mono', 'Consolas', monospace"
+    # ==================== HYPEROS GRADIENTS (BENTO STYLE) ====================
+    GRADIENT_HYPER_ORANGE = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #ff8c00, stop:1 #ffc107)"
+    GRADIENT_HYPER_BLUE = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #1e90ff, stop:1 #00bfff)"
+    GRADIENT_HYPER_PURPLE = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #8a2be2, stop:1 #da70d6)"
+    GRADIENT_HYPER_TEAL = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #20b2aa, stop:1 #48d1cc)"
+    GRADIENT_HYPER_DARK = "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #2c3e50, stop:1 #000000)"
     
-    # ==================== IOS DIMENSIONS ====================
-    RADIUS_CARD = "22px"      # Larger radius for cards
-    RADIUS_BUTTON = "12px"    # Standard button radius
-    RADIUS_INPUT = "0px"
-    BLUR_RADIUS = "20px"      # Standard Blur
+    # ==================== TYPOGRAPHY (Outfit & Inter) ====================
+    FONT_FAMILY = "'Outfit', 'Inter', '-apple-system', 'Segoe UI', sans-serif"
+    FONT_FAMILY_MONO = "'JetBrains Mono', 'SF Mono', 'Consolas', monospace"
+    
+    # ==================== PRECISION DIMENSIONS ====================
+    RADIUS_CARD = "24px"      # Bento Large Radius
+    RADIUS_BUTTON = "14px"    # Modern pill-like button
+    RADIUS_INPUT = "12px"
+    BLUR_RADIUS = "35px"      # Deeper Blur for Precision Glass
     
     # ==================== ANIMATION HELPER ====================
     class AnimationHelper:
@@ -266,6 +273,7 @@ class ThemeManager:
         cls.COLOR_BORDER = current_theme_colors["COLOR_BORDER"]
         cls.COLOR_BORDER_LIGHT = current_theme_colors["COLOR_BORDER_LIGHT"]
         cls.COLOR_DIALOG_BG = current_theme_colors["COLOR_DIALOG_BG"]
+        cls.COLOR_BG_MAIN = current_theme_colors["COLOR_BG_MAIN"]
         cls.COLOR_BACKGROUND = current_theme_colors.get("COLOR_BG_MAIN", current_theme_colors.get("COLOR_BACKGROUND"))
 
     
@@ -678,13 +686,15 @@ class ThemeManager:
         return f"""
             color: {theme['COLOR_TEXT_SECONDARY']};
             font-size: 11px;
-            font-weight: 600;
-            padding-left: 14px;
-            margin-bottom: 6px;
+            font-weight: 700;
+            padding-left: 18px;
+            margin-bottom: 8px;
+            margin-top: 15px;
             background: transparent;
             font-family: {cls.FONT_FAMILY};
             text-transform: uppercase;
-            opacity: 0.8;
+            letter-spacing: 1.2px;
+            opacity: 0.6;
         """
 
     @classmethod
@@ -700,9 +710,9 @@ class ThemeManager:
                 text-align: {alignment};
                 padding-left: {padding_left};
                 padding-right: {padding_left if alignment == "center" else "0px"};
-                border: none;
-                border-radius: 12px;
-                font-size: 15px;
+                border: 1px solid transparent;
+                border-radius: 14px;
+                font-size: 14px;
                 font-weight: 500;
                 color: {theme['COLOR_TEXT_PRIMARY']};
                 background: transparent;
@@ -712,15 +722,16 @@ class ThemeManager:
             }}
             QPushButton:hover {{
                 background-color: {hover_bg};
+                border: 1px solid {theme['COLOR_BORDER_LIGHT']};
             }}
             QPushButton:checked {{
-                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(61, 220, 132, 0.25), stop:1 rgba(50, 179, 108, 0.15));
+                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(61, 220, 132, 0.2), stop:1 rgba(50, 179, 108, 0.1));
                 color: {theme['COLOR_TEXT_PRIMARY']};
                 font-weight: 700;
                 border: 1px solid rgba(61, 220, 132, 0.4);
                 border-left: {'4px solid #3DDC84' if alignment == 'left' else 'none'};
                 padding-left: {c_padding};
-                border-bottom: {'3px solid #3DDC84' if alignment == 'center' else 'none'};
+                box-shadow: 0 4px 15px rgba(61, 220, 132, 0.1);
             }}
         """
 
@@ -744,7 +755,7 @@ class ThemeManager:
         return f"""
             #MainHeader {{
                 background-color: {theme['COLOR_GLASS_WHITE']};
-                border-radius: 16px;
+                border-radius: 20px;
                 border: 1px solid {theme['COLOR_BORDER_LIGHT']};
             }}
         """
@@ -758,6 +769,75 @@ class ThemeManager:
             color: {theme['COLOR_TEXT_PRIMARY']};
             background: transparent;
             font-family: {cls.FONT_FAMILY};
+        """
+    
+    @classmethod
+    def get_progress_bar_style(cls, variant="mini"):
+        """Style for QProgressBar"""
+        theme = cls.get_theme()
+        height = "4px" if variant == "mini" else "12px"
+        return f"""
+            QProgressBar {{
+                background-color: {theme['COLOR_BG_SECONDARY']};
+                border-radius: 2px;
+                text-align: center;
+                height: {height};
+                border: none;
+            }}
+            QProgressBar::chunk {{
+                background: {cls.COLOR_ACCENT_GRADIENT};
+                border-radius: 2px;
+            }}
+        """
+
+    @classmethod
+    def get_ghost_button_style(cls):
+        """Style for small icon buttons used in toolbars"""
+        theme = cls.get_theme()
+        return f"""
+            QPushButton {{
+                background: transparent;
+                border: 1px solid transparent;
+                border-radius: 6px;
+                padding: 4px;
+                color: {theme['COLOR_TEXT_SECONDARY']};
+                font-size: 14px;
+            }}
+            QPushButton:hover {{
+                background: {theme['COLOR_BG_SECONDARY']};
+                border: 1px solid {theme['COLOR_BORDER']};
+                color: {theme['COLOR_TEXT_PRIMARY']};
+            }}
+        """
+
+    @classmethod
+    def get_xiaomi_status_style(cls):
+        """Specialized style for the Xiaomi Status Header"""
+        theme = cls.get_theme()
+        return f"""
+            #XiaomiStatusWidget {{
+                background: {theme['COLOR_GLASS_WHITE']};
+                border-radius: 24px;
+                border: 1.5px solid {theme['COLOR_BORDER']};
+            }}
+            #StatusIconContainer {{
+                background: {cls.GRADIENT_HYPER_BLUE};
+                border-radius: 20px;
+                border: 1px solid rgba(255,255,255,0.2);
+            }}
+            #StatusTitle {{
+                font-size: 18px;
+                font-weight: 800;
+                color: {theme['COLOR_TEXT_PRIMARY']};
+                font-family: {cls.FONT_FAMILY};
+            }}
+            #StatusBadge {{
+                background: {cls.COLOR_ACCENT}15;
+                color: {cls.COLOR_ACCENT};
+                font-weight: 700;
+                font-size: 11px;
+                padding: 4px 12px;
+                border-radius: 8px;
         """
 
     @classmethod
@@ -797,3 +877,5 @@ class ThemeManager:
     COLOR_BORDER = LIGHT["COLOR_BORDER"]
     COLOR_BORDER_LIGHT = LIGHT["COLOR_BORDER_LIGHT"]
     COLOR_BACKGROUND = LIGHT["COLOR_BG_MAIN"]
+    COLOR_DIALOG_BG = LIGHT["COLOR_DIALOG_BG"]
+    COLOR_BG_MAIN = LIGHT["COLOR_BG_MAIN"]

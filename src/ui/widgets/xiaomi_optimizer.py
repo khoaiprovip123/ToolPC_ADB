@@ -38,9 +38,9 @@ class ModernCard(QFrame):
         
         # Shadow
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 30))
-        shadow.setOffset(0, 6)
+        shadow.setBlurRadius(25)
+        shadow.setColor(QColor(0, 0, 0, 45))
+        shadow.setOffset(0, 8)
         self.setGraphicsEffect(shadow)
         
         layout = QVBoxLayout(self)
@@ -54,19 +54,20 @@ class ModernCard(QFrame):
         # Icon Container
         self.icon_lbl = QLabel(icon)
         self.icon_lbl.setAlignment(Qt.AlignCenter)
-        self.icon_lbl.setFixedSize(48, 48)
+        self.icon_lbl.setFixedSize(52, 52)
         
-        icon_bg = "rgba(255,255,255,0.1)" if gradient_colors else f"{ThemeManager.COLOR_ACCENT}15"
+        icon_bg = "rgba(255,255,255,0.15)" if gradient_colors else f"{ThemeManager.COLOR_ACCENT}20"
         self.icon_lbl.setStyleSheet(f"""
-            font-size: 26px; 
+            font-size: 28px; 
             background: {icon_bg}; 
-            border-radius: 12px;
+            border-radius: 18px;
             border: 1px solid rgba(255,255,255,0.1);
+            font-family: {ThemeManager.FONT_FAMILY};
         """)
         
         title_lbl = QLabel(title)
-        title_color = "white" if gradient_colors else ThemeManager.COLOR_TEXT_PRIMARY
-        title_lbl.setStyleSheet(f"font-size: 17px; font-weight: 800; color: {title_color}; background: transparent; border: none;")
+        title_color = "white" if gradient_colors else ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']
+        title_lbl.setStyleSheet(f"font-size: 18px; font-weight: 900; color: {title_color}; background: transparent; border: none; font-family: {ThemeManager.FONT_FAMILY}; letter-spacing: -0.5px;")
         
         header.addWidget(self.icon_lbl)
         header.addWidget(title_lbl)
@@ -76,8 +77,8 @@ class ModernCard(QFrame):
         # Description
         desc_lbl = QLabel(desc)
         desc_lbl.setWordWrap(True)
-        desc_color = "rgba(255,255,255,0.85)" if gradient_colors else ThemeManager.COLOR_TEXT_SECONDARY
-        desc_lbl.setStyleSheet(f"font-size: 13.5px; color: {desc_color}; background: transparent; border: none; line-height: 1.4;")
+        desc_color = "rgba(255,255,255,0.9)" if gradient_colors else ThemeManager.get_theme()['COLOR_TEXT_SECONDARY']
+        desc_lbl.setStyleSheet(f"font-size: 13.5px; color: {desc_color}; background: transparent; border: none; line-height: 1.5; font-family: {ThemeManager.FONT_FAMILY};")
         layout.addWidget(desc_lbl)
         
         layout.addStretch()
@@ -87,14 +88,16 @@ class ModernCard(QFrame):
         
         # Badge or Status (Optional)
         self.status_badge = QLabel("Sẵn sàng")
-        badge_bg = "rgba(255,255,255,0.15)" if gradient_colors else "rgba(0,0,0,0.03)"
+        badge_bg = "rgba(255,255,255,0.2)" if gradient_colors else "rgba(0,0,0,0.05)"
         self.status_badge.setStyleSheet(f"""
             font-size: 11px; 
-            font-weight: 700; 
+            font-weight: 800; 
             color: {desc_color}; 
-            padding: 4px 10px; 
+            padding: 5px 12px; 
             background: {badge_bg}; 
-            border-radius: 6px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         """)
         action_row.addWidget(self.status_badge)
         action_row.addStretch()
@@ -102,41 +105,44 @@ class ModernCard(QFrame):
         btn = QPushButton("Bắt đầu")
         btn.setCursor(Qt.PointingHandCursor)
         btn.clicked.connect(self.on_click)
-        btn.setFixedSize(100, 36)
+        btn.setFixedSize(110, 40)
         
-        btn_style = "background: #1a1a1a; color: white;" if gradient_colors and gradient_colors[0] == "#ffffff" else ("background: white; color: black;" if gradient_colors else f"background: {ThemeManager.COLOR_ACCENT}; color: white;")
+        btn_style = "background: #ffffff; color: #000000;" if gradient_colors else f"background: {ThemeManager.COLOR_ACCENT}; color: white;"
         btn.setStyleSheet(f"""
             QPushButton {{
                 {btn_style}
-                border-radius: 10px;
-                font-weight: 700;
-                font-size: 12px;
+                border-radius: 12px;
+                font-weight: 900;
+                font-size: 13px;
                 border: none;
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
             QPushButton:hover {{
-                background: white;
-                opacity: 0.9;
+                background: rgba(255,255,255,0.9);
+                transform: scale(1.05);
             }}
         """)
         action_row.addWidget(btn)
         layout.addLayout(action_row)
 
     def setup_style(self, hover=False):
-        bg_style = f"background: {ThemeManager.COLOR_GLASS_WHITE};"
-        border_color = "rgba(0,0,0,0.06)"
+        theme = ThemeManager.get_theme()
+        bg_style = f"background: {theme['COLOR_GLASS_WHITE']};"
+        border_color = theme['COLOR_BORDER']
         
         if self.gradient_colors:
             bg_style = f"background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 {self.gradient_colors[0]}, stop:1 {self.gradient_colors[1]});"
-            border_color = "rgba(255,255,255,0.2)"
+            border_color = "rgba(255,255,255,0.25)"
             
-        hover_transform = "margin-top: -5px;" if hover else ""
+        hover_transform = "margin-top: -8px;" if hover else ""
         border_width = "2px" if hover else "1px"
+        glow = f"border: {border_width} solid {ThemeManager.COLOR_ACCENT};" if hover and not self.gradient_colors else f"border: {border_width} solid {border_color};"
         
         self.setStyleSheet(f"""
             #ModernCard {{
                 {bg_style}
-                border-radius: 20px;
-                border: none;
+                border-radius: 28px;
+                {glow}
                 {hover_transform}
             }}
         """)
@@ -152,6 +158,114 @@ class ModernCard(QFrame):
     def on_click(self):
         if self.callback:
             self.callback()
+
+class XiaomiDeviceInfoWidget(QFrame):
+    """Modern header widget showing real-time Xiaomi device information"""
+    def __init__(self, adb_manager, parent=None):
+        super().__init__(parent)
+        self.adb = adb_manager
+        self.setObjectName("XiaomiStatusWidget")
+        self.setFixedHeight(120)
+        self.setup_ui()
+        self.refresh_info()
+
+    def setup_ui(self):
+        self.setStyleSheet(ThemeManager.get_xiaomi_status_style())
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(20, 15, 20, 15)
+        layout.setSpacing(20)
+
+        # 1. OS Icon with Gradient
+        self.icon_container = QFrame()
+        self.icon_container.setObjectName("StatusIconContainer")
+        self.icon_container.setFixedSize(70, 70)
+        icon_layout = QVBoxLayout(self.icon_container)
+        icon_layout.setAlignment(Qt.AlignCenter)
+        self.os_icon = QLabel("⚡")
+        self.os_icon.setStyleSheet("font-size: 36px; background: transparent; border: none;")
+        icon_layout.addWidget(self.os_icon)
+        layout.addWidget(self.icon_container)
+
+        # 2. Main Info
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(4)
+        
+        title_row = QHBoxLayout()
+        self.title_lbl = QLabel("Xiaomi Device")
+        self.title_lbl.setObjectName("StatusTitle")
+        title_row.addWidget(self.title_lbl)
+        
+        self.os_badge = QLabel("MIUI / HyperOS")
+        self.os_badge.setObjectName("StatusBadge")
+        title_row.addWidget(self.os_badge)
+        title_row.addStretch()
+        info_layout.addLayout(title_row)
+
+        details_row = QHBoxLayout()
+        details_row.setSpacing(15)
+        
+        self.bl_status = QLabel("🔓 Bootloader: Đang đọc...")
+        self.bl_status.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 13px; font-weight: 600;")
+        
+        self.region_status = QLabel("📍 Vùng: Đang đọc...")
+        self.region_status.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_SECONDARY}; font-size: 13px; font-weight: 600;")
+        
+        details_row.addWidget(self.bl_status)
+        details_row.addWidget(self.region_status)
+        details_row.addStretch()
+        info_layout.addLayout(details_row)
+        
+        layout.addLayout(info_layout, stretch=1)
+
+        # 3. Quick Refresh & Toolbox
+        self.btn_refresh = QPushButton("Làm mới ↻")
+        self.btn_refresh.setCursor(Qt.PointingHandCursor)
+        self.btn_refresh.setFixedSize(110, 36)
+        self.btn_refresh.setStyleSheet(f"""
+            QPushButton {{
+                background: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']};
+                color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']};
+                border-radius: 12px;
+                font-weight: 700;
+                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+            }}
+            QPushButton:hover {{ background: {ThemeManager.COLOR_ACCENT}15; border-color: {ThemeManager.COLOR_ACCENT}50; }}
+        """)
+        self.btn_refresh.clicked.connect(self.refresh_info)
+        layout.addWidget(self.btn_refresh)
+
+    def refresh_info(self):
+        if not self.adb.current_device:
+            self.title_lbl.setText("Chưa kết nối thiết bị")
+            return
+
+        def update():
+            try:
+                # 1. Basic Info
+                brand = self.adb.shell("getprop ro.product.brand").strip().upper()
+                model = self.adb.shell("getprop ro.product.model").strip()
+                self.title_lbl.setText(f"{brand} {model}")
+                
+                # 2. OS version
+                miui = self.adb.shell("getprop ro.miui.ui.version.name").strip()
+                hyperos = self.adb.shell("getprop ro.miui.ui.version.code").strip() # HyperOS often uses code or different prop
+                if miui: self.os_badge.setText(f"MIUI {miui}")
+                else: self.os_badge.setText("HyperOS / Global")
+
+                # 3. Bootloader
+                is_unlocked = self.adb.shell("getprop ro.boot.flash.locked").strip() == "0"
+                self.bl_status.setText(f"{'🔓' if is_unlocked else '🔒'} Bootloader: {'Mở khóa' if is_unlocked else 'Đang khóa'}")
+                self.bl_status.setStyleSheet(f"color: {'#2ecc71' if is_unlocked else '#e74c3c'}; font-size: 13px; font-weight: 700;")
+
+                # 4. Region
+                region = self.adb.shell("getprop ro.miui.region").strip() or self.adb.shell("getprop ro.product.locale.region").strip()
+                self.region_status.setText(f"📍 Vùng: {region or 'VN'}")
+                
+            except Exception as e:
+                print(f"Error refreshing Xiaomi info: {e}")
+
+        # Run in thread or just quick shell for now
+        update()
 
 # XiaomiHubWidget removed — replaced by XiaomiToolsPage sidebar navigation
 
@@ -223,7 +337,15 @@ class XiaomiBaseWidget(QWidget):
 
     def add_section_header(self, layout, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {ThemeManager.COLOR_TEXT_PRIMARY}; border-bottom: 2px solid {ThemeManager.COLOR_ACCENT}50; padding-bottom: 5px; margin-top: 10px;")
+        lbl.setStyleSheet(f"""
+            font-size: 16px; 
+            font-weight: 800; 
+            color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']}; 
+            border-bottom: 2px solid {ThemeManager.COLOR_ACCENT}30; 
+            padding-bottom: 8px; 
+            margin-top: 15px;
+            font-family: {ThemeManager.FONT_FAMILY};
+        """)
         layout.addWidget(lbl)
 
     def run_art_tuning(self):
@@ -278,13 +400,14 @@ class AppItemCard(QFrame):
         self.setStyleSheet(f"""
             #AppItemCard {{
                 background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']};
-                border-radius: 14px;
-                border: 1px solid {ThemeManager.get_theme()['COLOR_BORDER']};
+                border-radius: 16px;
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']};
             }}
             #AppItemCard:hover {{
-                border: 1px solid {ThemeManager.COLOR_ACCENT}60;
+                border: 1px solid {ThemeManager.COLOR_ACCENT}80;
+                background: {ThemeManager.get_theme()['COLOR_BG_SECONDARY']}40;
             }}
-            QLabel {{ border: none; background: transparent; }}
+            QLabel {{ border: none; background: transparent; font-family: {ThemeManager.FONT_FAMILY}; }}
         """)
         
         layout = QHBoxLayout(self)
@@ -467,6 +590,11 @@ class XiaomiDebloaterWidget(XiaomiBaseWidget):
         header_l.addWidget(self.search_input)
         
         layout.addWidget(header)
+        
+        # ─── DEVICE INFO WIDGET (NEW) ───
+        self.device_info = XiaomiDeviceInfoWidget(self.adb)
+        self.device_info.setContentsMargins(20, 0, 20, 10)
+        layout.addWidget(self.device_info)
         
         # ─── APP LIST ───
         scroll = QScrollArea()
@@ -734,7 +862,11 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(0)
+        layout.setSpacing(15)
+
+        # ─── DEVICE INFO WIDGET (NEW) ───
+        self.device_info = XiaomiDeviceInfoWidget(self.adb)
+        layout.addWidget(self.device_info)
 
         # ─── STYLED TAB WIDGET (Pill Style / Segmented Control) ───
         self.tabs = QTabWidget()
@@ -745,34 +877,35 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
         # Style này giúp Tab trông giống như các nút bấm nổi bật (Segmented Control)
         self.tabs.setStyleSheet(f"""
             QTabWidget::pane {{
-                border: 1px solid {theme['COLOR_BORDER']};
-                border-radius: 16px;
+                border: 0.5px solid {theme['COLOR_BORDER']};
+                border-radius: 20px;
                 background: {theme['COLOR_GLASS_WHITE']};
                 margin-top: 10px;
             }}
             QTabBar {{
-                background: {theme['COLOR_BG_SECONDARY']};
-                border-radius: 12px;
+                background: {theme['COLOR_BG_SECONDARY']}40;
+                border-radius: 14px;
                 padding: 4px;
             }}
             QTabBar::tab {{
                 background: transparent;
                 color: {theme['COLOR_TEXT_SECONDARY']};
-                padding: 10px 20px;
-                font-size: 14px;
+                padding: 8px 18px;
+                font-size: 13px;
                 font-weight: 700;
                 border: none;
-                border-radius: 10px;
-                min-width: 120px;
+                border-radius: 12px;
+                min-width: 100px;
                 margin: 2px;
+                font-family: {ThemeManager.FONT_FAMILY};
             }}
             QTabBar::tab:selected {{
                 background: {theme['COLOR_GLASS_CARD']};
                 color: {accent};
-                border: 1px solid {theme['COLOR_BORDER_LIGHT']};
+                border: 0.5px solid {theme['COLOR_BORDER']};
             }}
             QTabBar::tab:hover:!selected {{
-                background: {accent}15;
+                background: {accent}10;
                 color: {theme['COLOR_TEXT_PRIMARY']};
             }}
         """)
@@ -781,16 +914,15 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
         tab1 = self._make_tab_scroll()
         g1 = QGridLayout()
         g1.setSpacing(16)
-        g1.addWidget(ModernCard("Chỉnh Tần Số Quét",  "Tùy chỉnh 60/90/120/144Hz hoặc Auto.",     "⚡", self.run_force_refresh_rate,       ["#f83600","#f9d423"]), 0, 0)
-        g1.addWidget(ModernCard("Tối Ưu Animation",   "Giảm thời gian chuyển cảnh (0.5x).",        "🐇", self.run_animations,                ["#4facfe","#00f2fe"]), 0, 1)
-        g1.addWidget(ModernCard("Hiện FPS / Hz",      "Hiển thị thông số trên màn hình.",           "📈", self.run_show_fps,                   ["#fc4a1a","#f7b733"]), 1, 0)
-        g1.addWidget(ModernCard("Hiệu Ứng Blur",      "Bật blur CC/Folder trên HyperOS.",           "💧", self.run_smart_blur,                 ["#89f7fe","#66a6ff"]), 1, 1)
-        g1.addWidget(ModernCard("Đa Nhiệm iOS Style", "Xếp chồng Giao diện đa nhiệm.",             "📚", self.run_hyperos_stacked_recent,     ["#a18cd1","#fbc2eb"]), 2, 0)
-        g1.addWidget(ModernCard("Control Center Mới", "Kích hoạt CC giao diện mới.",               "🎛️", lambda: self.run_task("new_cc", name="CC"), ["#e1eec3","#f05053"]), 2, 1)
-        g1.addWidget(ModernCard("Độ Phân Giải (WM)",  "Thay đổi kích thước và DPI.",               "📐", self.ask_resolution,                 ["#1d976c","#93f9b9"]), 3, 0)
-        g1.addWidget(ModernCard("Siêu Hình Nền",      "Mở khóa Super Wallpaper.",                  "🪐", self.run_unlock_super_wallpaper,     ["#f093fb","#f5576c"]), 3, 1)
-        g1.addWidget(ModernCard("Ẩn Nhãn Icon",       "Chế độ No Word, ẩn tên icon.",              "📝", self.run_remove_app_label,           ["#a18cd1","#fbc2eb"]), 4, 0)
-        g1.addWidget(ModernCard("Force Dark Mode",    "Ép chế độ tối toàn bộ app.",                "🌙", self.run_force_dark_mode,            ["#434343","#000000"]), 4, 1)
+        # Bento Layout: Span cards for importance
+        g1.addWidget(ModernCard("Chỉnh Tần Số Quét",  "Tùy chỉnh 60/90/120/144Hz hoặc Auto.",     "⚡", self.run_force_refresh_rate,       ["#f83600","#f9d423"]), 0, 0, 1, 2) # Wide
+        g1.addWidget(ModernCard("Tối Ưu Animation",   "Giảm thời gian chuyển cảnh (0.5x).",        "🐇", self.run_animations,                ["#4facfe","#00f2fe"]), 1, 0)
+        g1.addWidget(ModernCard("Hiện FPS / Hz",      "Hiển thị thông số trên màn hình.",           "📈", self.run_show_fps,                   ["#fc4a1a","#f7b733"]), 1, 1)
+        g1.addWidget(ModernCard("Hiệu Ứng Blur",      "Bật blur CC/Folder trên HyperOS.",           "💧", self.run_smart_blur,                 ["#89f7fe","#66a6ff"]), 2, 0)
+        g1.addWidget(ModernCard("Đa Nhiệm iOS Style", "Xếp chồng Giao diện đa nhiệm.",             "📚", self.run_hyperos_stacked_recent,     ["#a18cd1","#fbc2eb"]), 2, 1)
+        g1.addWidget(ModernCard("Control Center Mới", "Kích hoạt CC giao diện mới.",               "🎛️", lambda: self.run_task("new_cc", name="CC"), ["#e1eec3","#f05053"]), 3, 0)
+        g1.addWidget(ModernCard("Độ Phân Giải (WM)",  "Thay đổi kích thước và DPI.",               "📐", self.ask_resolution,                 ["#1d976c","#93f9b9"]), 3, 1)
+        g1.addWidget(ModernCard("Siêu Hình Nền",      "Mở khóa Super Wallpaper.",                  "🪐", self.run_unlock_super_wallpaper,     ["#f093fb","#f5576c"]), 4, 0, 1, 2) # Wide
         tab1.addLayout(g1)
         tab1.addStretch()
         self.tabs.addTab(self._wrap_scroll(tab1), "🎨  Hiển Thị")
@@ -800,11 +932,10 @@ class XiaomiAIOOptimizerWidget(XiaomiBaseWidget):
         g2 = QGridLayout()
         g2.setSpacing(16)
         g2.addWidget(ModernCard("Tối Ưu ART VM",       "Biên dịch lại app để mở nhanh.",           "💎", self.run_art_tuning,                                ["#43e97b","#38f9d7"]), 0, 0)
-        g2.addWidget(ModernCard("Fix Thông Báo",       "Sửa trễ thông báo, tự khởi động app.",     "🔔", lambda: self.switch_to_tab("Thông Báo"),           ["#ff9a9e","#fecfef"]), 0, 1)
-        g2.addWidget(ModernCard("Game Turbo",           "Tối ưu GPU/CPU khi chơi game.",            "🎮", lambda: self.run_task("game_perf_tune", name="Game"),["#f12711","#f5af19"]), 1, 0)
-        g2.addWidget(ModernCard("Sạc Nhanh",           "Mở khóa giới hạn sạc.",                    "⚡", lambda: self.run_task("fast_charge", name="Sạc"),   ["#FDC830","#F37335"]), 1, 1)
-        g2.addWidget(ModernCard("Giới Hạn App Nền",   "Kiểm soát app chạy ngầm.",                  "🛑", self.ask_bg_limit,                                  ["#bdc3c7","#2c3e50"]), 2, 0)
-        g2.addWidget(ModernCard("Tối Ưu Chuyên Sâu",  "Expert kernel tweaks cho HyperOS.",         "🔬", lambda: self.switch_to_tab("Chuyên Sâu"),           ["#f093fb","#f5576c"]), 2, 1)
+        g2.addWidget(ModernCard("Game Turbo",           "Tối ưu GPU/CPU khi chơi game.",            "🎮", lambda: self.run_task("game_perf_tune", name="Game"),["#f12711","#f5af19"]), 0, 1)
+        g2.addWidget(ModernCard("Sạc Nhanh",           "Mở khóa giới hạn sạc.",                    "⚡", lambda: self.run_task("fast_charge", name="Sạc"),   ["#FDC830","#F37335"]), 1, 0, 1, 2) # Wide
+        g2.addWidget(ModernCard("Fix Thông Báo",       "Sửa trễ thông báo, tự khởi động app.",     "🔔", lambda: self.switch_to_tab("Thông Báo"),           ["#ff9a9e","#fecfef"]), 2, 0)
+        g2.addWidget(ModernCard("Giới Hạn App Nền",   "Kiểm soát app chạy ngầm.",                  "🛑", self.ask_bg_limit,                                  ["#bdc3c7","#2c3e50"]), 2, 1)
         tab2.addLayout(g2)
         tab2.addStretch()
         self.tabs.addTab(self._wrap_scroll(tab2), "🚀  Hiệu Năng")
@@ -949,8 +1080,22 @@ class XiaomiExpertTweaksWidget(XiaomiBaseWidget):
         c_layout.addLayout(grid_u)
 
         btn_verify = QPushButton("🔍 Kiểm tra trạng thái hệ thống")
-        btn_verify.setFixedHeight(45)
-        btn_verify.setStyleSheet(f"QPushButton {{ background-color: {ThemeManager.COLOR_ACCENT}15; color: {ThemeManager.COLOR_ACCENT}; border: 1px solid {ThemeManager.COLOR_ACCENT}; border-radius: 12px; margin-top:20px; font-weight:bold; }}")
+        btn_verify.setFixedHeight(50)
+        btn_verify.setCursor(Qt.PointingHandCursor)
+        btn_verify.setStyleSheet(f"""
+            QPushButton {{ 
+                background-color: {ThemeManager.COLOR_ACCENT}15; 
+                color: {ThemeManager.COLOR_ACCENT}; 
+                border: 1px solid {ThemeManager.COLOR_ACCENT}40; 
+                border-radius: 14px; 
+                margin-top: 20px; 
+                font-weight: 800; 
+                font-family: {ThemeManager.FONT_FAMILY};
+            }}
+            QPushButton:hover {{
+                background-color: {ThemeManager.COLOR_ACCENT}25;
+            }}
+        """)
         btn_verify.clicked.connect(self.run_verify_status)
         c_layout.addWidget(btn_verify)
 
@@ -1000,17 +1145,18 @@ class NotificationAppItem(QFrame):
     def update_style(self):
         checked = self.cb.isChecked()
         theme = ThemeManager.get_theme()
-        bg = theme['COLOR_GLASS_WHITE'] if checked else "transparent"
-        border = f"1px solid {ThemeManager.COLOR_ACCENT}50" if checked else "1px solid transparent"
+        bg = f"{ThemeManager.COLOR_ACCENT}10" if checked else "transparent"
+        border = f"0.5px solid {ThemeManager.COLOR_ACCENT}60" if checked else "0.5px solid transparent"
         self.setStyleSheet(f"""
             NotificationAppItem {{
                 background-color: {bg};
                 border: {border};
-                border-radius: 12px;
+                border-radius: 14px;
             }}
             NotificationAppItem:hover {{
-                background-color: {ThemeManager.COLOR_BG_SECONDARY};
+                background-color: {theme['COLOR_BG_SECONDARY']}40;
             }}
+            QLabel {{ font-family: {ThemeManager.FONT_FAMILY}; }}
         """)
 
     def mousePressEvent(self, event):
@@ -1051,7 +1197,13 @@ class XiaomiNotificationFixWidget(XiaomiBaseWidget):
         
         # --- Top Section: Options ---
         opt_panel = QFrame()
-        opt_panel.setStyleSheet("background: #f8f9fa; border: 1px solid #dadce0; border-radius: 16px;")
+        opt_panel.setStyleSheet(f"""
+            QFrame {{
+                background: {ThemeManager.get_theme()['COLOR_GLASS_WHITE']}; 
+                border: 0.5px solid {ThemeManager.get_theme()['COLOR_BORDER']}; 
+                border-radius: 20px;
+            }}
+        """)
         opt_layout = QHBoxLayout(opt_panel)
         opt_layout.setContentsMargins(20, 15, 20, 15)
         
@@ -1132,8 +1284,22 @@ class XiaomiNotificationFixWidget(XiaomiBaseWidget):
         
         # --- Bottom Section: Action ---
         self.btn_apply = QPushButton("🚀 Bắt đầu tối ưu ngay (Apply Fix)")
-        self.btn_apply.setFixedHeight(55)
-        self.btn_apply.setStyleSheet(ThemeManager.get_button_style("primary") + "font-size: 16px; border-radius: 16px;")
+        self.btn_apply.setFixedHeight(60)
+        self.btn_apply.setCursor(Qt.PointingHandCursor)
+        self.btn_apply.setStyleSheet(f"""
+            QPushButton {{
+                background: {ThemeManager.COLOR_ACCENT_GRADIENT};
+                color: white;
+                font-size: 16px;
+                font-weight: 800;
+                border-radius: 18px;
+                border: none;
+                font-family: {ThemeManager.FONT_FAMILY};
+            }}
+            QPushButton:hover {{
+                opacity: 0.95;
+            }}
+        """)
         self.btn_apply.clicked.connect(self.run_fix)
         layout.addWidget(self.btn_apply)
 

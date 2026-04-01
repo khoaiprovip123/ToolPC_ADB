@@ -36,18 +36,18 @@ class AboutPage(QWidget):
         content_layout_inner.setSpacing(20)
         
         # About Header
-        about_group = QGroupBox("Giới thiệu")
+        about_group = QGroupBox("Ứng dụng")
         about_group.setStyleSheet(self.get_group_style())
         about_layout = QVBoxLayout(about_group)
         
         about_text = QLabel(
-            "<h2>📱 Xiaomi ADB Commander</h2>"
-            f"<p><b>Phiên bản:</b> {__version__} (Latest)</p>"
-            "<p><b>Tác giả:</b> Van Khoai</p>"
-            "<p>Công cụ quản lý thiết bị Android toàn diện, tối ưu hóa đặc biệt cho Xiaomi/MIUI/HyperOS.</p>"
+            f"<h2 style='font-family: {ThemeManager.FONT_FAMILY}; color: {ThemeManager.COLOR_ACCENT};'>📱 Xiaomi ADB Commander</h2>"
+            f"<p style='font-family: {ThemeManager.FONT_FAMILY};'><b>Phiên bản:</b> {__version__} (Vibe 2.0 Edition)</p>"
+            f"<p style='font-family: {ThemeManager.FONT_FAMILY};'><b>Tác giả:</b> Van Khoai</p>"
+            f"<p style='font-family: {ThemeManager.FONT_FAMILY};'>Công cụ quản lý thiết bị Android toàn diện, tối ưu hóa đặc biệt cho Xiaomi/MIUI/HyperOS với ngôn ngữ thiết kế Precision Glass.</p>"
         )
         about_text.setWordWrap(True)
-        about_text.setStyleSheet(f"color: {ThemeManager.COLOR_TEXT_PRIMARY};")
+        about_text.setStyleSheet(f"color: {ThemeManager.get_theme()['COLOR_TEXT_PRIMARY']}; border: none; background: transparent;")
         about_layout.addWidget(about_text)
         content_layout_inner.addWidget(about_group)
         
@@ -125,20 +125,24 @@ class AboutPage(QWidget):
         content_layout.addWidget(scroll)
     
     def get_group_style(self):
-        """Get group box styling"""
+        """Get group box styling for Bento Card look"""
+        theme = ThemeManager.get_theme()
         return f"""
             QGroupBox {{
-                background-color: {ThemeManager.COLOR_GLASS_WHITE};
-                border: 1px solid rgba(0,0,0,0.1);
-                border-radius: {ThemeManager.RADIUS_BUTTON};
-                margin-top: 10px;
-                padding: 15px;
-                color: {ThemeManager.COLOR_TEXT_PRIMARY};
-                font-weight: bold;
+                background-color: {theme['COLOR_GLASS_WHITE']};
+                border: 0.5px solid {theme['COLOR_BORDER']};
+                border-radius: {ThemeManager.RADIUS_CARD};
+                margin-top: 15px;
+                padding: 20px;
+                color: {ThemeManager.COLOR_ACCENT};
+                font-family: {ThemeManager.FONT_FAMILY};
+                font-weight: 800;
+                font-size: 11px;
+                text-transform: uppercase;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
+                left: 20px;
                 padding: 0 5px;
             }}
         """

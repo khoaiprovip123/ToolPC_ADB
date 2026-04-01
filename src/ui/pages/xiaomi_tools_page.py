@@ -54,10 +54,11 @@ class XiaomiToolsPage(QWidget):
         title_lbl.setStyleSheet(f"color: {ThemeManager.COLOR_ACCENT}; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding-left: 10px; margin-bottom: 5px;")
         sidebar_layout.addWidget(title_lbl)
         
-        # Navigation List
+        # Navigation List (Unified Scroll)
         self.nav_list = QListWidget()
         self.nav_list.setFocusPolicy(Qt.NoFocus)
         self.nav_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.nav_list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.nav_list.setStyleSheet(self.get_nav_list_style())
         self.nav_list.currentRowChanged.connect(self.on_nav_changed)
         sidebar_layout.addWidget(self.nav_list)
@@ -85,17 +86,15 @@ class XiaomiToolsPage(QWidget):
             (BatteryHealthWidget, "Pin & Sức Khỏe", "🔋"),
         ]
         
-        # Populate — skip group headers (widget_class is None)
+        # Populate — include group headers (widget_class is None)
         for widget_class, title, icon in tools:
             if widget_class is None:
-                # Add group separator label
-                sep = QLabel(title)
-                sep.setStyleSheet(f"""
-                    color: {ThemeManager.COLOR_TEXT_SECONDARY};
-                    font-size: 10px; font-weight: 800;
-                    letter-spacing: 0.8px; padding: 14px 10px 4px 10px;
-                """)
-                sidebar_layout.addWidget(sep)
+                # Add group separator as a non-selectable item
+                item = QListWidgetItem(title)
+                item.setFlags(Qt.NoItemFlags) # Non-selectable, non-enabled
+                item.setSizeHint(QSize(0, 40))
+                item.setData(Qt.UserRole, "header") # Custom role for styling if needed
+                self.nav_list.addItem(item)
                 continue
             
             widget = widget_class(self.adb)
@@ -106,8 +105,9 @@ class XiaomiToolsPage(QWidget):
             self.stack.addWidget(widget)
             
             # Add to nav
-            item = QListWidgetItem(f"{icon}  {title}")
-            item.setSizeHint(QSize(0, 44))
+            item = QListWidgetItem(f"   {icon}  {title}")
+            item.setSizeHint(QSize(0, 48))
+            item.setData(Qt.UserRole, "item")
             self.nav_list.addItem(item)
             
         # Select first
@@ -124,10 +124,14 @@ class XiaomiToolsPage(QWidget):
         
     def get_sidebar_style(self):
         theme = ThemeManager.get_theme()
+        # GLASS ISLANDS: Translucent background with margin
         return f"""
             QFrame {{
-                background-color: {theme['COLOR_BG_SECONDARY']};
-                border-right: 1px solid {theme['COLOR_BORDER']};
+                background-color: rgba(20, 20, 20, 0.15); /* Neutral Glass */
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 28px;
+                margin: 12px;
+                margin-right: 2px;
             }}
         """
         
@@ -138,33 +142,52 @@ class XiaomiToolsPage(QWidget):
                 background: transparent;
                 border: none;
                 outline: none;
+                padding-top: 10px;
             }}
             QListWidget::item {{
+                height: 48px;
                 background: transparent;
-                border-radius: 12px;
-                padding: 12px 15px;
-                margin-bottom: 4px;
+                border-radius: 14px;
+                margin-bottom: 6px;
+                margin-left: 8px;
+                margin-right: 8px;
                 color: {theme['COLOR_TEXT_SECONDARY']};
                 font-family: {ThemeManager.FONT_FAMILY};
                 font-size: 14px;
-                font-weight: 500;
-                border: 1px solid transparent;
+                font-weight: 600;
             }}
             QListWidget::item:hover {{
-                background: {theme['COLOR_GLASS_HOVER']};
+                background: rgba(255, 255, 255, 0.08);
                 color: {theme['COLOR_TEXT_PRIMARY']};
             }}
             QListWidget::item:selected {{
-                background-color: {theme['COLOR_GLASS_WHITE']};
+                background: {ThemeManager.GRADIENT_HYPER_BLUE};
+                color: white;
+                font-weight: 800;
+            }}
+            /* Specific style for headers via flags (they won't be selectable) */
+            QListWidget::item:disabled {{
                 color: {ThemeManager.COLOR_ACCENT};
-                font-weight: 700;
-                border: 1px solid {theme['COLOR_BORDER_LIGHT']};
+                font-size: 11px;
+                font-weight: 900;
+                letter-spacing: 1.2px;
+                padding-top: 15px;
+                margin-bottom: 0px;
+                background: transparent;
             }}
         """
 
     def on_nav_changed(self, index):
         if index >= 0:
-            self.stack.setCurrentIndex(index)
+            item = self.nav_list.item(index)
+            # Only switch stack if it's an "item", not a "header"
+            if item and item.data(Qt.UserRole) == "item":
+                # Find the actual widget index (ignoring headers)
+                widget_idx = 0
+                for i in range(index):
+                    if self.nav_list.item(i).data(Qt.UserRole) == "item":
+                        widget_idx += 1
+                self.stack.setCurrentIndex(widget_idx)
     
     def reset(self):
         """Reset only the active widget for performance; others reset lazily when navigated to"""
